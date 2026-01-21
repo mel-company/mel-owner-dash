@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,11 +16,11 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const success = await login(username, password);
+      const success = await login(email, password);
       if (success) {
         navigate('/dashboard');
       } else {
-        setError('اسم المستخدم أو كلمة المرور غير صحيحة');
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
       }
     } catch (err) {
       setError('حدث خطأ أثناء تسجيل الدخول');
@@ -51,21 +51,21 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="username" className="block text-sm font-semibold text-gray-700 mb-2">
-              اسم المستخدم
+            <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+              البريد الإلكتروني
             </label>
             <div className="relative">
               <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3.5 pr-12 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-gray-50 focus:bg-white"
-                placeholder="أدخل اسم المستخدم"
+                placeholder="أدخل البريد الإلكتروني"
               />
               <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400">
-                👤
+                📧
               </span>
             </div>
           </div>
@@ -117,21 +117,10 @@ const Login = () => {
         </form>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-center text-sm font-semibold text-gray-600 mb-3">بيانات تجريبية:</p>
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between p-2 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg">
-              <span className="font-medium text-gray-700">المالك</span>
-              <span className="text-gray-600 font-mono">owner / owner123</span>
-            </div>
-            <div className="flex items-center justify-between p-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
-              <span className="font-medium text-gray-700">الموظف</span>
-              <span className="text-gray-600 font-mono">employee / emp123</span>
-            </div>
-            <div className="flex items-center justify-between p-2 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
-              <span className="font-medium text-gray-700">الدعم</span>
-              <span className="text-gray-600 font-mono">support / support123</span>
-            </div>
-          </div>
+          <p className="text-center text-sm font-semibold text-gray-600 mb-3">ملاحظة:</p>
+          <p className="text-center text-xs text-gray-500">
+            يرجى استخدام البريد الإلكتروني وكلمة المرور المسجلة في النظام
+          </p>
         </div>
       </div>
     </div>

@@ -1,14 +1,38 @@
 import { useAuth } from '../contexts/AuthContext';
+import {
+  Store,
+  Users,
+  Wallet,
+  Ticket,
+  FileText,
+  Package,
+  Store as StoreIcon,
+  DollarSign,
+  UserPlus,
+  CheckCircle,
+  TrendingUp,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();
 
-  const stats = [
+  const stats: Array<{
+    title: string;
+    value: string;
+    change: string;
+    icon: LucideIcon;
+    gradient: string;
+    bgGradient: string;
+    changeColor: string;
+    currency?: string;
+    borderColor: string;
+  }> = [
     {
       title: 'إجمالي المتاجر',
       value: '24',
       change: '+12%',
-      icon: '🏪',
+      icon: Store,
       gradient: 'from-blue-500 to-cyan-500',
       bgGradient: 'from-blue-50 to-cyan-50',
       changeColor: 'text-green-600',
@@ -18,7 +42,7 @@ const Dashboard = () => {
       title: 'الموظفين النشطين',
       value: '15',
       change: '+3',
-      icon: '👥',
+      icon: Users,
       gradient: 'from-green-500 to-emerald-500',
       bgGradient: 'from-green-50 to-emerald-50',
       changeColor: 'text-green-600',
@@ -28,7 +52,7 @@ const Dashboard = () => {
       title: 'إجمالي الإيرادات',
       value: '125,000',
       change: '+8%',
-      icon: '💰',
+      icon: Wallet,
       gradient: 'from-purple-500 to-pink-500',
       bgGradient: 'from-purple-50 to-pink-50',
       changeColor: 'text-green-600',
@@ -39,7 +63,7 @@ const Dashboard = () => {
       title: 'التذاكر المفتوحة',
       value: '8',
       change: '-4',
-      icon: '🎫',
+      icon: Ticket,
       gradient: 'from-orange-500 to-red-500',
       bgGradient: 'from-orange-50 to-red-50',
       changeColor: 'text-red-600',
@@ -49,7 +73,7 @@ const Dashboard = () => {
       title: 'الاشتراكات النشطة',
       value: '18',
       change: '+5',
-      icon: '📋',
+      icon: FileText,
       gradient: 'from-indigo-500 to-purple-500',
       bgGradient: 'from-indigo-50 to-purple-50',
       changeColor: 'text-green-600',
@@ -59,7 +83,7 @@ const Dashboard = () => {
       title: 'الطلبات اليوم',
       value: '142',
       change: '+23%',
-      icon: '📦',
+      icon: Package,
       gradient: 'from-pink-500 to-rose-500',
       bgGradient: 'from-pink-50 to-rose-50',
       changeColor: 'text-green-600',
@@ -67,14 +91,21 @@ const Dashboard = () => {
     },
   ];
 
-  const recentActivity = [
+  const recentActivity: Array<{
+    id: number;
+    action: string;
+    time: string;
+    type: string;
+    color: string;
+    icon: LucideIcon;
+  }> = [
     { 
       id: 1, 
       action: 'متجر جديد تم إنشاؤه', 
       time: 'منذ ساعتين', 
       type: 'store', 
       color: 'bg-blue-100 text-blue-700',
-      icon: '🏪'
+      icon: StoreIcon
     },
     { 
       id: 2, 
@@ -82,7 +113,7 @@ const Dashboard = () => {
       time: 'منذ 3 ساعات', 
       type: 'payment', 
       color: 'bg-green-100 text-green-700',
-      icon: '💰'
+      icon: DollarSign
     },
     { 
       id: 3, 
@@ -90,7 +121,7 @@ const Dashboard = () => {
       time: 'منذ 5 ساعات', 
       type: 'employee', 
       color: 'bg-purple-100 text-purple-700',
-      icon: '👥'
+      icon: UserPlus
     },
     { 
       id: 4, 
@@ -98,7 +129,7 @@ const Dashboard = () => {
       time: 'منذ يوم', 
       type: 'support', 
       color: 'bg-orange-100 text-orange-700',
-      icon: '🎫'
+      icon: CheckCircle
     },
   ];
 
@@ -116,7 +147,7 @@ const Dashboard = () => {
           <div className="flex-1 min-w-[280px]">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
-                <span className="text-3xl">👋</span>
+                <Users className="h-8 w-8 text-white" />
               </div>
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold mb-1">
@@ -153,8 +184,8 @@ const Dashboard = () => {
             className={`bg-gradient-to-br ${stat.bgGradient} rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-2 ${stat.borderColor} group`}
           >
             <div className="flex items-start justify-between mb-4">
-              <div className={`w-16 h-16 bg-gradient-to-br ${stat.gradient} rounded-2xl flex items-center justify-center text-3xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                {stat.icon}
+              <div className={`w-16 h-16 bg-gradient-to-br ${stat.gradient} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                <stat.icon className="h-8 w-8 text-white" />
               </div>
               <div className="text-left">
                 <span className={`text-sm font-bold px-3 py-1.5 rounded-lg bg-white/80 backdrop-blur-sm ${stat.changeColor} shadow-sm`}>
@@ -184,7 +215,7 @@ const Dashboard = () => {
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-xl">📊</span>
+              <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-800">النشاطات الأخيرة</h2>
@@ -204,8 +235,8 @@ const Dashboard = () => {
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="flex items-center gap-4 flex-1">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${activity.color} shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                  {activity.icon}
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${activity.color} shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                  <activity.icon className="h-6 w-6" />
                 </div>
                 <div className="flex-1">
                   <span className="text-gray-800 font-bold block mb-1 text-lg">

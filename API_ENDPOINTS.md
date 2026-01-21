@@ -719,6 +719,375 @@ GET /api/payment/methods/stats
 
 ---
 
+## 🔧 System APIs
+
+### System Authentication Endpoints
+
+### 50. تسجيل الدخول (System)
+```
+POST /system-user-auth/login
+```
+**Request Body:**
+```json
+{
+  "email": "string",
+  "password": "string"
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "token": "jwt_token_here",
+  "user": {
+    "id": "string",
+    "username": "string",
+    "name": "string",
+    "role": "owner" | "employee" | "support",
+    "email": "string"
+  }
+}
+```
+
+### 51. تسجيل الخروج (System)
+```
+POST /system-user-auth/logout
+```
+**Headers:** `Authorization: Bearer {token}`
+**Response:**
+```json
+{
+  "success": true,
+  "message": "تم تسجيل الخروج بنجاح"
+}
+```
+
+---
+
+### System Store Endpoints
+
+### 52. قائمة المتاجر (System)
+```
+GET /stores/system
+```
+**Headers:** `Authorization: Bearer {token}`
+**Response:**
+```json
+{
+  "stores": [
+    {
+      "id": "string",
+      "name": "string",
+      "owner": "string",
+      "ownerEmail": "string",
+      "subscriptionId": "string",
+      "subscriptionPlan": "Premium" | "Pro" | "Basic",
+      "status": "active" | "inactive" | "expired",
+      "revenue": 45000,
+      "orders": 234,
+      "expiryDate": "2024-12-31",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-11-15T00:00:00Z"
+    }
+  ],
+  "total": 24
+}
+```
+
+### 53. إنشاء متجر (System)
+```
+POST /stores/system
+```
+**Headers:** `Authorization: Bearer {token}`
+**Request Body:**
+```json
+{
+  "name": "string",
+  "owner": "string",
+  "ownerEmail": "string",
+  "subscriptionPlanId": "string",
+  "status": "active"
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "name": "string",
+    "owner": "string",
+    "ownerEmail": "string",
+    "subscriptionId": "string",
+    "status": "active",
+    "createdAt": "2024-01-01T00:00:00Z"
+  }
+}
+```
+
+### 54. تفاصيل متجر (System)
+```
+GET /stores/system/{id}
+```
+**Headers:** `Authorization: Bearer {token}`
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "name": "string",
+    "owner": "string",
+    "ownerEmail": "string",
+    "subscriptionId": "string",
+    "subscriptionPlan": "Premium" | "Pro" | "Basic",
+    "status": "active" | "inactive" | "expired",
+    "revenue": 45000,
+    "orders": 234,
+    "expiryDate": "2024-12-31",
+    "createdAt": "2024-01-01T00:00:00Z",
+    "updatedAt": "2024-11-15T00:00:00Z"
+  }
+}
+```
+
+### 55. تحديث متجر (System)
+```
+PUT /stores/system/{id}
+```
+**Headers:** `Authorization: Bearer {token}`
+**Request Body:**
+```json
+{
+  "name": "string",
+  "owner": "string",
+  "ownerEmail": "string",
+  "subscriptionPlanId": "string",
+  "status": "active" | "inactive"
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "name": "string",
+    "owner": "string",
+    "ownerEmail": "string",
+    "status": "active",
+    "updatedAt": "2024-11-15T00:00:00Z"
+  },
+  "message": "تم تحديث المتجر بنجاح"
+}
+```
+
+### 56. حذف متجر (System)
+```
+DELETE /stores/system/{id}
+```
+**Headers:** `Authorization: Bearer {token}`
+**Response:**
+```json
+{
+  "success": true,
+  "message": "تم حذف المتجر بنجاح"
+}
+```
+
+---
+
+### System Employees
+
+*Note: System employee endpoints will be added here when available*
+
+---
+
+### Plan Endpoints
+
+*Note: Plan endpoints will be added here when available*
+
+---
+
+### System Subscription Endpoints
+
+### 57. جميع الاشتراكات (System)
+```
+GET /subscription/system/all
+```
+**Headers:** `Authorization: Bearer {token}`
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "string",
+      "storeId": "string",
+      "storeName": "string",
+      "planId": "string",
+      "planName": "string",
+      "startDate": "2024-01-01",
+      "endDate": "2024-12-31",
+      "status": "active" | "expired" | "cancelled" | "paused",
+      "autoRenew": true,
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+### 58. البحث في الاشتراكات (System)
+```
+PUT /subscription/system/search
+```
+**Headers:** `Authorization: Bearer {token}`
+**Request Body:**
+```json
+{
+  "storeId": "string",
+  "planId": "string",
+  "status": "active" | "expired" | "cancelled" | "paused",
+  "dateFrom": "2024-01-01",
+  "dateTo": "2024-12-31"
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "string",
+      "storeId": "string",
+      "storeName": "string",
+      "planId": "string",
+      "planName": "string",
+      "startDate": "2024-01-01",
+      "endDate": "2024-12-31",
+      "status": "active",
+      "autoRenew": true
+    }
+  ]
+}
+```
+
+### 59. تحديث اشتراك (System)
+```
+PUT /subscription/system/{id}
+```
+**Headers:** `Authorization: Bearer {token}`
+**Request Body:**
+```json
+{
+  "planId": "string",
+  "startDate": "2024-01-01",
+  "endDate": "2024-12-31",
+  "autoRenew": true
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "storeId": "string",
+    "storeName": "string",
+    "planId": "string",
+    "planName": "string",
+    "startDate": "2024-01-01",
+    "endDate": "2024-12-31",
+    "status": "active",
+    "autoRenew": true,
+    "updatedAt": "2024-11-15T00:00:00Z"
+  },
+  "message": "تم تحديث الاشتراك بنجاح"
+}
+```
+
+### 60. إيقاف الاشتراك مؤقتاً (System)
+```
+PUT /subscription/system/{id}/pause
+```
+**Headers:** `Authorization: Bearer {token}`
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "status": "paused",
+    "pausedAt": "2024-11-15T00:00:00Z"
+  },
+  "message": "تم إيقاف الاشتراك مؤقتاً"
+}
+```
+
+### 61. استئناف الاشتراك (System)
+```
+PUT /subscription/system/{id}/resume
+```
+**Headers:** `Authorization: Bearer {token}`
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "status": "active",
+    "resumedAt": "2024-11-15T00:00:00Z"
+  },
+  "message": "تم استئناف الاشتراك بنجاح"
+}
+```
+
+### 62. إلغاء الاشتراك (System)
+```
+PUT /subscription/system/{id}/cancel
+```
+**Headers:** `Authorization: Bearer {token}`
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "status": "cancelled",
+    "cancelledAt": "2024-11-15T00:00:00Z"
+  },
+  "message": "تم إلغاء الاشتراك بنجاح"
+}
+```
+
+### 63. تجديد الاشتراك (System)
+```
+PUT /subscription/system/{id}/renew
+```
+**Headers:** `Authorization: Bearer {token}`
+**Request Body (Optional):**
+```json
+{
+  "duration": "monthly" | "yearly"
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "status": "active",
+    "startDate": "2024-11-15",
+    "endDate": "2024-12-15",
+    "renewedAt": "2024-11-15T00:00:00Z"
+  },
+  "message": "تم تجديد الاشتراك بنجاح"
+}
+```
+
+---
+
 ## 🔒 Authorization & Permissions
 
 ### Roles:

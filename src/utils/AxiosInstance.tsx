@@ -1,8 +1,11 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
 // Create an axios instance with Vite environment variables
+// Note: baseURL should NOT include /api/v1 if endpoints already include it
+// Or baseURL should include /api/v1 and endpoints should NOT include it
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1',
+  baseURL: baseURL.endsWith('/api/v1') ? baseURL : `${baseURL}/api/v1`,
   timeout: 30000, // 30 seconds
   headers: {
     'Content-Type': 'application/json',
@@ -18,6 +21,14 @@ axiosInstance.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Log request for debugging
+    console.log('API Request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+    });
     
     return config;
   },
@@ -55,7 +66,12 @@ axiosInstance.interceptors.response.use(
 
         case 404:
           // Not Found
-          console.error('Resource not found:', data?.error?.message || 'The requested resource was not found');
+          console.error('Resource not found (404):', {
+            url: error.config?.url,
+            baseURL: error.config?.baseURL,
+            fullURL: `${error.config?.baseURL}${error.config?.url}`,
+            response: data,
+          });
           break;
 
         case 500:

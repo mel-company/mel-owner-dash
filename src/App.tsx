@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { SidebarProvider } from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
 import DashboardLayout from './components/DashboardLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Stores from './pages/Stores';
+import StoreDetails from './pages/StoreDetails';
 import Employees from './pages/Employees';
 import Accounting from './pages/Accounting';
 import SubscriptionPlans from './pages/SubscriptionPlans';
@@ -22,7 +24,9 @@ function App() {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <DashboardLayout />
+                <SidebarProvider>
+                  <DashboardLayout />
+                </SidebarProvider>
               </ProtectedRoute>
             }
           >
@@ -32,6 +36,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['owner', 'employee']}>
                   <Stores />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="stores/:id"
+              element={
+                <ProtectedRoute requiredRoles={['owner', 'employee']}>
+                  <StoreDetails />
                 </ProtectedRoute>
               }
             />
