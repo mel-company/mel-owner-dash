@@ -20,6 +20,13 @@ axiosInstance.interceptors.request.use(
     
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('✅ Token added to request:', {
+        url: config.url,
+        hasToken: true,
+        tokenLength: token.length,
+      });
+    } else {
+      console.warn('⚠️ No token found in localStorage for request:', config.url);
     }
     
     // Log request for debugging
@@ -28,6 +35,8 @@ axiosInstance.interceptors.request.use(
       url: config.url,
       baseURL: config.baseURL,
       fullURL: `${config.baseURL}${config.url}`,
+      hasToken: !!token,
+      withCredentials: config.withCredentials,
     });
     
     return config;
@@ -52,8 +61,14 @@ axiosInstance.interceptors.response.use(
       switch (status) {
         case 401:
           // Unauthorized - Clear token and redirect to login
+          console.error('❌ Unauthorized (401):', {
+            message: data?.error?.message || 'Authentication failed',
+            url: error.config?.url,
+            hasToken: !!localStorage.getItem('token'),
+          });
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          localStorage.removeItem('refreshToken');
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';
           }
@@ -108,7 +123,7 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
-export interface PaginatedResponse<T = unknown> { // eslint-disable-line @typescript-eslint/no-explicit-any
+export interface PaginatedResponse<T = unknown> { 
   data: T[];
   pagination: {
     page: number;

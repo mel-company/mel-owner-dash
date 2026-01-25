@@ -1,11 +1,62 @@
 import axiosInstance from '../utils/AxiosInstance';
 
+// Enums as const objects
+export const TicketPriorityEnum = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export const TicketStatusEnum = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  ON_HOLD: 'ON_HOLD',
+  RESOLVED: 'RESOLVED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const TicketTypeEnum = {
+  BUG: 'BUG',
+  FEATURE_REQUEST: 'FEATURE_REQUEST',
+  QUESTION: 'QUESTION',
+  SUPPORT: 'SUPPORT',
+  FEEDBACK: 'FEEDBACK',
+  REPORT: 'REPORT',
+  OTHER: 'OTHER',
+} as const;
+
+export const DepartmentEnum = {
+  FINANCE: 'FINANCE',
+  MARKETING: 'MARKETING',
+  SALES: 'SALES',
+  CUSTOMER_SERVICE: 'CUSTOMER_SERVICE',
+  IT: 'IT',
+  OTHER: 'OTHER',
+} as const;
+
+export const TicketMessageSenderType = {
+  SYSTEM_USER: 'SYSTEM_USER',
+  STORE_USER: 'STORE_USER',
+  USER: 'USER',
+  CUSTOMER: 'CUSTOMER',
+} as const;
+
+export type TicketPriorityEnum = typeof TicketPriorityEnum[keyof typeof TicketPriorityEnum];
+export type TicketStatusEnum = typeof TicketStatusEnum[keyof typeof TicketStatusEnum];
+export type TicketTypeEnum = typeof TicketTypeEnum[keyof typeof TicketTypeEnum];
+export type DepartmentEnum = typeof DepartmentEnum[keyof typeof DepartmentEnum];
+export type TicketMessageSenderType = typeof TicketMessageSenderType[keyof typeof TicketMessageSenderType];
+
 export interface SupportTicket {
   id: string;
   title: string;
   description: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'CANCELLED';
-  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: TicketStatusEnum;
+  priority?: TicketPriorityEnum;
+  type?: TicketTypeEnum;
+  department?: DepartmentEnum;
   category?: string;
   createdAt: string;
   updatedAt: string;
@@ -23,7 +74,9 @@ export interface TicketsListResponse {
 export interface CreateTicketRequest {
   title: string;
   description: string;
-  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  priority?: TicketPriorityEnum;
+  type?: TicketTypeEnum;
+  department?: DepartmentEnum;
   category?: string;
   storeId?: string;
 }
@@ -44,7 +97,7 @@ export const supportTicketsService = {
       '/support-ticket/system',
       ticketData
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 
   /**
@@ -60,7 +113,7 @@ export const supportTicketsService = {
     const url = `/support-ticket/system${queryString ? `?${queryString}` : ''}`;
 
     const response = await axiosInstance.get<TicketsListResponse>(url);
-    return response as unknown as TicketsListResponse; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as TicketsListResponse;
   },
 
   /**
@@ -71,7 +124,7 @@ export const supportTicketsService = {
     const response = await axiosInstance.get<SupportTicket>(
       `/support-ticket/system/${id}`
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 
   /**
@@ -90,7 +143,7 @@ export const supportTicketsService = {
     const response = await axiosInstance.put<SupportTicket>(
       `/support-ticket/system/${id}/cancel`
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 
   /**
@@ -101,7 +154,7 @@ export const supportTicketsService = {
     const response = await axiosInstance.put<SupportTicket>(
       `/support-ticket/system/${id}/close`
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 
   /**
@@ -112,7 +165,7 @@ export const supportTicketsService = {
     const response = await axiosInstance.put<SupportTicket>(
       `/support-ticket/system/${id}/resolve`
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 
   // ========== Store User Tickets ==========
@@ -126,7 +179,7 @@ export const supportTicketsService = {
       '/support-ticket/store',
       ticketData
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 
   /**
@@ -142,7 +195,7 @@ export const supportTicketsService = {
     const url = `/support-ticket/store${queryString ? `?${queryString}` : ''}`;
 
     const response = await axiosInstance.get<TicketsListResponse>(url);
-    return response as unknown as TicketsListResponse; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as TicketsListResponse;
   },
 
   /**
@@ -153,7 +206,7 @@ export const supportTicketsService = {
     const response = await axiosInstance.get<SupportTicket>(
       `/support-ticket/store/${id}`
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 
   /**
@@ -172,7 +225,7 @@ export const supportTicketsService = {
     const response = await axiosInstance.put<SupportTicket>(
       `/support-ticket/store/${id}/cancel`
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 
   /**
@@ -183,6 +236,6 @@ export const supportTicketsService = {
     const response = await axiosInstance.put<SupportTicket>(
       `/support-ticket/store/${id}/close`
     );
-    return response as unknown as SupportTicket; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SupportTicket;
   },
 };

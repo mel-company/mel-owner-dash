@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
-import { supportTicketsService, type SupportTicket, type CreateTicketRequest } from '../services/supportTicketsService';
+import {
+  supportTicketsService,
+  type SupportTicket,
+  type CreateTicketRequest,
+  TicketPriorityEnum,
+  TicketStatusEnum,
+  TicketTypeEnum,
+  DepartmentEnum,
+} from '../services/supportTicketsService';
 
 const Support = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -17,8 +25,9 @@ const Support = () => {
   const [formData, setFormData] = useState<CreateTicketRequest>({
     title: '',
     description: '',
-    priority: 'MEDIUM',
-    category: '',
+    priority: TicketPriorityEnum.MEDIUM,
+    type: TicketTypeEnum.SUPPORT,
+    department: DepartmentEnum.CUSTOMER_SERVICE,
   });
 
   useEffect(() => {
@@ -79,18 +88,19 @@ const Support = () => {
     setFormData({
       title: '',
       description: '',
-      priority: 'MEDIUM',
-      category: '',
+      priority: TicketPriorityEnum.MEDIUM,
+      type: TicketTypeEnum.SUPPORT,
+      department: DepartmentEnum.CUSTOMER_SERVICE,
     });
   };
 
   const getPriorityColor = (priority: string | undefined) => {
     if (!priority) return 'bg-gray-100 text-gray-700';
     const colors: { [key: string]: string } = {
-      'URGENT': 'bg-red-100 text-red-700',
-      'HIGH': 'bg-orange-100 text-orange-700',
-      'MEDIUM': 'bg-yellow-100 text-yellow-700',
-      'LOW': 'bg-green-100 text-green-700',
+      [TicketPriorityEnum.CRITICAL]: 'bg-red-100 text-red-700',
+      [TicketPriorityEnum.HIGH]: 'bg-orange-100 text-orange-700',
+      [TicketPriorityEnum.MEDIUM]: 'bg-yellow-100 text-yellow-700',
+      [TicketPriorityEnum.LOW]: 'bg-green-100 text-green-700',
     };
     return colors[priority] || 'bg-gray-100 text-gray-700';
   };
@@ -98,11 +108,12 @@ const Support = () => {
   const getStatusColor = (status: string | undefined) => {
     if (!status) return 'bg-gray-100 text-gray-700';
     const colors: { [key: string]: string } = {
-      'OPEN': 'bg-blue-100 text-blue-700',
-      'IN_PROGRESS': 'bg-yellow-100 text-yellow-700',
-      'RESOLVED': 'bg-green-100 text-green-700',
-      'CLOSED': 'bg-gray-100 text-gray-700',
-      'CANCELLED': 'bg-red-100 text-red-700',
+      [TicketStatusEnum.OPEN]: 'bg-blue-100 text-blue-700',
+      [TicketStatusEnum.IN_PROGRESS]: 'bg-yellow-100 text-yellow-700',
+      [TicketStatusEnum.ON_HOLD]: 'bg-purple-100 text-purple-700',
+      [TicketStatusEnum.RESOLVED]: 'bg-green-100 text-green-700',
+      [TicketStatusEnum.CLOSED]: 'bg-gray-100 text-gray-700',
+      [TicketStatusEnum.CANCELLED]: 'bg-red-100 text-red-700',
     };
     return colors[status] || 'bg-gray-100 text-gray-700';
   };
@@ -110,10 +121,10 @@ const Support = () => {
   const getPriorityText = (priority: string | undefined) => {
     if (!priority) return 'غير محدد';
     const priorityMap: { [key: string]: string } = {
-      'URGENT': 'عاجل',
-      'HIGH': 'عالية',
-      'MEDIUM': 'متوسطة',
-      'LOW': 'منخفضة',
+      [TicketPriorityEnum.CRITICAL]: 'حرج',
+      [TicketPriorityEnum.HIGH]: 'عالية',
+      [TicketPriorityEnum.MEDIUM]: 'متوسطة',
+      [TicketPriorityEnum.LOW]: 'منخفضة',
     };
     return priorityMap[priority] || priority;
   };
@@ -121,13 +132,41 @@ const Support = () => {
   const getStatusText = (status: string | undefined) => {
     if (!status) return 'غير محدد';
     const statusMap: { [key: string]: string } = {
-      'OPEN': 'مفتوحة',
-      'IN_PROGRESS': 'قيد المعالجة',
-      'RESOLVED': 'محلولة',
-      'CLOSED': 'مغلقة',
-      'CANCELLED': 'ملغاة',
+      [TicketStatusEnum.OPEN]: 'مفتوحة',
+      [TicketStatusEnum.IN_PROGRESS]: 'قيد المعالجة',
+      [TicketStatusEnum.ON_HOLD]: 'معلقة',
+      [TicketStatusEnum.RESOLVED]: 'محلولة',
+      [TicketStatusEnum.CLOSED]: 'مغلقة',
+      [TicketStatusEnum.CANCELLED]: 'ملغاة',
     };
     return statusMap[status] || status;
+  };
+
+  const getTypeText = (type: string | undefined) => {
+    if (!type) return 'غير محدد';
+    const typeMap: { [key: string]: string } = {
+      [TicketTypeEnum.BUG]: 'خطأ',
+      [TicketTypeEnum.FEATURE_REQUEST]: 'طلب ميزة',
+      [TicketTypeEnum.QUESTION]: 'سؤال',
+      [TicketTypeEnum.SUPPORT]: 'دعم',
+      [TicketTypeEnum.FEEDBACK]: 'ملاحظات',
+      [TicketTypeEnum.REPORT]: 'تقرير',
+      [TicketTypeEnum.OTHER]: 'أخرى',
+    };
+    return typeMap[type] || type;
+  };
+
+  const getDepartmentText = (department: string | undefined) => {
+    if (!department) return 'غير محدد';
+    const deptMap: { [key: string]: string } = {
+      [DepartmentEnum.FINANCE]: 'المالية',
+      [DepartmentEnum.MARKETING]: 'التسويق',
+      [DepartmentEnum.SALES]: 'المبيعات',
+      [DepartmentEnum.CUSTOMER_SERVICE]: 'خدمة العملاء',
+      [DepartmentEnum.IT]: 'تقنية المعلومات',
+      [DepartmentEnum.OTHER]: 'أخرى',
+    };
+    return deptMap[department] || department;
   };
 
   const filteredTickets = tickets.filter(ticket => {
@@ -140,9 +179,9 @@ const Support = () => {
 
   const stats = {
     total: tickets.length,
-    open: tickets.filter(t => t.status === 'OPEN').length,
-    inProgress: tickets.filter(t => t.status === 'IN_PROGRESS').length,
-    closed: tickets.filter(t => t.status === 'CLOSED' || t.status === 'RESOLVED').length,
+    open: tickets.filter(t => t.status === TicketStatusEnum.OPEN).length,
+    inProgress: tickets.filter(t => t.status === TicketStatusEnum.IN_PROGRESS).length,
+    closed: tickets.filter(t => t.status === TicketStatusEnum.CLOSED || t.status === TicketStatusEnum.RESOLVED).length,
   };
 
   if (loading && tickets.length === 0) {
@@ -204,11 +243,12 @@ const Support = () => {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="">جميع الحالات</option>
-            <option value="OPEN">مفتوحة</option>
-            <option value="IN_PROGRESS">قيد المعالجة</option>
-            <option value="RESOLVED">محلولة</option>
-            <option value="CLOSED">مغلقة</option>
-            <option value="CANCELLED">ملغاة</option>
+            <option value={TicketStatusEnum.OPEN}>مفتوحة</option>
+            <option value={TicketStatusEnum.IN_PROGRESS}>قيد المعالجة</option>
+            <option value={TicketStatusEnum.ON_HOLD}>معلقة</option>
+            <option value={TicketStatusEnum.RESOLVED}>محلولة</option>
+            <option value={TicketStatusEnum.CLOSED}>مغلقة</option>
+            <option value={TicketStatusEnum.CANCELLED}>ملغاة</option>
           </select>
           <select
             value={filters.priority}
@@ -216,10 +256,10 @@ const Support = () => {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="">جميع الأولويات</option>
-            <option value="URGENT">عاجل</option>
-            <option value="HIGH">عالية</option>
-            <option value="MEDIUM">متوسطة</option>
-            <option value="LOW">منخفضة</option>
+            <option value={TicketPriorityEnum.CRITICAL}>حرج</option>
+            <option value={TicketPriorityEnum.HIGH}>عالية</option>
+            <option value={TicketPriorityEnum.MEDIUM}>متوسطة</option>
+            <option value={TicketPriorityEnum.LOW}>منخفضة</option>
           </select>
           <input
             type="text"
@@ -248,7 +288,8 @@ const Support = () => {
                 <tr>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">رقم التذكرة</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">العنوان</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الفئة</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">النوع</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">القسم</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الأولوية</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">تاريخ الإنشاء</th>
@@ -264,7 +305,12 @@ const Support = () => {
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{ticket.title}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">{ticket.category || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                      {ticket.type ? getTypeText(ticket.type) : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                      {ticket.department ? getDepartmentText(ticket.department) : '-'}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
                         {getPriorityText(ticket.priority)}
@@ -285,7 +331,7 @@ const Support = () => {
                       >
                         عرض
                       </button>
-                      {ticket.status === 'OPEN' && (
+                      {ticket.status === TicketStatusEnum.OPEN && (
                         <>
                           <button
                             onClick={() => handleCloseTicket(ticket.id)}
@@ -341,24 +387,46 @@ const Support = () => {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">الأولوية</label>
                 <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+                  value={formData.priority || TicketPriorityEnum.MEDIUM}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as TicketPriorityEnum })}
                   className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 >
-                  <option value="LOW">منخفضة</option>
-                  <option value="MEDIUM">متوسطة</option>
-                  <option value="HIGH">عالية</option>
-                  <option value="URGENT">عاجل</option>
+                  <option value={TicketPriorityEnum.LOW}>منخفضة</option>
+                  <option value={TicketPriorityEnum.MEDIUM}>متوسطة</option>
+                  <option value={TicketPriorityEnum.HIGH}>عالية</option>
+                  <option value={TicketPriorityEnum.CRITICAL}>حرج</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">الفئة</label>
-                <input
-                  type="text"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">نوع التذكرة</label>
+                <select
+                  value={formData.type || TicketTypeEnum.SUPPORT}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value as TicketTypeEnum })}
                   className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
+                >
+                  <option value={TicketTypeEnum.BUG}>خطأ</option>
+                  <option value={TicketTypeEnum.FEATURE_REQUEST}>طلب ميزة</option>
+                  <option value={TicketTypeEnum.QUESTION}>سؤال</option>
+                  <option value={TicketTypeEnum.SUPPORT}>دعم</option>
+                  <option value={TicketTypeEnum.FEEDBACK}>ملاحظات</option>
+                  <option value={TicketTypeEnum.REPORT}>تقرير</option>
+                  <option value={TicketTypeEnum.OTHER}>أخرى</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">القسم</label>
+                <select
+                  value={formData.department || DepartmentEnum.CUSTOMER_SERVICE}
+                  onChange={(e) => setFormData({ ...formData, department: e.target.value as DepartmentEnum })}
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                >
+                  <option value={DepartmentEnum.FINANCE}>المالية</option>
+                  <option value={DepartmentEnum.MARKETING}>التسويق</option>
+                  <option value={DepartmentEnum.SALES}>المبيعات</option>
+                  <option value={DepartmentEnum.CUSTOMER_SERVICE}>خدمة العملاء</option>
+                  <option value={DepartmentEnum.IT}>تقنية المعلومات</option>
+                  <option value={DepartmentEnum.OTHER}>أخرى</option>
+                </select>
               </div>
               <div className="flex gap-4 pt-4">
                 <button

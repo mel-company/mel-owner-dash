@@ -1,5 +1,14 @@
 import axiosInstance from '../utils/AxiosInstance';
 
+// Employee Role Enum
+export const EmployeeRoleEnum = {
+  EMPLOYEE: 'EMPLOYEE',
+  DEVELOPER: 'DEVELOPER',
+  SUPPORT: 'SUPPORT',
+} as const;
+
+export type EmployeeRoleEnum = typeof EmployeeRoleEnum[keyof typeof EmployeeRoleEnum];
+
 export interface SystemEmployee {
   id: string;
   name: string;
@@ -22,7 +31,7 @@ export interface CreateEmployeeRequest {
   name: string;
   email: string;
   phone?: string;
-  role?: string;
+  role?: EmployeeRoleEnum;
   password?: string;
 }
 
@@ -30,7 +39,7 @@ export interface UpdateEmployeeRequest {
   name?: string;
   email?: string;
   phone?: string;
-  role?: string;
+  role?: EmployeeRoleEnum;
   status?: string;
 }
 
@@ -38,7 +47,7 @@ export interface SearchEmployeesParams {
   page?: number;
   limit?: number;
   search?: string;
-  role?: string;
+  role?: 'OWNER' | 'EMPLOYEE' | 'DEVELOPER' | 'SUPPORT';
   status?: string;
 }
 
@@ -56,7 +65,7 @@ export const systemEmployeesService = {
       '/system-employee',
       employeeData
     );
-    return response as unknown as SystemEmployee; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SystemEmployee;
   },
 
   /**
@@ -75,7 +84,7 @@ export const systemEmployeesService = {
     const url = `/system-employee${queryString ? `?${queryString}` : ''}`;
 
     const response = await axiosInstance.get<EmployeesListResponse>(url);
-    return response as unknown as EmployeesListResponse; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as EmployeesListResponse;
   },
 
   /**
@@ -94,7 +103,7 @@ export const systemEmployeesService = {
     const url = `/system-employee/search${queryString ? `?${queryString}` : ''}`;
 
     const response = await axiosInstance.get<EmployeesListResponse>(url);
-    return response as unknown as EmployeesListResponse; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as EmployeesListResponse;
   },
 
   /**
@@ -105,7 +114,7 @@ export const systemEmployeesService = {
     const response = await axiosInstance.get<SystemEmployee>(
       `/system-employee/${id}`
     );
-    return response as unknown as SystemEmployee; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SystemEmployee;
   },
 
   /**
@@ -113,11 +122,11 @@ export const systemEmployeesService = {
    * PATCH /api/v1/system-employee/{id}
    */
   updateEmployee: async (id: string, employeeData: UpdateEmployeeRequest): Promise<SystemEmployee> => {
-    const response = await axiosInstance.patch<SystemEmployee>(
+    const response = await axiosInstance.put<SystemEmployee>(
       `/system-employee/${id}`,
       employeeData
     );
-    return response as unknown as SystemEmployee; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as SystemEmployee;
   },
 
   /**

@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
-import { systemEmployeesService, type SystemEmployee, type CreateEmployeeRequest } from '../services/systemEmployeesService';
+import {
+  systemEmployeesService,
+  type SystemEmployee,
+  type CreateEmployeeRequest,
+  EmployeeRoleEnum,
+} from '../services/systemEmployeesService';
 
 const Employees = () => {
   const [employees, setEmployees] = useState<SystemEmployee[]>([]);
@@ -13,7 +18,7 @@ const Employees = () => {
     name: '',
     email: '',
     phone: '',
-    role: '',
+    role: '' as EmployeeRoleEnum,
     password: '',
   });
 
@@ -84,7 +89,7 @@ const Employees = () => {
       name: employee.name,
       email: employee.email,
       phone: employee.phone || '',
-      role: employee.role || '',
+      role: employee.role as EmployeeRoleEnum,
     });
     setShowModal(true);
   };
@@ -100,7 +105,7 @@ const Employees = () => {
       name: '',
       email: '',
       phone: '',
-      role: '',
+      role: "" as EmployeeRoleEnum,
       password: '',
     });
   };
@@ -112,12 +117,11 @@ const Employees = () => {
       : 'bg-gray-100 text-gray-700';
   };
 
-  const getRoleColor = (role: string | undefined) => {
+  const getRoleColor = (role: EmployeeRoleEnum | undefined) => {
     if (!role) return 'bg-gray-100 text-gray-700';
-    const colors: { [key: string]: string } = {
+    const colors: { [key in EmployeeRoleEnum]: string } = {
       'EMPLOYEE': 'bg-blue-100 text-blue-700',
       'SUPPORT': 'bg-purple-100 text-purple-700',
-      'OWNER': 'bg-yellow-100 text-yellow-700',
       'DEVELOPER': 'bg-yellow-100 text-yellow-700',
     };
     return colors[role] || 'bg-gray-100 text-gray-700';
@@ -128,12 +132,11 @@ const Employees = () => {
     return status === 'active' || status === 'ACTIVE' ? 'نشط' : 'غير نشط';
   };
 
-  const getRoleText = (role: string | undefined) => {
+    const getRoleText = (role: EmployeeRoleEnum | undefined) => {
     if (!role) return 'غير محدد';
-    const roleMap: { [key: string]: string } = {
+    const roleMap: { [key in EmployeeRoleEnum]: string } = {
       'EMPLOYEE': 'موظف',
       'SUPPORT': 'دعم فني',
-      'OWNER': 'المالك',
       'DEVELOPER': 'مطور',
     };
     return roleMap[role] || role;
@@ -224,8 +227,8 @@ const Employees = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-gray-600">{employee.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-600">{employee.phone || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleColor(employee.role)}`}>
-                        {getRoleText(employee.role)}
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleColor(employee.role as EmployeeRoleEnum)}`}>
+                        {getRoleText(employee.role as EmployeeRoleEnum)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -296,12 +299,15 @@ const Employees = () => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">الدور</label>
-                <input
-                  type="text"
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                <select
+                  value={formData.role || EmployeeRoleEnum.EMPLOYEE}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as EmployeeRoleEnum })}
                   className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
+                >
+                  <option value={EmployeeRoleEnum.EMPLOYEE}>موظف</option>
+                  <option value={EmployeeRoleEnum.SUPPORT}>دعم فني</option>
+                  <option value={EmployeeRoleEnum.DEVELOPER}>مطور</option>
+                </select>
               </div>
               {!editingEmployee && (
                 <div>
