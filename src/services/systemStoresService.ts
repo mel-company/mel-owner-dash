@@ -74,6 +74,17 @@ export interface UpdateStoreRequest {
   status?: 'active' | 'inactive';
 }
 
+
+export interface PlanFeature {
+  id: string;
+  feature: {
+    id: string;
+    name: string;
+    description?: string;
+    enabled?: boolean;
+  };
+}
+
 /**
  * System Stores Service
  * Handles system-level store management endpoints
