@@ -12,3 +12,4 @@ export * from './supportTicketsService';
 export * from './supportMessagesService';
 export * from './paymentProviderService';
 export * from './paymentMethodService';
+export * from './ownerStatsService';
