@@ -2,7 +2,7 @@ import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import { systemAuthService } from '../services/systemAuthService';
 
-export type UserRole = 'owner' | 'employee' | 'support';
+export type UserRole = 'owner' | 'employee' | 'support' | 'developer';
 
 export interface User {
   id: string;
@@ -14,6 +14,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
+      
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   hasAccess: (requiredRole: UserRole[]) => boolean;
