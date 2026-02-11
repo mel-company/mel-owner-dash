@@ -1,9 +1,11 @@
 import axiosInstance from '../utils/AxiosInstance';
 
 export interface PlanFeature {
-  id: string;
+  feature: {
+    id: string;
   name: string;
   description?: string;
+  };
 }
 
 export interface PlanModule {
@@ -20,7 +22,8 @@ export interface Plan {
   yearly_price: number;
   enabled: boolean;
   most_popular: boolean;
-  features: PlanFeature[];
+  features: PlanFeature[
+      ];
   modules: PlanModule[];
   subscriptions?: unknown[];
   _count: {

@@ -84,9 +84,9 @@ export const SubscriptionPlans = () => {
             <ul className="space-y-2">
               {Array.isArray(plan.features) && plan.features.length > 0 ? (
                 plan.features.map((features: PlanFeature) => (
-                  <li key={features.id} className="flex gap-2">
+                  <li key={features.feature.id} className="flex gap-2">
                     <span className="text-green-600">✓</span>
-                    <span>{renderText(features.description)}</span>
+                    <span>{renderText(features.feature.name)}</span>
                   </li>
                 ))
               ) : (
