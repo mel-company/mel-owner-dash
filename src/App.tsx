@@ -13,6 +13,7 @@ import SubscriptionPlans from './pages/SubscriptionPlans';
 import Support from './pages/Support';
 import DeliveryCompanies from './pages/DeliveryCompanies';
 import PaymentMethods from './pages/PaymentMethods';
+import Developer from './pages/Developer';
 
 function App() {
   return (
@@ -96,6 +97,16 @@ function App() {
               }
             />
           </Route>
+
+
+          <Route
+            path="/developer"
+            element={
+              <ProtectedRoute requiredRoles={['developer']}>
+                <Developer />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

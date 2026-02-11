@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             // Map backend role to frontend role
             const roleMap: { [key: string]: UserRole } = {
-              'DEVELOPER': 'owner',
+              'DEVELOPER': 'developer',
               'OWNER': 'owner',
               'EMPLOYEE': 'employee',
               'SUPPORT': 'support',
@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userData: User = {
               id: payload.id,
               username: payload.email.split('@')[0] || payload.name.toLowerCase(),
-              role: roleMap[payload.role] || 'employee',
+              role: roleMap[payload.role] ,
               name: payload.name,
               email: payload.email,
             };

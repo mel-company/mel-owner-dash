@@ -16,7 +16,7 @@ const ROLE_ACCOUNTS: Record<string, { email: string; password: string }> = {
     password: '1234',
   },
   developer: {
-    email: 'hassan21@mel.com',
+    email: 'ali@mel.com',
     password: '1234',
   },
 };
@@ -42,7 +42,7 @@ const Login = () => {
       const success = await login(account.email, account.password);
 
       if (success) {
-        navigate('/dashboard');
+        navigate(role === 'developer' ? '/developer' : '/dashboard');
       } else {
         setError('فشل تسجيل الدخول');
       }

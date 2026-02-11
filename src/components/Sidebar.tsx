@@ -25,6 +25,7 @@ import {
   LogOut,
   ChevronRight,
   ChevronLeft,
+  Code,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -43,7 +44,7 @@ const AppSidebar = () => {
     path: string;
     label: string;
     icon: LucideIcon;
-    roles: Array<'owner' | 'employee' | 'support'>;
+    roles: Array<'owner' | 'employee' | 'support' | 'developer'>;
   }> = [
     { path: '/dashboard', label: 'لوحة التحكم', icon: LayoutDashboard, roles: ['owner', 'employee', 'support'] },
     { path: '/dashboard/stores', label: 'إدارة المتاجر', icon: Store, roles: ['owner', 'employee'] },
@@ -53,17 +54,19 @@ const AppSidebar = () => {
     { path: '/dashboard/support', label: 'الدعم الفني', icon: Headphones, roles: ['support', 'owner'] },
     { path: '/dashboard/delivery', label: 'شركات الشحن', icon: Truck, roles: ['owner'] },
     { path: '/dashboard/payments', label: 'بوابات الدفع', icon: CreditCard, roles: ['owner'] },
+    { path: '/developer', label: 'مطور النظام', icon: Code, roles: ['developer'] },
   ];
 
   const filteredMenuItems = menuItems.filter(item => 
-    item.roles.includes(user?.role as 'owner' | 'employee' | 'support')
+    item.roles.includes(user?.role as 'owner' | 'employee' | 'support' | 'developer'  )
   );
 
   const getRoleLabel = (role: string) => {
     const roles: { [key: string]: string } = {
       'owner': 'مدير النظام',
       'employee': 'موظف',
-      'support': 'دعم فني'
+      'support': 'دعم فني',
+      'developer': 'مطور النظام'
     };
     return roles[role] || role;
   };
@@ -72,7 +75,8 @@ const AppSidebar = () => {
     const colors: { [key: string]: string } = {
       'owner': 'from-amber-500 to-orange-500',
       'employee': 'from-blue-500 to-indigo-500',
-      'support': 'from-purple-500 to-pink-500'
+      'support': 'from-purple-500 to-pink-500',
+      'developer': 'from-green-500 to-lime-500'
     };
     return colors[role] || 'from-gray-500 to-gray-600';
   };
