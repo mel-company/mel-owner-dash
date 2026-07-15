@@ -995,8 +995,8 @@ const TextField = ({
 }) => (
   <div>
     <FieldLabel optional={optional} error={error}>{label}</FieldLabel>
-    <div className={cn('flex h-12 items-center rounded-2xl border bg-white px-4 shadow-sm', error ? 'border-red-300 bg-red-50' : 'border-slate-200')} dir="ltr">
-      {prefix && <span className="mr-3 rounded-xl bg-slate-100 px-3 py-1 text-sm font-bold text-slate-500">{prefix}</span>}
+    <div className={cn('flex h-12 items-center rounded-2xl border bg-white px-4 shadow-sm', error ? 'border-red-300 bg-red-50' : 'border-slate-200')}>
+      {prefix && <span className="ml-3 rounded-xl bg-slate-100 px-3 py-1 text-sm font-bold text-slate-500">{prefix}</span>}
       <input
         value={value}
         placeholder={placeholder}
