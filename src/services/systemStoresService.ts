@@ -58,6 +58,11 @@ export interface StoresListResponse {
   limit: number | null;
 }
 
+export interface StoresListParams {
+  page?: number;
+  limit?: number;
+}
+
 export interface CreateStoreRequest {
   name: string;
   owner: string;
@@ -94,13 +99,14 @@ export const systemStoresService = {
    * قائمة المتاجر (System)
    * GET /stores/system
    */
-  getAllStores: async (): Promise<StoresListResponse> => {
+  getAllStores: async (params?: StoresListParams): Promise<StoresListResponse> => {
     // AxiosInstance interceptor already returns response.data
     const response = await axiosInstance.get<StoresListResponse>(
-      '/store/system'
+      '/store/system',
+      { params }
     );
     // Response structure: { data: Store[], total: number, page: number | null, limit: number | null }
-    return response as unknown as StoresListResponse; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as StoresListResponse;
   },
 
   /**

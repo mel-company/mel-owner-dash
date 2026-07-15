@@ -2,9 +2,50 @@
 @import "tw-animate-css";
 @import "mapbox-gl/dist/mapbox-gl.css";
 
+@font-face {
+  font-family: "Setar XS";
+  src: url("/fonts/Setar XS/SetarXSTrial-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Setar XS";
+  src: url("/fonts/Setar XS/SetarXSTrial-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Setar XS";
+  src: url("/fonts/Setar XS/SetarXSTrial-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Setar XS";
+  src: url("/fonts/Setar XS/SetarXSTrial-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Setar XS";
+  src: url("/fonts/Setar XS/SetarXSTrial-ExtraBold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --font-sans: "Setar XS", system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -120,5 +161,16 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Setar XS", system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .view-button {
+    @apply inline-flex h-11 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-slate-500 shadow-sm ring-1 ring-slate-100 transition hover:bg-slate-50 hover:text-slate-900;
+  }
+
+  .view-button-active {
+    @apply bg-blue-600 text-white shadow-blue-100 hover:bg-blue-600 hover:text-white;
   }
 }

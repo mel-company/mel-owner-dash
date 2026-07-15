@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import BrandLogo from '../components/BrandLogo';
 
 const ROLE_ACCOUNTS: Record<string, { email: string; password: string }> = {
   owner: {
@@ -54,15 +55,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-indigo-600 via-purple-600 to-pink-500 p-4">
       <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 w-full max-w-md">
 
-        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl mb-4">
-            <span className="text-3xl font-bold text-white">M</span>
+          <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-[1.7rem] bg-linear-to-br from-cyan-400 via-blue-600 to-violet-600 p-4 shadow-xl shadow-violet-200">
+            <BrandLogo variant="mark" imageClassName="h-full w-full brightness-0 invert" />
           </div>
-          <h1 className="text-4xl font-bold text-indigo-600 mb-2">mel.iq</h1>
+          <BrandLogo variant="dark" className="mb-3" imageClassName="h-14" />
           <p className="text-gray-600">اختر الدور لتسجيل الدخول</p>
         </div>
 
