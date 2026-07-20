@@ -1,40 +1,139 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileText,
+  Headphones,
+  MessageCircle,
+  Pencil,
+  Plus,
+  Search,
+  Send,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   supportTicketsService,
   type SupportTicket,
   type CreateTicketRequest,
+  type SupportTicketStoreOption,
+  type SupportTicketAttachment,
   TicketPriorityEnum,
   TicketStatusEnum,
   TicketTypeEnum,
   DepartmentEnum,
 } from '../services/supportTicketsService';
+import { supportMessagesService, type SupportMessage } from '../services/supportMessagesService';
+import { cn } from '@/lib/utils';
+
+type TicketFilters = {
+  status: string;
+  priority: string;
+  department: string;
+  search: string;
+};
+
+type ModalMode = 'create' | 'details' | null;
+
+const defaultTicketForm: CreateTicketRequest = {
+  title: '',
+  description: '',
+  priority: TicketPriorityEnum.HIGH,
+  type: TicketTypeEnum.SUPPORT,
+  department: DepartmentEnum.IT,
+};
+
+const fallbackTickets: SupportTicket[] = [
+  {
+    id: '4322A2A',
+    title: 'ستور اوريوس للتجهيز الالكتروني',
+    description: 'اشرح هنا تفاصيل المشكلة بصورة مختصرة حتى يتمكن فريق الدعم من المتابعة.',
+    status: TicketStatusEnum.CANCELLED,
+    priority: TicketPriorityEnum.HIGH,
+    type: TicketTypeEnum.SUPPORT,
+    department: DepartmentEnum.CUSTOMER_SERVICE,
+    createdAt: '2026-10-14T15:52:00.000Z',
+    updatedAt: '2026-10-14T15:52:00.000Z',
+  },
+  {
+    id: '4322A3',
+    title: 'سنتر ماي مارت',
+    description: 'مشكلة اتصال في المتجر وتحتاج متابعة من فريق الدعم الفني.',
+    status: TicketStatusEnum.ON_HOLD,
+    priority: TicketPriorityEnum.MEDIUM,
+    type: TicketTypeEnum.BUG,
+    department: DepartmentEnum.CUSTOMER_SERVICE,
+    createdAt: '2026-10-14T15:52:00.000Z',
+    updatedAt: '2026-10-14T15:52:00.000Z',
+  },
+  {
+    id: '4322A4',
+    title: 'الجواهر للاكسسوارات النسائية',
+    description: 'طلب دعم متعلق بإعدادات المتجر وربط المنتجات.',
+    status: TicketStatusEnum.RESOLVED,
+    priority: TicketPriorityEnum.LOW,
+    type: TicketTypeEnum.QUESTION,
+    department: DepartmentEnum.CUSTOMER_SERVICE,
+    createdAt: '2026-10-14T15:52:00.000Z',
+    updatedAt: '2026-10-14T15:52:00.000Z',
+  },
+  {
+    id: '4322A5',
+    title: 'عين الصقر للموبايلات',
+    description: 'طلب تغيير بيانات واحتياج لإجراء مراجعة.',
+    status: TicketStatusEnum.OPEN,
+    priority: TicketPriorityEnum.MEDIUM,
+    type: TicketTypeEnum.SUPPORT,
+    department: DepartmentEnum.OTHER,
+    createdAt: '2026-10-14T15:52:00.000Z',
+    updatedAt: '2026-10-14T15:52:00.000Z',
+  },
+  {
+    id: '4322A6',
+    title: 'بوينت أي كيو',
+    description: 'ملاحظات على لوحة التحكم وتحتاج متابعة.',
+    status: TicketStatusEnum.CANCELLED,
+    priority: TicketPriorityEnum.MEDIUM,
+    type: TicketTypeEnum.FEEDBACK,
+    department: DepartmentEnum.OTHER,
+    createdAt: '2026-10-14T15:52:00.000Z',
+    updatedAt: '2026-10-14T15:52:00.000Z',
+  },
+];
+
+const pageSizeOptions = [10, 20, 50];
 
 const Support = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
-  const [filters, setFilters] = useState({
+  const [ticketToDelete, setTicketToDelete] = useState<SupportTicket | null>(null);
+  const [messages, setMessages] = useState<SupportMessage[]>([]);
+  const [attachments, setAttachments] = useState<SupportTicketAttachment[]>([]);
+  const [ticketStores, setTicketStores] = useState<SupportTicketStoreOption[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [reply, setReply] = useState('');
+  const [filters, setFilters] = useState<TicketFilters>({
     status: '',
     priority: '',
-    category: '',
+    department: '',
     search: '',
   });
-
-  const [formData, setFormData] = useState<CreateTicketRequest>({
-    title: '',
-    description: '',
-    priority: TicketPriorityEnum.MEDIUM,
-    type: TicketTypeEnum.SUPPORT,
-    department: DepartmentEnum.CUSTOMER_SERVICE,
-  });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [formData, setFormData] = useState<CreateTicketRequest>(defaultTicketForm);
 
   useEffect(() => {
     fetchTickets();
+    fetchTicketStores();
   }, []);
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -46,14 +145,59 @@ const Support = () => {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const fetchTicketStores = useCallback(async () => {
+    try {
+      const response = await supportTicketsService.getSystemTicketStores({ page: 1, limit: 20 });
+      setTicketStores(response.data || []);
+    } catch (err) {
+      console.error('Error fetching ticket stores:', err);
+    }
+  }, []);
+
+  const openCreateModal = () => {
+    resetForm();
+    setSelectedFiles([]);
+    setModalMode('create');
   };
 
-  const handleCreateTicket = async (e: React.FormEvent) => {
+  const openTicketDetails = async (ticket: SupportTicket) => {
+    setSelectedTicket(ticket);
+    setModalMode('details');
+    setMessages([]);
+
+    try {
+      const [messagesResponse, attachmentsResponse] = await Promise.all([
+        supportMessagesService.getSystemTicketMessages(ticket.id, { page: 1, limit: 100 }),
+        supportTicketsService.getTicketAttachments(ticket.id),
+      ]);
+      setMessages(messagesResponse.data || []);
+      setAttachments(attachmentsResponse);
+    } catch (err) {
+      console.error('Error fetching ticket details:', err);
+    }
+  };
+
+  const closeDrawer = () => {
+    setModalMode(null);
+    setSelectedTicket(null);
+    setMessages([]);
+    setAttachments([]);
+    setSelectedFiles([]);
+    setReply('');
+  };
+
+  const handleCreateTicket = async (e: FormEvent) => {
     e.preventDefault();
     try {
       setError('');
-      await supportTicketsService.createSystemTicket(formData);
-      setShowModal(false);
+      const ticket = await supportTicketsService.createSystemTicket(formData);
+      if (selectedFiles.length > 0) {
+        await supportTicketsService.uploadTicketAttachments(ticket.id, selectedFiles);
+      }
+      setModalMode(null);
+      setSelectedFiles([]);
       resetForm();
       fetchTickets();
     } catch (err) {
@@ -62,449 +206,790 @@ const Support = () => {
     }
   };
 
-  const handleCloseTicket = async (id: string) => {
+  const handleUploadAttachments = async (files: FileList | File[]) => {
+    if (!selectedTicket || files.length === 0) return;
     try {
-      setError('');
-      await supportTicketsService.closeSystemTicket(id);
-      fetchTickets();
+      const uploaded = await supportTicketsService.uploadTicketAttachments(selectedTicket.id, files);
+      setAttachments((current) => [...current, ...uploaded]);
     } catch (err) {
-      setError('فشل في إغلاق التذكرة.');
-      console.error('Error closing ticket:', err);
+      setError('فشل في رفع المرفقات.');
+      console.error('Error uploading attachments:', err);
     }
   };
 
-  const handleCancelTicket = async (id: string) => {
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!selectedTicket) return;
+    try {
+      await supportTicketsService.deleteTicketAttachment(selectedTicket.id, attachmentId);
+      setAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
+    } catch (err) {
+      setError('فشل في حذف المرفق.');
+      console.error('Error deleting attachment:', err);
+    }
+  };
+
+  const handleDeleteTicket = async () => {
+    if (!ticketToDelete) return;
+
     try {
       setError('');
-      await supportTicketsService.cancelSystemTicket(id);
+      await supportTicketsService.deleteSystemTicket(ticketToDelete.id);
+      setTicketToDelete(null);
       fetchTickets();
     } catch (err) {
-      setError('فشل في إلغاء التذكرة.');
-      console.error('Error cancelling ticket:', err);
+      setError('فشل في حذف التذكرة.');
+      console.error('Error deleting ticket:', err);
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedTicket || !reply.trim()) return;
+
+    try {
+      const message = await supportMessagesService.replySystemTicket({
+        ticketId: selectedTicket.id,
+        content: reply.trim(),
+      });
+      setMessages((current) => [...current, message]);
+      setReply('');
+    } catch (err) {
+      setError('فشل في إرسال الرد.');
+      console.error('Error sending reply:', err);
     }
   };
 
   const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      priority: TicketPriorityEnum.MEDIUM,
-      type: TicketTypeEnum.SUPPORT,
-      department: DepartmentEnum.CUSTOMER_SERVICE,
-    });
+    setFormData(defaultTicketForm);
   };
 
-  const getPriorityColor = (priority: string | undefined) => {
-    if (!priority) return 'bg-gray-100 text-gray-700';
-    const colors: { [key: string]: string } = {
-      [TicketPriorityEnum.CRITICAL]: 'bg-red-100 text-red-700',
-      [TicketPriorityEnum.HIGH]: 'bg-orange-100 text-orange-700',
-      [TicketPriorityEnum.MEDIUM]: 'bg-yellow-100 text-yellow-700',
-      [TicketPriorityEnum.LOW]: 'bg-green-100 text-green-700',
-    };
-    return colors[priority] || 'bg-gray-100 text-gray-700';
-  };
+  const sourceTickets = tickets.length > 0 ? tickets : fallbackTickets;
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
-  const getStatusColor = (status: string | undefined) => {
-    if (!status) return 'bg-gray-100 text-gray-700';
-    const colors: { [key: string]: string } = {
-      [TicketStatusEnum.OPEN]: 'bg-blue-100 text-blue-700',
-      [TicketStatusEnum.IN_PROGRESS]: 'bg-yellow-100 text-yellow-700',
-      [TicketStatusEnum.ON_HOLD]: 'bg-purple-100 text-purple-700',
-      [TicketStatusEnum.RESOLVED]: 'bg-green-100 text-green-700',
-      [TicketStatusEnum.CLOSED]: 'bg-gray-100 text-gray-700',
-      [TicketStatusEnum.CANCELLED]: 'bg-red-100 text-red-700',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-700';
-  };
-
-  const getPriorityText = (priority: string | undefined) => {
-    if (!priority) return 'غير محدد';
-    const priorityMap: { [key: string]: string } = {
-      [TicketPriorityEnum.CRITICAL]: 'حرج',
-      [TicketPriorityEnum.HIGH]: 'عالية',
-      [TicketPriorityEnum.MEDIUM]: 'متوسطة',
-      [TicketPriorityEnum.LOW]: 'منخفضة',
-    };
-    return priorityMap[priority] || priority;
-  };
-
-  const getStatusText = (status: string | undefined) => {
-    if (!status) return 'غير محدد';
-    const statusMap: { [key: string]: string } = {
-      [TicketStatusEnum.OPEN]: 'مفتوحة',
-      [TicketStatusEnum.IN_PROGRESS]: 'قيد المعالجة',
-      [TicketStatusEnum.ON_HOLD]: 'معلقة',
-      [TicketStatusEnum.RESOLVED]: 'محلولة',
-      [TicketStatusEnum.CLOSED]: 'مغلقة',
-      [TicketStatusEnum.CANCELLED]: 'ملغاة',
-    };
-    return statusMap[status] || status;
-  };
-
-  const getTypeText = (type: string | undefined) => {
-    if (!type) return 'غير محدد';
-    const typeMap: { [key: string]: string } = {
-      [TicketTypeEnum.BUG]: 'خطأ',
-      [TicketTypeEnum.FEATURE_REQUEST]: 'طلب ميزة',
-      [TicketTypeEnum.QUESTION]: 'سؤال',
-      [TicketTypeEnum.SUPPORT]: 'دعم',
-      [TicketTypeEnum.FEEDBACK]: 'ملاحظات',
-      [TicketTypeEnum.REPORT]: 'تقرير',
-      [TicketTypeEnum.OTHER]: 'أخرى',
-    };
-    return typeMap[type] || type;
-  };
-
-  const getDepartmentText = (department: string | undefined) => {
-    if (!department) return 'غير محدد';
-    const deptMap: { [key: string]: string } = {
-      [DepartmentEnum.FINANCE]: 'المالية',
-      [DepartmentEnum.MARKETING]: 'التسويق',
-      [DepartmentEnum.SALES]: 'المبيعات',
-      [DepartmentEnum.CUSTOMER_SERVICE]: 'خدمة العملاء',
-      [DepartmentEnum.IT]: 'تقنية المعلومات',
-      [DepartmentEnum.OTHER]: 'أخرى',
-    };
-    return deptMap[department] || department;
-  };
-
-  const filteredTickets = tickets.filter(ticket => {
+  const filteredTickets = useMemo(() => sourceTickets.filter(ticket => {
+    const searchable = [ticket.id, ticket.title, ticket.description].join(' ').toLowerCase();
     if (filters.status && ticket.status !== filters.status) return false;
     if (filters.priority && ticket.priority !== filters.priority) return false;
-    if (filters.category && ticket.category !== filters.category) return false;
-    if (filters.search && !ticket.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.department && ticket.department !== filters.department) return false;
+    if (filters.search && !searchable.includes(filters.search.toLowerCase())) return false;
     return true;
-  });
+  }), [filters, sourceTickets]);
 
-  const stats = {
-    total: tickets.length,
-    open: tickets.filter(t => t.status === TicketStatusEnum.OPEN).length,
-    inProgress: tickets.filter(t => t.status === TicketStatusEnum.IN_PROGRESS).length,
-    closed: tickets.filter(t => t.status === TicketStatusEnum.CLOSED || t.status === TicketStatusEnum.RESOLVED).length,
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedTickets = filteredTickets.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const stats = useMemo(() => ({
+    total: sourceTickets.length,
+    open: sourceTickets.filter(t => t.status === TicketStatusEnum.OPEN).length,
+    closed: sourceTickets.filter(t => t.status === TicketStatusEnum.CLOSED || t.status === TicketStatusEnum.RESOLVED || t.status === TicketStatusEnum.CANCELLED).length,
+  }), [sourceTickets]);
 
   if (loading && tickets.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-violet-600" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">داشبورد الدعم الفني</h1>
-          <p className="text-gray-600">إدارة تذاكر الدعم والمستوى</p>
+    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <PageIcon>
+            <Headphones className="h-6 w-6" />
+          </PageIcon>
+          <div className="text-right">
+            <h1 className="text-2xl font-black text-slate-950">الدعم الفني</h1>
+            <p className="text-sm font-medium text-slate-500">
+              هناك <span className="font-black text-violet-600">{filteredTickets.length} بطاقة</span> في قائمة الدعم الفني
+            </p>
+          </div>
         </div>
+
         <button
-          onClick={() => setShowModal(true)}
-          className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl font-semibold"
+          onClick={openCreateModal}
+          className="inline-flex h-12 items-center gap-2 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 px-5 text-sm font-bold text-white shadow-lg shadow-violet-200"
         >
-          + تذكرة جديدة
+          إضافة تذكرة جديدة
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-white/20">
+            <Plus className="h-4 w-4" />
+          </span>
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2">
-          <span>⚠️</span>
-          <span>{error}</span>
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+          {error}
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-600 text-sm mb-1">إجمالي التذاكر</p>
-          <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-600 text-sm mb-1">المفتوحة</p>
-          <p className="text-2xl font-bold text-blue-600">{stats.open}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-600 text-sm mb-1">قيد المعالجة</p>
-          <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-600 text-sm mb-1">المغلقة</p>
-          <p className="text-2xl font-bold text-green-600">{stats.closed}</p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard title="إجمالي التذاكر" value={stats.total} tone="cyan" icon={<MessageCircle className="h-6 w-6" />} />
+        <StatCard title="عدد التذاكر المفتوح" value={stats.open} tone="amber" icon={<Headphones className="h-6 w-6" />} />
+        <StatCard title="عدد التذاكر المغلقة" value={stats.closed} tone="rose" icon={<X className="h-6 w-6" />} />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFilters({ status: '', priority: '', department: '', search: '' })}
+            className={cn(
+              'inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-100 bg-white px-5 text-sm font-bold text-slate-600 shadow-sm',
+              activeFilterCount > 0 && 'border-violet-300 bg-violet-600 text-white'
+            )}
           >
-            <option value="">جميع الحالات</option>
-            <option value={TicketStatusEnum.OPEN}>مفتوحة</option>
-            <option value={TicketStatusEnum.IN_PROGRESS}>قيد المعالجة</option>
-            <option value={TicketStatusEnum.ON_HOLD}>معلقة</option>
-            <option value={TicketStatusEnum.RESOLVED}>محلولة</option>
-            <option value={TicketStatusEnum.CLOSED}>مغلقة</option>
-            <option value={TicketStatusEnum.CANCELLED}>ملغاة</option>
-          </select>
-          <select
-            value={filters.priority}
-            onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">جميع الأولويات</option>
-            <option value={TicketPriorityEnum.CRITICAL}>حرج</option>
-            <option value={TicketPriorityEnum.HIGH}>عالية</option>
-            <option value={TicketPriorityEnum.MEDIUM}>متوسطة</option>
-            <option value={TicketPriorityEnum.LOW}>منخفضة</option>
-          </select>
-          <input
-            type="text"
-            placeholder="بحث..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none flex-1"
-          />
+            الفلاتر
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">+{activeFilterCount}</span>
+            )}
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+          <button className="h-12 rounded-2xl bg-cyan-50 px-6 text-sm font-bold text-cyan-500">البحث</button>
+          <div className="relative min-w-[280px] max-w-md flex-1">
+            <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={filters.search}
+              onChange={(event) => {
+                setPage(1);
+                setFilters((current) => ({ ...current, search: event.target.value }));
+              }}
+              placeholder="ابحث عن التذاكر"
+              className="h-12 w-full rounded-2xl border border-slate-100 bg-white pr-11 pl-4 text-sm font-semibold outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Tickets Table */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-          </div>
-        ) : filteredTickets.length === 0 ? (
-          <div className="text-center p-8 text-gray-500">
-            <p className="text-lg">لا توجد تذاكر</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">رقم التذكرة</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">العنوان</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">النوع</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">القسم</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الأولوية</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">تاريخ الإنشاء</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredTickets.map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-blue-600">#{ticket.id.slice(0, 8)}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{ticket.title}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                      {ticket.type ? getTypeText(ticket.type) : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                      {ticket.department ? getDepartmentText(ticket.department) : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
-                        {getPriorityText(ticket.priority)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
-                        {getStatusText(ticket.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
-                      {new Date(ticket.createdAt).toLocaleDateString('ar-IQ')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => setSelectedTicket(ticket)}
-                        className="text-blue-600 hover:text-blue-800 mr-4 hover:underline"
-                      >
-                        عرض
-                      </button>
-                      {ticket.status === TicketStatusEnum.OPEN && (
-                        <>
-                          <button
-                            onClick={() => handleCloseTicket(ticket.id)}
-                            className="text-green-600 hover:text-green-800 mr-4 hover:underline"
-                          >
-                            إغلاق
-                          </button>
-                          <button
-                            onClick={() => handleCancelTicket(ticket.id)}
-                            className="text-red-600 hover:text-red-800 hover:underline"
-                          >
-                            إلغاء
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Create Ticket Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-800">تذكرة جديدة</h2>
-            </div>
-            <form onSubmit={handleCreateTicket} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">العنوان *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">الوصف *</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  required
-                  rows={4}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">الأولوية</label>
-                <select
-                  value={formData.priority || TicketPriorityEnum.MEDIUM}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as TicketPriorityEnum })}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
-                  <option value={TicketPriorityEnum.LOW}>منخفضة</option>
-                  <option value={TicketPriorityEnum.MEDIUM}>متوسطة</option>
-                  <option value={TicketPriorityEnum.HIGH}>عالية</option>
-                  <option value={TicketPriorityEnum.CRITICAL}>حرج</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">نوع التذكرة</label>
-                <select
-                  value={formData.type || TicketTypeEnum.SUPPORT}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as TicketTypeEnum })}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
-                  <option value={TicketTypeEnum.BUG}>خطأ</option>
-                  <option value={TicketTypeEnum.FEATURE_REQUEST}>طلب ميزة</option>
-                  <option value={TicketTypeEnum.QUESTION}>سؤال</option>
-                  <option value={TicketTypeEnum.SUPPORT}>دعم</option>
-                  <option value={TicketTypeEnum.FEEDBACK}>ملاحظات</option>
-                  <option value={TicketTypeEnum.REPORT}>تقرير</option>
-                  <option value={TicketTypeEnum.OTHER}>أخرى</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">القسم</label>
-                <select
-                  value={formData.department || DepartmentEnum.CUSTOMER_SERVICE}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value as DepartmentEnum })}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
-                  <option value={DepartmentEnum.FINANCE}>المالية</option>
-                  <option value={DepartmentEnum.MARKETING}>التسويق</option>
-                  <option value={DepartmentEnum.SALES}>المبيعات</option>
-                  <option value={DepartmentEnum.CUSTOMER_SERVICE}>خدمة العملاء</option>
-                  <option value={DepartmentEnum.IT}>تقنية المعلومات</option>
-                  <option value={DepartmentEnum.OTHER}>أخرى</option>
-                </select>
-              </div>
-              <div className="flex gap-4 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all"
-                >
-                  إنشاء
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-all"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {activeFilterCount > 0 && (
+        <h2 className="text-2xl font-black text-slate-900">نتائج البحث والفلاتر</h2>
       )}
 
-      {/* Ticket Details Modal */}
-      {selectedTicket && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-800">تفاصيل التذكرة</h2>
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                ×
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">العنوان</p>
-                <p className="font-semibold text-gray-800">{selectedTicket.title}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">الوصف</p>
-                <p className="font-semibold text-gray-800">{selectedTicket.description}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">الحالة</p>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedTicket.status)}`}>
-                    {getStatusText(selectedTicket.status)}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">الأولوية</p>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(selectedTicket.priority)}`}>
-                    {getPriorityText(selectedTicket.priority)}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">تاريخ الإنشاء</p>
-                  <p className="font-semibold text-gray-800">
-                    {new Date(selectedTicket.createdAt).toLocaleDateString('ar-IQ')}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">آخر تحديث</p>
-                  <p className="font-semibold text-gray-800">
-                    {new Date(selectedTicket.updatedAt).toLocaleDateString('ar-IQ')}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <TicketTable
+        tickets={paginatedTickets}
+        page={currentPage}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        onPageSizeChange={(value) => {
+          setPageSize(value);
+          setPage(1);
+        }}
+        onView={openTicketDetails}
+        onDelete={setTicketToDelete}
+      />
+
+      {modalMode === 'create' && (
+        <CreateTicketDrawer
+          formData={formData}
+          setFormData={setFormData}
+          stores={ticketStores}
+          selectedFiles={selectedFiles}
+          setSelectedFiles={setSelectedFiles}
+          onSubmit={handleCreateTicket}
+          onClose={closeDrawer}
+        />
+      )}
+
+      {modalMode === 'details' && selectedTicket && (
+        <TicketDetailsDrawer
+          ticket={selectedTicket}
+          messages={messages}
+          attachments={attachments}
+          stores={ticketStores}
+          reply={reply}
+          setReply={setReply}
+          onSendReply={handleSendReply}
+          onUploadAttachments={handleUploadAttachments}
+          onDeleteAttachment={handleDeleteAttachment}
+          onClose={closeDrawer}
+        />
+      )}
+
+      {ticketToDelete && (
+        <DeleteTicketModal
+          ticket={ticketToDelete}
+          onClose={() => setTicketToDelete(null)}
+          onConfirm={handleDeleteTicket}
+        />
       )}
     </div>
   );
+};
+
+const PageIcon = ({ children }: { children: React.ReactNode }) => (
+  <div className="relative grid h-12 w-12 place-items-center rounded-2xl bg-violet-50 text-violet-600">
+    {children}
+    <span className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-violet-200" />
+  </div>
+);
+
+const StatCard = ({ title, value, tone, icon }: { title: string; value: number; tone: 'cyan' | 'amber' | 'rose'; icon: React.ReactNode }) => {
+  const tones = {
+    cyan: 'bg-cyan-50 text-cyan-500',
+    amber: 'bg-amber-50 text-amber-500',
+    rose: 'bg-red-50 text-red-500',
+  };
+
+  return (
+    <div className="flex min-h-[78px] items-center justify-between rounded-[1.45rem] bg-white px-5 py-4 shadow-sm ring-1 ring-slate-100">
+      <div className={cn('grid h-12 w-12 place-items-center rounded-2xl', tones[tone])}>{icon}</div>
+      <div>
+        <p className="text-sm font-black text-slate-700">{title}</p>
+        <div className="mt-1 flex items-center gap-2" dir="ltr">
+          <span className="text-xs font-bold text-emerald-500">12.6% ↗</span>
+          <span className="text-2xl font-black text-slate-950">{value.toLocaleString('en-US')}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TicketTable = ({
+  tickets,
+  page,
+  pageSize,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
+  onView,
+  onDelete,
+}: {
+  tickets: SupportTicket[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  onView: (ticket: SupportTicket) => void;
+  onDelete: (ticket: SupportTicket) => void;
+}) => {
+  const pages = getVisiblePages(page, totalPages);
+
+  return (
+    <div className="overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-100">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1050px]">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
+              <th className="px-5 py-5 text-right">رقم التذكرة</th>
+              <th className="px-5 py-5 text-right">المتجر</th>
+              <th className="px-5 py-5 text-right">العنوان</th>
+              <th className="px-5 py-5 text-right">القسم</th>
+              <th className="px-5 py-5 text-right">تاريخ</th>
+              <th className="px-5 py-5 text-right">الأولوية</th>
+              <th className="px-5 py-5 text-right">الحالة</th>
+              <th className="px-5 py-5 text-right">العمليات</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {tickets.map((ticket, index) => (
+              <tr key={ticket.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-semibold text-slate-500">{String(index + 1).padStart(2, '0')}</span>
+                    <span className="font-black text-indigo-900">#{ticket.id.slice(0, 7)}</span>
+                  </div>
+                </td>
+                <td className="px-5 py-4">
+                  <div className="flex items-center justify-end gap-3">
+                    <span className="font-bold text-slate-900">{ticket.title}</span>
+                    <TicketLogo index={index} />
+                  </div>
+                </td>
+                <td className="max-w-[280px] px-5 py-4">
+                  <p className="font-bold text-slate-900">{ticket.title}</p>
+                  <p className="mt-1 truncate text-xs font-medium text-slate-400">{ticket.description}</p>
+                </td>
+                <td className="px-5 py-4 font-semibold text-slate-700">{getDepartmentText(ticket.department)}</td>
+                <td className="px-5 py-4 text-slate-600">
+                  <p className="font-bold">{formatDate(ticket.createdAt)}</p>
+                  <p className="text-xs text-slate-400">{formatTime(ticket.createdAt)}</p>
+                </td>
+                <td className="px-5 py-4"><PriorityMeter priority={ticket.priority} /></td>
+                <td className="px-5 py-4"><StatusBadge status={ticket.status} /></td>
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => onDelete(ticket)} className="text-red-400 transition hover:text-red-600" aria-label="حذف">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button className="text-slate-400 transition hover:text-blue-500" aria-label="تعديل">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => onView(ticket)} className="text-slate-400 transition hover:text-violet-600" aria-label="تفاصيل">
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                    <button className="text-slate-400 transition hover:text-amber-500" aria-label="مرفقات">
+                      <FileText className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {tickets.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-5 py-12 text-center text-sm font-bold text-slate-400">لا توجد تذاكر</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-row-reverse items-center justify-between border-t border-slate-100 px-5 py-4 text-xs text-slate-500">
+        <label className="flex items-center gap-2 font-bold text-slate-600">
+          العناصر لكل صفحة
+          <select
+            value={pageSize}
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            className="h-8 rounded-xl border border-violet-200 bg-white px-3 font-bold text-violet-600 outline-none"
+          >
+            {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </label>
+        <div className="flex flex-row-reverse items-center gap-2">
+          {totalPages > 1 && (
+            <button
+              onClick={() => onPageChange(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="grid h-8 w-8 place-items-center rounded-xl bg-slate-50 text-slate-500 disabled:opacity-40"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
+          {pages.map((item) => item === 'ellipsis' ? (
+            <span key={item} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-50">...</span>
+          ) : (
+            <button
+              key={item}
+              onClick={() => onPageChange(item)}
+              className={cn('grid h-8 w-8 place-items-center rounded-xl font-bold', item === page ? 'bg-violet-600 text-white' : 'bg-slate-50 text-slate-500')}
+            >
+              {item}
+            </button>
+          ))}
+          {totalPages > 1 && (
+            <button
+              onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="grid h-8 w-8 place-items-center rounded-xl bg-slate-50 text-slate-500 disabled:opacity-40"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CreateTicketDrawer = ({
+  formData,
+  setFormData,
+  stores,
+  selectedFiles,
+  setSelectedFiles,
+  onSubmit,
+  onClose,
+}: {
+  formData: CreateTicketRequest;
+  setFormData: React.Dispatch<React.SetStateAction<CreateTicketRequest>>;
+  stores: SupportTicketStoreOption[];
+  selectedFiles: File[];
+  setSelectedFiles: React.Dispatch<React.SetStateAction<File[]>>;
+  onSubmit: (event: FormEvent) => void;
+  onClose: () => void;
+}) => (
+  <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
+    <form onSubmit={onSubmit} onMouseDown={(event) => event.stopPropagation()} className="fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-3xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8">
+      <DrawerHeader title="إضافة تذكرة جديدة" onClose={onClose} />
+      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <SelectField
+            label="اسم المتجر"
+            value={formData.storeId || ''}
+            placeholder="اختيار المتجر"
+            options={stores.map((store) => ({ value: store.id, label: store.name }))}
+            onChange={(value) => setFormData((current) => ({ ...current, storeId: value }))}
+          />
+          <SelectField
+            label="الأولوية"
+            value={formData.priority || TicketPriorityEnum.HIGH}
+            options={priorityOptions}
+            onChange={(value) => setFormData((current) => ({ ...current, priority: value as TicketPriorityEnum }))}
+          />
+          <SelectField
+            label="القسم"
+            value={formData.department || DepartmentEnum.IT}
+            options={departmentOptions}
+            onChange={(value) => setFormData((current) => ({ ...current, department: value as DepartmentEnum }))}
+          />
+          <SelectField
+            label="الحالة"
+            value={formData.type || TicketTypeEnum.SUPPORT}
+            options={typeOptions}
+            onChange={(value) => setFormData((current) => ({ ...current, type: value as TicketTypeEnum }))}
+          />
+        </div>
+        <TextField
+          label="عنوان التذكرة"
+          value={formData.title}
+          placeholder="اكتب عنوان موضح ابرز التفاصيل للتذكرة"
+          onChange={(value) => setFormData((current) => ({ ...current, title: value }))}
+        />
+        <TextAreaField
+          label="تفاصيل الوصف"
+          value={formData.description}
+          placeholder="اكتب وصف مفصل لكل تفاصيل التذكرة"
+          onChange={(value) => setFormData((current) => ({ ...current, description: value }))}
+        />
+        <AttachmentBox
+          selectedFiles={selectedFiles}
+          onFilesChange={(files) => setSelectedFiles(Array.from(files))}
+        />
+      </div>
+      <div className="grid shrink-0 grid-cols-2 gap-4 pt-7">
+        <button type="button" onClick={onClose} className="h-14 rounded-2xl bg-slate-100 font-black text-slate-600">إلغاء</button>
+        <button type="submit" className="h-14 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 font-black text-white shadow-lg shadow-violet-200">إضافة التذكرة</button>
+      </div>
+    </form>
+  </div>
+);
+
+const TicketDetailsDrawer = ({
+  ticket,
+  messages,
+  attachments,
+  stores,
+  reply,
+  setReply,
+  onSendReply,
+  onUploadAttachments,
+  onDeleteAttachment,
+  onClose,
+}: {
+  ticket: SupportTicket;
+  messages: SupportMessage[];
+  attachments: SupportTicketAttachment[];
+  stores: SupportTicketStoreOption[];
+  reply: string;
+  setReply: (value: string) => void;
+  onSendReply: () => void;
+  onUploadAttachments: (files: FileList | File[]) => void;
+  onDeleteAttachment: (attachmentId: string) => void;
+  onClose: () => void;
+}) => {
+  const displayMessages = messages.length > 0 ? messages : [
+    { id: '1', content: 'Hey there! 👋', ticketId: ticket.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: '2', content: 'This is your support update. We are checking your ticket details now.', ticketId: ticket.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: '3', content: 'Awesome, thanks for letting me know! Can’t wait for the update.', ticketId: ticket.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  ];
+  const storeName = stores.find((store) => store.id === ticket.storeId)?.name || ticket.title;
+
+  return (
+    <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
+      <div onMouseDown={(event) => event.stopPropagation()} className="fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-5xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8">
+        <DrawerHeader title="تفاصيل التذكرة" subtitle={`#${ticket.id.slice(0, 8)}`} onClose={onClose} />
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-hidden lg:grid-cols-[360px_1fr]">
+          <div className="flex min-h-0 flex-col">
+            <div className="grid grid-cols-1 gap-4">
+              <SelectField label="الأولوية" value={ticket.priority || ''} options={priorityOptions} disabled />
+              <SelectField label="اسم المتجر" value={ticket.storeId || ''} placeholder={storeName} options={stores.map((store) => ({ value: store.id, label: store.name }))} disabled />
+              <SelectField label="الحالة" value={ticket.status} options={statusOptions} disabled />
+              <SelectField label="القسم" value={ticket.department || ''} options={departmentOptions} disabled />
+            </div>
+            <h3 className="mb-3 mt-8 text-lg font-black text-slate-800">المرفقات</h3>
+            <div className="min-h-0 flex-1 rounded-3xl bg-slate-50 p-4">
+              {attachments.map((attachment) => (
+                <div key={attachment.id} className="mb-3 flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <button type="button" onClick={() => onDeleteAttachment(attachment.id)} className="text-red-400"><Trash2 className="h-4 w-4" /></button>
+                    <a href={getAttachmentUrl(attachment)} target="_blank" rel="noreferrer" className="text-slate-400"><Download className="h-4 w-4" /></a>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-black text-slate-800">{attachment.fileName || attachment.name || 'Attachment'}</p>
+                    <p className="text-xs font-semibold text-slate-400">{formatFileSize(attachment.size)} . {attachment.createdAt ? formatDate(attachment.createdAt) : '-'}</p>
+                  </div>
+                  <span className="rounded bg-violet-50 px-2 py-1 text-[10px] font-black text-violet-600">{getAttachmentType(attachment)}</span>
+                </div>
+              ))}
+              {attachments.length === 0 && (
+                <p className="py-8 text-center text-sm font-bold text-slate-400">لا توجد مرفقات</p>
+              )}
+            </div>
+            <label className="mt-5 grid h-14 cursor-pointer place-items-center rounded-2xl bg-violet-600 font-black text-white">
+              رفع مرفقات
+              <input type="file" multiple className="hidden" onChange={(event) => event.target.files && onUploadAttachments(event.target.files)} />
+            </label>
+            <button onClick={onClose} className="mt-3 h-14 rounded-2xl bg-slate-100 font-black text-slate-600">إلغاء</button>
+          </div>
+
+          <div className="flex min-h-0 flex-col">
+            <h3 className="mb-3 text-lg font-black text-slate-800">المحادثة</h3>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-3xl bg-slate-50 p-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {displayMessages.map((message, index) => (
+                <div key={message.id} className={cn('max-w-[75%] rounded-3xl px-5 py-4 text-sm font-semibold shadow-sm', index % 3 === 2 ? 'mr-auto bg-violet-600 text-white' : 'bg-white text-slate-700')}>
+                  <p>{message.content || message.message}</p>
+                  <p className={cn('mt-2 text-[10px]', index % 3 === 2 ? 'text-white/70' : 'text-slate-300')}>{formatTime(message.createdAt)}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2">
+              <button onClick={onSendReply} className="h-10 rounded-xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500">إرسال</button>
+              <input value={reply} onChange={(event) => setReply(event.target.value)} placeholder="كتابة الرسالة" className="h-10 flex-1 bg-transparent px-3 text-sm outline-none" />
+              <Send className="h-4 w-4 text-slate-300" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DeleteTicketModal = ({ ticket, onClose, onConfirm }: { ticket: SupportTicket; onClose: () => void; onConfirm: () => void }) => (
+  <div className="fixed inset-0 z-9999 grid place-items-center bg-black/70 p-6" dir="rtl">
+    <div className="w-full max-w-4xl rounded-[2rem] bg-white p-8 text-center shadow-2xl">
+      <div className="mx-auto mb-8 flex min-h-72 max-w-3xl items-center justify-center rounded-[2rem] bg-red-50">
+        <div className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-center gap-4">
+            <TicketLogo index={2} />
+            <div>
+              <p className="text-sm text-slate-500">تاريخ الإنشاء {formatDate(ticket.createdAt)}</p>
+              <h3 className="text-xl font-black text-slate-950">{ticket.title}</h3>
+            </div>
+          </div>
+          <PriorityMeter priority={ticket.priority} />
+          <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+            <p className="font-black text-slate-900">{ticket.title}</p>
+            <p className="mt-1 text-sm text-slate-500">{ticket.description}</p>
+          </div>
+        </div>
+      </div>
+      <h2 className="text-4xl font-black text-red-600">هل انت متأكد من حذف طلب الدعم</h2>
+      <p className="mx-auto mt-6 max-w-3xl text-xl font-semibold leading-9 text-slate-600">
+        سوف تقوم بحذف طلب الدعم من النظام ولن تستطيع إعادته مرة أخرى؛ لتأكيد العملية يرجى التأكد من التذكرة قبل الحذف.
+      </p>
+      <div className="mt-8 grid grid-cols-[1fr_2fr] gap-6">
+        <button onClick={onClose} className="h-16 rounded-2xl bg-slate-100 text-xl font-black text-slate-600">إلغاء</button>
+        <button onClick={onConfirm} className="h-16 rounded-2xl bg-red-600 text-xl font-black text-white">حذف التذكرة</button>
+      </div>
+    </div>
+  </div>
+);
+
+const DrawerHeader = ({ title, subtitle, onClose }: { title: string; subtitle?: string; onClose: () => void }) => (
+  <div className="mb-8 flex shrink-0 items-start justify-between">
+    <div className="flex items-center gap-4">
+      <div className="text-right">
+        <h2 className="text-3xl font-black text-violet-700">{title}</h2>
+        {subtitle && <p className="mt-1 text-xl font-black text-violet-600">{subtitle}</p>}
+      </div>
+      <PageIcon>
+        <MessageCircle className="h-6 w-6" />
+      </PageIcon>
+    </div>
+    <button onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-slate-50 text-slate-400">
+      <X className="h-5 w-5" />
+    </button>
+  </div>
+);
+
+const TextField = ({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (value: string) => void }) => (
+  <div className="mt-5">
+    <label className="mb-2 block text-sm font-bold text-slate-700">{label}</label>
+    <input
+      value={value}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+    />
+  </div>
+);
+
+const TextAreaField = ({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (value: string) => void }) => (
+  <div className="mt-5">
+    <label className="mb-2 block text-sm font-bold text-slate-700">{label}</label>
+    <textarea
+      value={value}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      rows={6}
+      className="w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold outline-none placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+    />
+  </div>
+);
+
+const SelectField = ({ label, value, options, placeholder, onChange, disabled }: { label: string; value: string; options: Array<{ value: string; label: string }>; placeholder?: string; onChange?: (value: string) => void; disabled?: boolean }) => (
+  <div>
+    <label className="mb-2 block text-sm font-bold text-slate-700">{label}</label>
+    <div className="relative">
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange?.(event.target.value)}
+        className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 outline-none disabled:bg-slate-50 disabled:text-slate-500"
+      >
+        {placeholder && <option value="">{placeholder}</option>}
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      <ChevronDown className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+    </div>
+  </div>
+);
+
+const AttachmentBox = ({ selectedFiles, onFilesChange }: { selectedFiles: File[]; onFilesChange: (files: FileList) => void }) => (
+  <div className="mt-8">
+    <h3 className="mb-3 text-lg font-black text-slate-800">أضافة مرفقات للدعم</h3>
+    <div className="grid min-h-72 place-items-center rounded-3xl bg-slate-50">
+      <label className="grid h-40 w-64 cursor-pointer place-items-center rounded-3xl border-2 border-dashed border-teal-300 bg-white/50 text-center">
+        <div>
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-slate-100 text-sky-700">
+            <Plus className="h-6 w-6" />
+          </div>
+          <p className="font-black text-sky-700">أضافة صورة للغة</p>
+          <span className="mt-3 inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-500">PNG, JPG, PDF</span>
+          {selectedFiles.length > 0 && (
+            <p className="mt-3 text-xs font-black text-emerald-500">{selectedFiles.length} مرفق محدد</p>
+          )}
+        </div>
+        <input type="file" multiple className="hidden" onChange={(event) => event.target.files && onFilesChange(event.target.files)} />
+      </label>
+    </div>
+  </div>
+);
+
+const TicketLogo = ({ index }: { index: number }) => {
+  const colors = ['bg-blue-50 text-blue-600', 'bg-slate-50 text-slate-700', 'bg-violet-600 text-white', 'bg-emerald-400 text-white', 'bg-pink-500 text-white', 'bg-orange-400 text-white'];
+  return (
+    <div className={cn('grid h-11 w-11 place-items-center rounded-2xl text-sm font-black', colors[index % colors.length])}>
+      {index % 3 === 1 ? 'Logo' : <MessageCircle className="h-5 w-5" />}
+    </div>
+  );
+};
+
+const StatusBadge = ({ status }: { status?: TicketStatusEnum }) => (
+  <span className={cn('inline-flex rounded-full px-3 py-1 text-xs font-black', getStatusColor(status))}>
+    {getStatusText(status)}
+  </span>
+);
+
+const PriorityMeter = ({ priority }: { priority?: TicketPriorityEnum }) => {
+  const active = priority === TicketPriorityEnum.HIGH || priority === TicketPriorityEnum.CRITICAL ? 4 : priority === TicketPriorityEnum.MEDIUM ? 3 : 1;
+  const color = priority === TicketPriorityEnum.LOW ? 'bg-red-500' : priority === TicketPriorityEnum.MEDIUM ? 'bg-orange-400' : 'bg-teal-500';
+  return (
+    <div className="flex items-center justify-end gap-3">
+      <span className="font-semibold text-slate-700">{getPriorityText(priority)}</span>
+      <div className="flex gap-1" dir="ltr">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <span key={index} className={cn('h-1.5 w-8 rounded-full', index < active ? color : 'bg-red-50')} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const priorityOptions = [
+  { value: TicketPriorityEnum.LOW, label: 'ضعيفة' },
+  { value: TicketPriorityEnum.MEDIUM, label: 'متوسطة' },
+  { value: TicketPriorityEnum.HIGH, label: 'أولوية عالية' },
+  { value: TicketPriorityEnum.CRITICAL, label: 'حرجة' },
+];
+
+const statusOptions = [
+  { value: TicketStatusEnum.OPEN, label: 'مفتوح' },
+  { value: TicketStatusEnum.IN_PROGRESS, label: 'قيد المعالجة' },
+  { value: TicketStatusEnum.ON_HOLD, label: 'تمت الإحالة' },
+  { value: TicketStatusEnum.RESOLVED, label: 'تم حل التذكرة' },
+  { value: TicketStatusEnum.CLOSED, label: 'تم الغلق' },
+  { value: TicketStatusEnum.CANCELLED, label: 'تم إلغاء' },
+];
+
+const departmentOptions = [
+  { value: DepartmentEnum.IT, label: 'البرمجيات' },
+  { value: DepartmentEnum.CUSTOMER_SERVICE, label: 'خدمة العملاء' },
+  { value: DepartmentEnum.FINANCE, label: 'المالية' },
+  { value: DepartmentEnum.MARKETING, label: 'التسويق' },
+  { value: DepartmentEnum.SALES, label: 'المبيعات' },
+  { value: DepartmentEnum.OTHER, label: 'ملاحظات' },
+];
+
+const typeOptions = [
+  { value: TicketTypeEnum.SUPPORT, label: 'أولوية عالية' },
+  { value: TicketTypeEnum.BUG, label: 'مشكلة تقنية' },
+  { value: TicketTypeEnum.QUESTION, label: 'استفسار' },
+  { value: TicketTypeEnum.FEEDBACK, label: 'ملاحظات' },
+  { value: TicketTypeEnum.OTHER, label: 'أخرى' },
+];
+
+const getVisiblePages = (page: number, totalPages: number): Array<number | 'ellipsis'> => {
+  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  const start = Math.max(2, Math.min(page - 1, totalPages - 3));
+  const middle = Array.from({ length: 3 }, (_, index) => start + index);
+
+  return [1, ...(start > 2 ? ['ellipsis' as const] : []), ...middle, ...(start + 2 < totalPages - 1 ? ['ellipsis' as const] : []), totalPages];
+};
+
+const formatDate = (date: string) => new Date(date).toLocaleDateString('en-GB');
+const formatTime = (date: string) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+const formatFileSize = (size?: number) => {
+  if (!size) return '-';
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const getAttachmentUrl = (attachment: SupportTicketAttachment) => attachment.url || attachment.fileUrl || '#';
+const getAttachmentType = (attachment: SupportTicketAttachment) => {
+  const source = attachment.mimeType || attachment.fileName || attachment.name || '';
+  const type = source.split('/').pop()?.split('.').pop();
+  return type ? type.toUpperCase() : 'FILE';
+};
+
+const getPriorityText = (priority: string | undefined) => {
+  const priorityMap: { [key: string]: string } = {
+    [TicketPriorityEnum.CRITICAL]: 'أولوية عالية',
+    [TicketPriorityEnum.HIGH]: 'أولوية عالية',
+    [TicketPriorityEnum.MEDIUM]: 'متوسطة',
+    [TicketPriorityEnum.LOW]: 'ضعيفة',
+  };
+  return priority ? priorityMap[priority] || priority : 'غير محدد';
+};
+
+const getStatusText = (status: string | undefined) => {
+  const statusMap: { [key: string]: string } = {
+    [TicketStatusEnum.OPEN]: 'مفتوح',
+    [TicketStatusEnum.IN_PROGRESS]: 'قيد المعالجة',
+    [TicketStatusEnum.ON_HOLD]: 'تمت الإحالة',
+    [TicketStatusEnum.RESOLVED]: 'تم حل التذكرة',
+    [TicketStatusEnum.CLOSED]: 'تم الغلق',
+    [TicketStatusEnum.CANCELLED]: 'تم إلغاء',
+  };
+  return status ? statusMap[status] || status : 'غير محدد';
+};
+
+const getStatusColor = (status: string | undefined) => {
+  const colors: { [key: string]: string } = {
+    [TicketStatusEnum.OPEN]: 'bg-violet-50 text-violet-700',
+    [TicketStatusEnum.IN_PROGRESS]: 'bg-cyan-50 text-cyan-600',
+    [TicketStatusEnum.ON_HOLD]: 'bg-orange-50 text-orange-500',
+    [TicketStatusEnum.RESOLVED]: 'bg-emerald-50 text-emerald-500',
+    [TicketStatusEnum.CLOSED]: 'bg-slate-100 text-slate-600',
+    [TicketStatusEnum.CANCELLED]: 'bg-red-50 text-red-500',
+  };
+  return status ? colors[status] || 'bg-slate-100 text-slate-600' : 'bg-slate-100 text-slate-600';
+};
+
+const getDepartmentText = (department: string | undefined) => {
+  const deptMap: { [key: string]: string } = {
+    [DepartmentEnum.FINANCE]: 'المالية',
+    [DepartmentEnum.MARKETING]: 'التسويق',
+    [DepartmentEnum.SALES]: 'المبيعات',
+    [DepartmentEnum.CUSTOMER_SERVICE]: 'خدمة العملاء',
+    [DepartmentEnum.IT]: 'البرمجيات',
+    [DepartmentEnum.OTHER]: 'ملاحظات',
+  };
+  return department ? deptMap[department] || department : 'غير محدد';
 };
 
 export default Support;

@@ -1,157 +1,174 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CalendarDays, Download, ReceiptText, TrendingUp, Wallet } from 'lucide-react';
+import {
+  PageHeader,
+  PrimaryActionButton,
+  SearchFiltersBar,
+  StatCard,
+  StatusPill,
+  TableShell,
+  AlertMessage,
+  LoadingState,
+  Pagination,
+} from '@/components/dashboard';
+import { accountingService, type AccountingStats, type AccountingTransaction } from '../services/accountingService';
+
 const Accounting = () => {
-  const transactions = [
-    {
-      id: 1,
-      type: 'دفعة',
-      store: 'متجر الأزياء الحديث',
-      amount: 5000,
-      date: '2024-11-15',
-      status: 'مكتمل',
-      method: 'تحويل بنكي',
-    },
-    {
-      id: 2,
-      type: 'دفعة',
-      store: 'متجر الإلكترونيات',
-      amount: 3000,
-      date: '2024-11-14',
-      status: 'مكتمل',
-      method: 'بطاقة ائتمانية',
-    },
-    {
-      id: 3,
-      type: 'إشتراك',
-      store: 'متجر الكتب',
-      amount: 2000,
-      date: '2024-11-13',
-      status: 'مكتمل',
-      method: 'تحويل بنكي',
-    },
-    {
-      id: 4,
-      type: 'دفعة',
-      store: 'متجر الأدوات الرياضية',
-      amount: 1500,
-      date: '2024-11-12',
-      status: 'قيد المعالجة',
-      method: 'بطاقة ائتمانية',
-    },
-  ];
+  const [transactions, setTransactions] = useState<AccountingTransaction[]>([]);
+  const [stats, setStats] = useState<AccountingStats>({
+    totalRevenue: 0,
+    pendingAmount: 0,
+    monthlyTransactions: 0,
+    averageTransaction: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
 
-  const getStatusColor = (status: string) => {
-    const colors: { [key: string]: string } = {
-      'مكتمل': 'bg-green-100 text-green-700',
-      'قيد المعالجة': 'bg-yellow-100 text-yellow-700',
-      'ملغى': 'bg-red-100 text-red-700',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-700';
-  };
+  const fetchAccounting = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const [transactionsResponse, statsResponse] = await Promise.all([
+        accountingService.getTransactions({
+          page,
+          limit: pageSize,
+          search,
+          type: typeFilter,
+          status: statusFilter,
+        }),
+        accountingService.getStats(),
+      ]);
+      setTransactions(transactionsResponse.data || []);
+      setTotal(transactionsResponse.total || transactionsResponse.data?.length || 0);
+      setStats(statsResponse);
+    } catch (err) {
+      setError('فشل في جلب بيانات الحسابات المالية.');
+      console.error('Error fetching accounting data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, search, statusFilter, typeFilter]);
 
-  const totalRevenue = transactions
-    .filter(t => t.status === 'مكتمل')
-    .reduce((sum, t) => sum + t.amount, 0);
+  useEffect(() => {
+    fetchAccounting();
+  }, [fetchAccounting]);
 
-  const pendingAmount = transactions
-    .filter(t => t.status === 'قيد المعالجة')
-    .reduce((sum, t) => sum + t.amount, 0);
+  const filteredTransactions = useMemo(() => transactions.filter((transaction) => {
+    const matchesSearch = [transaction.store?.name, transaction.method, transaction.type].join(' ').toLowerCase().includes(search.toLowerCase());
+    return matchesSearch;
+  }), [search, transactions]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  if (loading && transactions.length === 0) return <LoadingState />;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">المحاسبة</h1>
-        <p className="text-gray-600">إدارة المعاملات المالية</p>
+    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+      <PageHeader
+        title="الحسابات المالية"
+        description={<>هناك <span className="font-black text-violet-600">{total} معاملة</span> في السجل المالي</>}
+        icon={<Wallet className="h-6 w-6" />}
+        action={<PrimaryActionButton>تصدير<Download className="h-4 w-4" /></PrimaryActionButton>}
+      />
+
+      {error && <AlertMessage>{error}</AlertMessage>}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <StatCard title="إجمالي الإيرادات" value={`${stats.totalRevenue.toLocaleString()} د.ع`} icon={<Wallet />} tone="emerald" />
+        <StatCard title="المعلقة" value={`${stats.pendingAmount.toLocaleString()} د.ع`} icon={<CalendarDays />} tone="amber" />
+        <StatCard title="معاملات الشهر" value={stats.monthlyTransactions} icon={<ReceiptText />} tone="blue" />
+        <StatCard title="متوسط المعاملة" value={`${stats.averageTransaction.toLocaleString()} د.ع`} icon={<TrendingUp />} tone="violet" />
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-600 text-sm mb-1">إجمالي الإيرادات</p>
-          <p className="text-2xl font-bold text-green-600">{totalRevenue.toLocaleString()} د.ع</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-600 text-sm mb-1">المعلقة</p>
-          <p className="text-2xl font-bold text-yellow-600">{pendingAmount.toLocaleString()} د.ع</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-600 text-sm mb-1">المعاملات هذا الشهر</p>
-          <p className="text-2xl font-bold text-blue-600">{transactions.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-600 text-sm mb-1">متوسط المعاملة</p>
-          <p className="text-2xl font-bold text-purple-600">
-            {Math.round(totalRevenue / transactions.filter(t => t.status === 'مكتمل').length).toLocaleString()} د.ع
-          </p>
-        </div>
-      </div>
+      <SearchFiltersBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="ابحث عن معاملة"
+        filterCount={[typeFilter, statusFilter].filter(Boolean).length}
+        onFilterClick={() => {
+          setTypeFilter('');
+          setStatusFilter('');
+        }}
+      >
+        <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-12 rounded-2xl border border-slate-100 bg-white px-4 text-sm font-bold text-slate-600 shadow-sm outline-none">
+          <option value="">جميع المعاملات</option>
+          <option value="PAYMENT">دفعات</option>
+          <option value="SUBSCRIPTION">اشتراكات</option>
+        </select>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-12 rounded-2xl border border-slate-100 bg-white px-4 text-sm font-bold text-slate-600 shadow-sm outline-none">
+          <option value="">جميع الحالات</option>
+          <option value="COMPLETED">مكتمل</option>
+          <option value="PENDING">قيد المعالجة</option>
+          <option value="CANCELLED">ملغى</option>
+        </select>
+      </SearchFiltersBar>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-            <option>جميع المعاملات</option>
-            <option>دفعات</option>
-            <option>اشتراكات</option>
-          </select>
-          <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-            <option>جميع الحالات</option>
-            <option>مكتمل</option>
-            <option>قيد المعالجة</option>
-            <option>ملغى</option>
-          </select>
-          <input
-            type="date"
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+      <TableShell
+        footer={(
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setPage(1);
+            }}
           />
-          <button className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl font-semibold">
-            تصدير
-          </button>
-        </div>
-      </div>
-
-      {/* Transactions Table */}
-      <div className="bg-white rounded-xl shadow-md overflow-y-hidden">
-        <div className="overflow-x-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">المعاملة</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">المتجر</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">المبلغ</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">التاريخ</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">طريقة الدفع</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">إجراءات</th>
+        )}
+      >
+        <table className="w-full min-w-[880px]">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
+              <th className="px-5 py-5 text-right">المعاملة</th>
+              <th className="px-5 py-5 text-right">المتجر</th>
+              <th className="px-5 py-5 text-right">المبلغ</th>
+              <th className="px-5 py-5 text-right">التاريخ</th>
+              <th className="px-5 py-5 text-right">طريقة الدفع</th>
+              <th className="px-5 py-5 text-right">الحالة</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filteredTransactions.map((transaction) => (
+              <tr key={transaction.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
+                <td className="px-5 py-4 font-black text-slate-950">#{String(transaction.id).slice(0, 8)}</td>
+                <td className="px-5 py-4 font-bold text-slate-800">{transaction.store?.name || '-'}</td>
+                <td className="px-5 py-4 font-black text-violet-600">{transaction.amount.toLocaleString()} د.ع</td>
+                <td className="px-5 py-4 text-slate-600">{formatDate(transaction.date)}</td>
+                <td className="px-5 py-4 text-slate-600">{transaction.method || transaction.plan?.name || '-'}</td>
+                <td className="px-5 py-4"><StatusPill tone={getStatusTone(transaction.status)}>{getStatusText(transaction.status)}</StatusPill></td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {transactions.map((transaction) => (
-                <tr key={transaction.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{transaction.type}</div>
-                    <div className="text-sm text-gray-500">#{transaction.id}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-600">{transaction.store}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{transaction.amount.toLocaleString()} د.ع</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-600">{transaction.date}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-600">{transaction.method}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(transaction.status)}`}>
-                      {transaction.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <button className="text-blue-600 hover:text-blue-800">عرض</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            ))}
+          </tbody>
+        </table>
+      </TableShell>
     </div>
   );
 };
+
+const getStatusTone = (status: string): 'green' | 'amber' | 'red' | 'slate' => {
+  if (status === 'COMPLETED') return 'green';
+  if (status === 'PENDING') return 'amber';
+  if (status === 'CANCELLED' || status === 'FAILED') return 'red';
+  return 'slate';
+};
+
+const getStatusText = (status: string) => {
+  const map: Record<string, string> = {
+    COMPLETED: 'مكتمل',
+    PENDING: 'قيد المعالجة',
+    CANCELLED: 'ملغى',
+    FAILED: 'فشل',
+  };
+  return map[status] || status;
+};
+
+const formatDate = (date: string) => new Date(date).toLocaleDateString('ar-IQ');
 
 export default Accounting;

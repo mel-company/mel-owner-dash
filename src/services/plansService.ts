@@ -31,6 +31,19 @@ export interface Plan {
   };
 }
 
+export interface PlanPayload {
+  name: string;
+  description: string;
+  monthly_price: number;
+  yearly_price: number;
+  enabled: boolean;
+  most_popular: boolean;
+  features?: string[];
+  featureIds?: string[];
+  modules?: string[];
+  moduleIds?: string[];
+}
+
 export interface PlansListResponse {
   data: Plan[];
   total: number;
@@ -54,28 +67,31 @@ export const plansService = {
    * @param params - Query parameters (page, limit)
    */
   getAllPlans: async (params?: GetPlansParams): Promise<PlansListResponse> => {
-    const queryParams = new URLSearchParams();
-    if (params?.page) {
-      queryParams.append('page', params.page.toString());
-    }
-    if (params?.limit) {
-      queryParams.append('limit', params.limit.toString());
-    }
-    
-    const queryString = queryParams.toString();
-    const url = `/plan${queryString ? `?${queryString}` : ''}`;
-    
-    const response = await axiosInstance.get<PlansListResponse>(url);
-    return response as unknown as PlansListResponse; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const response = await axiosInstance.get<PlansListResponse>('/plan', { params });
+    return response as unknown as PlansListResponse;
   },
 
   /**
    * تفاصيل خطة محددة
-   * GET /api/v1/plan/store-plans/{id}
+   * GET /api/v1/plan/{id}
    * @param id - Plan ID (UUID)
    */
   getPlanById: async (id: string): Promise<Plan> => {
-    const response = await axiosInstance.get<Plan>(`/plan/store-plans/${id}`);
-    return response as unknown as Plan; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const response = await axiosInstance.get<Plan>(`/plan/${id}`);
+    return response as unknown as Plan;
+  },
+
+  createPlan: async (payload: PlanPayload): Promise<Plan> => {
+    const response = await axiosInstance.post<Plan>('/plan', payload);
+    return response as unknown as Plan;
+  },
+
+  updatePlan: async (id: string, payload: PlanPayload): Promise<Plan> => {
+    const response = await axiosInstance.put<Plan>(`/plan/${id}`, payload);
+    return response as unknown as Plan;
+  },
+
+  deletePlan: async (id: string): Promise<void> => {
+    await axiosInstance.delete<void>(`/plan/${id}`);
   },
 };

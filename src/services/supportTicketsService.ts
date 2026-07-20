@@ -81,6 +81,39 @@ export interface CreateTicketRequest {
   storeId?: string;
 }
 
+export interface SupportTicketStoreOption {
+  id: string;
+  name: string;
+}
+
+export interface SupportTicketAttachment {
+  id: string;
+  url?: string;
+  fileUrl?: string;
+  name?: string;
+  fileName?: string;
+  mimeType?: string;
+  size?: number;
+  createdAt?: string;
+}
+
+export interface SupportTicketStoresResponse {
+  data: SupportTicketStoreOption[];
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+
+const isNotFoundError = (error: unknown) => {
+  if (typeof error !== 'object' || error === null) return false;
+  const possibleError = error as { response?: { status?: number } };
+  return possibleError.response?.status === 404;
+};
+
+const normalizeAttachmentsResponse = (response: SupportTicketAttachment[] | { data: SupportTicketAttachment[] }) => (
+  Array.isArray(response) ? response : response.data || []
+);
+
 /**
  * Support Tickets Service
  * Handles support ticket management endpoints for both System and Store users
@@ -114,6 +147,94 @@ export const supportTicketsService = {
 
     const response = await axiosInstance.get<TicketsListResponse>(url);
     return response as unknown as TicketsListResponse;
+  },
+
+  /**
+   * قائمة المتاجر لدروبداون إنشاء التذاكر
+   * GET /api/v1/support-ticket/system/stores
+   */
+  getSystemTicketStores: async (params?: { page?: number; limit?: number; search?: string }): Promise<SupportTicketStoresResponse> => {
+    const response = await axiosInstance.get<SupportTicketStoresResponse>('/support-ticket/system/stores', { params });
+    return response as unknown as SupportTicketStoresResponse;
+  },
+
+  /**
+   * مرفقات التذكرة
+   * GET /api/v1/support-ticket/{id}/attachments
+   */
+  getTicketAttachments: async (ticketId: string): Promise<SupportTicketAttachment[]> => {
+    const paths = [
+      `/support-ticket/${ticketId}/attachments`,
+      `/support-ticket/system/${ticketId}/attachments`,
+      `/support-ticket/store/${ticketId}/attachments`,
+    ];
+
+    for (const path of paths) {
+      try {
+        const response = await axiosInstance.get<SupportTicketAttachment[] | { data: SupportTicketAttachment[] }>(path);
+        return normalizeAttachmentsResponse(response as unknown as SupportTicketAttachment[] | { data: SupportTicketAttachment[] });
+      } catch (error) {
+        if (!isNotFoundError(error)) throw error;
+      }
+    }
+
+    return [];
+  },
+
+  /**
+   * رفع مرفقات التذكرة
+   * POST /api/v1/support-ticket/{id}/attachments
+   */
+  uploadTicketAttachments: async (ticketId: string, files: FileList | File[]): Promise<SupportTicketAttachment[]> => {
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append('files', file));
+    const paths = [
+      `/support-ticket/${ticketId}/attachments`,
+      `/support-ticket/system/${ticketId}/attachments`,
+      `/support-ticket/store/${ticketId}/attachments`,
+    ];
+
+    let lastError: unknown;
+    for (const path of paths) {
+      try {
+        const response = await axiosInstance.post<SupportTicketAttachment[] | { data: SupportTicketAttachment[] }>(
+          path,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+        return normalizeAttachmentsResponse(response as unknown as SupportTicketAttachment[] | { data: SupportTicketAttachment[] });
+      } catch (error) {
+        lastError = error;
+        if (!isNotFoundError(error)) throw error;
+      }
+    }
+
+    throw lastError;
+  },
+
+  /**
+   * حذف مرفق من التذكرة
+   * DELETE /api/v1/support-ticket/{id}/attachments/{attachmentId}
+   */
+  deleteTicketAttachment: async (ticketId: string, attachmentId: string): Promise<void> => {
+    const paths = [
+      `/support-ticket/${ticketId}/attachments/${attachmentId}`,
+      `/support-ticket/system/${ticketId}/attachments/${attachmentId}`,
+      `/support-ticket/store/${ticketId}/attachments/${attachmentId}`,
+    ];
+
+    let lastError: unknown;
+    for (const path of paths) {
+      try {
+        await axiosInstance.delete<void>(path);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (!isNotFoundError(error)) throw error;
+      }
+    }
+
+    throw lastError;
   },
 
   /**

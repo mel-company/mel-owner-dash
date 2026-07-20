@@ -25,3 +25,5 @@ export * from './supportMessagesService';
 export * from './paymentProviderService';
 export * from './paymentMethodService';
 export * from './ownerStatsService';
+export * from './deliveryCompanyService';
+export * from './accountingService';

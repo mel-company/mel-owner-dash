@@ -1,28 +1,35 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowRight, CalendarDays, Globe, Mail, MapPin, Phone, Store as StoreIcon, UserRound } from 'lucide-react';
+import {
+  AlertMessage,
+  LoadingState,
+  PageHeader,
+  PrimaryActionButton,
+  StatCard,
+  StatusPill,
+  TableShell,
+} from '@/components/dashboard';
 import { systemStoresService, type Store } from '../services/systemStoresService';
+
+const publicAssetBaseUrl = import.meta.env.VITE_PUBLIC_URL || 'https://pub-fe6c304a027a4a3b9e3efb4fd3520dcf.r2.dev/';
 
 const StoreDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (id) {
-      fetchStoreDetails();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (id) fetchStoreDetails(id);
   }, [id]);
 
-  const fetchStoreDetails = async () => {
-    if (!id) return;
-    
+  const fetchStoreDetails = async (storeId: string) => {
     try {
       setLoading(true);
       setError('');
-      const storeData = await systemStoresService.getStoreById(id);
+      const storeData = await systemStoresService.getStoreById(storeId);
       setStore(storeData);
     } catch (err) {
       setError('فشل في جلب تفاصيل المتجر. يرجى المحاولة مرة أخرى.');
@@ -32,341 +39,146 @@ const StoreDetails = () => {
     }
   };
 
-  const getSubscriptionColor = (planName: string | null | undefined) => {
-    if (!planName) return 'bg-gray-100 text-gray-700';
-    const colors: { [key: string]: string } = {
-      'Premium': 'bg-purple-100 text-purple-700',
-      'Pro': 'bg-blue-100 text-blue-700',
-      'Pro Max': 'bg-indigo-100 text-indigo-700',
-      'Go': 'bg-green-100 text-green-700',
-      'Basic': 'bg-gray-100 text-gray-700',
-    };
-    return colors[planName] || 'bg-gray-100 text-gray-700';
-  };
-
-  const getStatusColor = (status: string | null | undefined) => {
-    if (!status) return 'bg-gray-100 text-gray-700';
-    const statusMap: { [key: string]: string } = {
-      'ACTIVE': 'bg-green-100 text-green-700',
-      'CANCELLED': 'bg-red-100 text-red-700',
-      'EXPIRED': 'bg-red-100 text-red-700',
-      'PAUSED': 'bg-yellow-100 text-yellow-700',
-    };
-    return statusMap[status] || 'bg-gray-100 text-gray-700';
-  };
-
-  const getStatusText = (status: string | null | undefined) => {
-    if (!status) return 'بدون اشتراك';
-    const statusMap: { [key: string]: string } = {
-      'ACTIVE': 'نشط',
-      'CANCELLED': 'ملغى',
-      'EXPIRED': 'منتهي',
-      'PAUSED': 'متوقف',
-    };
-    return statusMap[status] || status;
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingState />;
 
   if (error || !store) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        <div className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2">
-          <span>⚠️</span>
-          <span>{error || 'المتجر غير موجود'}</span>
-        </div>
-        <button
-          onClick={() => navigate('/dashboard/stores')}
-          className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 transition-all font-semibold"
-        >
-          العودة إلى المتاجر
-        </button>
+      <div className="min-h-screen space-y-5 bg-[#f8fafc]" dir="rtl">
+        <AlertMessage>{error || 'المتجر غير موجود'}</AlertMessage>
+        <PrimaryActionButton onClick={() => navigate('/dashboard/stores')}>العودة إلى المتاجر</PrimaryActionButton>
       </div>
     );
   }
 
+  const logo = getPublicAssetUrl(store.logo);
+  const subscriptionStatus = store.subscription?.status;
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <button
-            onClick={() => navigate('/dashboard/stores')}
-            className="text-indigo-600 hover:text-indigo-700 font-semibold mb-4 flex items-center gap-2"
-          >
-            ← العودة إلى المتاجر
-          </button>
-          <div className="flex items-center gap-6">
-            {store.logo && (
-                <div className="shrink-0">
-                <img
-                  src={store.logo}
-                  alt={store.name}
-                  className="w-24 h-24 rounded-xl object-cover border-2 border-gray-200 shadow-lg"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">{store.name}</h1>
-              <p className="text-gray-600">تفاصيل المتجر الكاملة</p>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+      <PageHeader
+        title={store.name}
+        description="تفاصيل المتجر الكاملة ومعلومات الاشتراك والمالك"
+        icon={logo ? <img src={logo} alt="" className="h-8 w-8 rounded-xl object-cover" /> : <StoreIcon className="h-6 w-6" />}
+        action={<PrimaryActionButton onClick={() => navigate('/dashboard/stores')}><ArrowRight className="h-4 w-4" />العودة إلى المتاجر</PrimaryActionButton>}
+      />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <StatCard title="نوع المتجر" value={getStoreType(store.store_type)} icon={<StoreIcon />} tone="blue" hint={null} />
+        <StatCard title="حالة الاشتراك" value={getStatusText(subscriptionStatus)} icon={<CalendarDays />} tone={subscriptionStatus === 'ACTIVE' ? 'teal' : 'amber'} hint={null} />
+        <StatCard title="المالك" value={store.owner?.name || 'غير محدد'} icon={<UserRound />} tone="violet" hint={null} />
+        <StatCard title="النطاق" value={store.domain || 'غير محدد'} icon={<Globe />} tone="cyan" hint={null} />
       </div>
 
-      {/* Store Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Basic Information */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">المعلومات الأساسية</h2>
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">اسم المتجر</p>
-              <p className="font-semibold text-gray-800">{store.name}</p>
-            </div>
-            {store.description && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">الوصف</p>
-                <p className="font-semibold text-gray-800">{store.description}</p>
-              </div>
-            )}
-            {store.location && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">الموقع</p>
-                <p className="font-semibold text-gray-800">{store.location}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-sm text-gray-600 mb-1">نوع المتجر</p>
-              <p className="font-semibold text-gray-800">
-                {store.store_type === 'ECOMMERCE' ? 'متجر إلكتروني' : store.store_type || 'غير محدد'}
-              </p>
-            </div>
-            {store.domain && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">النطاق</p>
-                <a
-                  href={`https://${store.domain}.mel.iq`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
-                >
-                  {store.domain}.mel.iq
-                </a>
-              </div>
-            )}
-            {store.logo && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">الشعار</p>
-                <img
-                  src={store.logo}
-                  alt={`${store.name} logo`}
-                  className="w-32 h-32 rounded-lg object-cover border border-gray-200 shadow"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+        <DetailsCard title="المعلومات الأساسية">
+          <InfoItem label="اسم المتجر" value={store.name} />
+          <InfoItem label="الوصف" value={store.description || 'لا يوجد وصف'} />
+          <InfoItem label="نوع المتجر" value={getStoreType(store.store_type)} />
+          <InfoItem label="الموقع" value={store.location || 'غير محدد'} icon={<MapPin className="h-4 w-4" />} />
+          <InfoItem label="البريد" value={store.email || 'غير محدد'} icon={<Mail className="h-4 w-4" />} />
+          <InfoItem label="الهاتف" value={store.phone || 'غير محدد'} icon={<Phone className="h-4 w-4" />} />
+        </DetailsCard>
 
-        {/* Owner Information */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">معلومات المالك</h2>
-          <div className="space-y-3">
-            {store.owner ? (
-              <>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">اسم المالك</p>
-                  <p className="font-semibold text-gray-800">{store.owner.name}</p>
-                </div>
-                {store.owner.email && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">البريد الإلكتروني</p>
-                    <p className="font-semibold text-gray-800">{store.owner.email}</p>
-                  </div>
-                )}
-                {store.owner.phone && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">الهاتف</p>
-                    <p className="font-semibold text-gray-800">{store.owner.phone}</p>
-                  </div>
-                )}
-                {store.owner.location && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">الموقع</p>
-                    <p className="font-semibold text-gray-800">{store.owner.location}</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">البريد الإلكتروني</p>
-                <p className="font-semibold text-gray-800">{store.email || 'غير محدد'}</p>
-              </div>
-            )}
-            {store.phone && !store.owner?.phone && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">هاتف المتجر</p>
-                <p className="font-semibold text-gray-800">{store.phone}</p>
-              </div>
-            )}
-            {store.ownerId && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">معرف المالك</p>
-                <p className="font-semibold text-gray-800 text-xs font-mono">{store.ownerId}</p>
-              </div>
-            )}
-          </div>
-        </div>
+        <DetailsCard title="معلومات المالك">
+          <InfoItem label="اسم المالك" value={store.owner?.name || 'غير محدد'} />
+          <InfoItem label="البريد الإلكتروني" value={store.owner?.email || 'غير محدد'} />
+          <InfoItem label="الهاتف" value={store.owner?.phone || 'غير محدد'} />
+          <InfoItem label="الموقع" value={store.owner?.location || 'غير محدد'} />
+          <InfoItem label="معرف المالك" value={store.ownerId || 'غير محدد'} />
+        </DetailsCard>
+      </div>
 
-        {/* Subscription Information */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">معلومات الاشتراك</h2>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <DetailsCard title="معلومات الاشتراك">
           {store.subscription ? (
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">الخطة</p>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getSubscriptionColor(store.subscription.plan.name)}`}>
-                  {store.subscription.plan.name}
-                </span>
+            <>
+              <div className="mb-4 flex items-center justify-between rounded-2xl bg-violet-50 px-4 py-3">
+                <StatusPill tone={subscriptionStatus === 'ACTIVE' ? 'green' : 'amber'}>{getStatusText(subscriptionStatus)}</StatusPill>
+                <div>
+                  <p className="text-sm font-bold text-slate-400">الخطة</p>
+                  <p className="text-lg font-black text-violet-700">{store.subscription.plan.name}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">وصف الخطة</p>
-                <p className="font-semibold text-gray-800">{store.subscription.plan.description}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">الحالة</p>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(store.subscription.status)}`}>
-                  {getStatusText(store.subscription.status)}
-                </span>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">تاريخ البدء</p>
-                <p className="font-semibold text-gray-800">
-                  {new Date(store.subscription.start_at).toLocaleDateString('ar-IQ')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">تاريخ الانتهاء</p>
-                <p className="font-semibold text-gray-800">
-                  {new Date(store.subscription.end_at).toLocaleDateString('ar-IQ')}
-                </p>
-              </div>
-            </div>
+              <InfoItem label="وصف الخطة" value={store.subscription.plan.description} />
+              <InfoItem label="تاريخ البدء" value={formatDate(store.subscription.start_at)} />
+              <InfoItem label="تاريخ الانتهاء" value={formatDate(store.subscription.end_at)} />
+            </>
           ) : (
-            <p className="text-gray-500">لا يوجد اشتراك نشط</p>
+            <p className="rounded-2xl bg-slate-50 p-5 text-sm font-bold text-slate-400">لا يوجد اشتراك مرتبط بهذا المتجر</p>
           )}
-        </div>
+        </DetailsCard>
 
-        {/* Additional Information */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">معلومات إضافية</h2>
-          <div className="space-y-3">
-            {store.currency && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">العملة</p>
-                <p className="font-semibold text-gray-800">{store.currency}</p>
-              </div>
-            )}
-            {store.language && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">اللغة</p>
-                <p className="font-semibold text-gray-800">{store.language}</p>
-              </div>
-            )}
-            {store.timezone && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">المنطقة الزمنية</p>
-                <p className="font-semibold text-gray-800">{store.timezone}</p>
-              </div>
-            )}
-            {store.deliveryCompanyId && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">شركة التوصيل</p>
-                <p className="font-semibold text-gray-800 text-xs font-mono">{store.deliveryCompanyId}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-sm text-gray-600 mb-1">تاريخ الإنشاء</p>
-              <p className="font-semibold text-gray-800">
-                {new Date(store.createdAt).toLocaleDateString('ar-IQ')}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">آخر تحديث</p>
-              <p className="font-semibold text-gray-800">
-                {new Date(store.updatedAt).toLocaleDateString('ar-IQ')}
-              </p>
-            </div>
-          </div>
-        </div>
+        <DetailsCard title="الروابط والنطاق">
+          <InfoItem label="النطاق" value={store.domain ? `${store.domain}.mel.iq` : 'غير محدد'} />
+          <InfoItem label="آخر تحديث للنطاق" value={store.domain_last_update ? formatDate(store.domain_last_update) : 'غير محدد'} />
+          <InfoItem label="Instagram" value={store.instagram || 'غير محدد'} />
+          <InfoItem label="Facebook" value={store.facebook || 'غير محدد'} />
+          <InfoItem label="TikTok" value={store.tiktok || 'غير محدد'} />
+          <InfoItem label="X" value={store.x || 'غير محدد'} />
+        </DetailsCard>
       </div>
 
-      {/* Social Media Links */}
-      {(store.instagram || store.facebook || store.tiktok || store.x) && (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">روابط وسائل التواصل الاجتماعي</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {store.instagram && (
-              <a
-                href={store.instagram}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-pink-600 hover:text-pink-700 font-semibold"
-              >
-                <span>📷</span>
-                <span>Instagram</span>
-              </a>
-            )}
-            {store.facebook && (
-              <a
-                href={store.facebook}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
-              >
-                <span>👥</span>
-                <span>Facebook</span>
-              </a>
-            )}
-            {store.tiktok && (
-              <a
-                href={store.tiktok}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-gray-800 hover:text-gray-900 font-semibold"
-              >
-                <span>🎵</span>
-                <span>TikTok</span>
-              </a>
-            )}
-            {store.x && (
-              <a
-                href={store.x}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-gray-800 hover:text-gray-900 font-semibold"
-              >
-                <span>𝕏</span>
-                <span>X (Twitter)</span>
-              </a>
-            )}
-          </div>
-        </div>
-      )}
+      <TableShell>
+        <table className="w-full min-w-[760px]">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
+              <th className="px-5 py-5 text-right">المعلومة</th>
+              <th className="px-5 py-5 text-right">القيمة</th>
+              <th className="px-5 py-5 text-right">الحالة</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            <SummaryRow label="العملة" value={store.currency || 'غير محدد'} />
+            <SummaryRow label="اللغة" value={store.language || 'غير محدد'} />
+            <SummaryRow label="المنطقة الزمنية" value={store.timezone || 'غير محدد'} />
+            <SummaryRow label="شركة الشحن" value={store.deliveryCompanyId || 'غير محدد'} />
+          </tbody>
+        </table>
+      </TableShell>
     </div>
   );
 };
+
+const DetailsCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <h2 className="mb-5 text-xl font-black text-slate-950">{title}</h2>
+    <div className="space-y-3">{children}</div>
+  </div>
+);
+
+const InfoItem = ({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) => (
+  <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+    <span className="max-w-[65%] truncate font-bold text-slate-800">{value}</span>
+    <span className="flex items-center gap-2 text-sm font-semibold text-slate-400">{label}{icon}</span>
+  </div>
+);
+
+const SummaryRow = ({ label, value }: { label: string; value: string }) => (
+  <tr className="text-sm text-slate-700 transition hover:bg-slate-50/70">
+    <td className="px-5 py-4 font-black text-slate-950">{label}</td>
+    <td className="px-5 py-4 font-semibold text-slate-600">{value}</td>
+    <td className="px-5 py-4"><StatusPill tone={value === 'غير محدد' ? 'slate' : 'green'}>{value === 'غير محدد' ? 'ناقص' : 'متوفر'}</StatusPill></td>
+  </tr>
+);
+
+const getPublicAssetUrl = (path?: string | null) => {
+  if (!path) return '';
+  if (/^(https?:)?\/\//.test(path) || path.startsWith('data:') || path.startsWith('blob:')) return path;
+  return `${publicAssetBaseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+};
+
+const getStoreType = (type?: string | null) => type === 'ECOMMERCE' ? 'متجر إلكتروني' : type || 'غير محدد';
+
+const getStatusText = (status?: string | null) => {
+  const statusMap: Record<string, string> = {
+    ACTIVE: 'نشط',
+    CANCELLED: 'ملغى',
+    EXPIRED: 'منتهي',
+    PAUSED: 'متوقف',
+  };
+  return status ? statusMap[status] || status : 'بدون اشتراك';
+};
+
+const formatDate = (date: string) => new Date(date).toLocaleDateString('ar-IQ');
 
 export default StoreDetails;

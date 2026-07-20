@@ -2,7 +2,8 @@ import axiosInstance from '../utils/AxiosInstance';
 
 export interface SupportMessage {
   id: string;
-  content: string;
+  content?: string;
+  message?: string;
   ticketId: string;
   userId?: string;
   createdAt: string;
@@ -17,18 +18,36 @@ export interface MessagesListResponse {
 }
 
 export interface CreateMessageRequest {
-  content: string;
+  content?: string;
+  message?: string;
   ticketId: string;
 }
 
 export interface ReplyMessageRequest {
-  content: string;
+  content?: string;
+  message?: string;
   ticketId: string;
 }
 
 export interface UpdateMessageRequest {
-  content: string;
+  content?: string;
+  message?: string;
 }
+
+const normalizeMessagePayload = <T extends { content?: string; message?: string }>(payload: T) => {
+  const message = payload.message || payload.content || '';
+  return {
+    ...payload,
+    message,
+    content: message,
+  };
+};
+
+const normalizeSupportMessage = (message: SupportMessage): SupportMessage => ({
+  ...message,
+  content: message.content || message.message || '',
+  message: message.message || message.content || '',
+});
 
 /**
  * Support Messages Service
@@ -42,9 +61,9 @@ export const supportMessagesService = {
   replySystemTicket: async (replyData: ReplyMessageRequest): Promise<SupportMessage> => {
     const response = await axiosInstance.post<SupportMessage>(
       '/message/system/reply',
-      replyData
+      normalizeMessagePayload(replyData)
     );
-    return response as unknown as SupportMessage; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return normalizeSupportMessage(response as unknown as SupportMessage);
   },
 
   /**
@@ -54,9 +73,9 @@ export const supportMessagesService = {
   sendMessage: async (messageData: CreateMessageRequest): Promise<SupportMessage> => {
     const response = await axiosInstance.post<SupportMessage>(
       '/message/send',
-      messageData
+      normalizeMessagePayload(messageData)
     );
-    return response as unknown as SupportMessage; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return normalizeSupportMessage(response as unknown as SupportMessage);
   },
 
   /**
@@ -75,7 +94,8 @@ export const supportMessagesService = {
     const url = `/message/system/${ticketId}/messages${queryString ? `?${queryString}` : ''}`;
 
     const response = await axiosInstance.get<MessagesListResponse>(url);
-    return response as unknown as MessagesListResponse; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const payload = response as unknown as MessagesListResponse;
+    return { ...payload, data: (payload.data || []).map(normalizeSupportMessage) };
   },
 
   /**
@@ -94,7 +114,8 @@ export const supportMessagesService = {
     const url = `/message/store/${ticketId}/messages${queryString ? `?${queryString}` : ''}`;
 
     const response = await axiosInstance.get<MessagesListResponse>(url);
-    return response as unknown as MessagesListResponse; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const payload = response as unknown as MessagesListResponse;
+    return { ...payload, data: (payload.data || []).map(normalizeSupportMessage) };
   },
 
   /**
@@ -104,9 +125,9 @@ export const supportMessagesService = {
   updateMessage: async (id: string, messageData: UpdateMessageRequest): Promise<SupportMessage> => {
     const response = await axiosInstance.put<SupportMessage>(
       `/message/${id}`,
-      messageData
+      normalizeMessagePayload(messageData)
     );
-    return response as unknown as SupportMessage; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return normalizeSupportMessage(response as unknown as SupportMessage);
   },
 
   /**
