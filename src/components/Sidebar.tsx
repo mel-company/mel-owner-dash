@@ -14,7 +14,7 @@ import {
   Wallet02Icon,
 } from '@hugeicons-pro/core-stroke-rounded';
 import { useAuth } from '../contexts/AuthContext';
-import BrandLogo from './BrandLogo';
+import { useSupportUnread } from '../contexts/SupportUnreadContext';
 import {
   Sidebar,
   SidebarContent,
@@ -40,15 +40,16 @@ type AppMenuItem = {
   roles: Array<'owner' | 'employee' | 'support' | 'developer'>;
   section: 'system' | 'user';
   badge?: string;
+  dynamicBadge?: 'support-unread';
 };
 
 const menuItems: AppMenuItem[] = [
-  { path: '/dashboard', label: 'لوحة التحكم', icon: DashboardSquare03Icon, roles: ['owner', 'employee', 'support'], section: 'system', badge: '+1' },
+  { path: '/dashboard', label: 'لوحة التحكم', icon: DashboardSquare03Icon, roles: ['owner', 'employee', 'support'], section: 'system' },
   { path: '/dashboard/employees', label: 'إدارة الموظفين', icon: UserGroupIcon, roles: ['owner'], section: 'system' },
   { path: '/dashboard/accounting', label: 'الحسابات المالية', icon: Invoice03Icon, roles: ['owner', 'employee'], section: 'system' },
   { path: '/dashboard/delivery', label: 'شركات الشحن', icon: DeliveryTruck01Icon, roles: ['owner'], section: 'system' },
   { path: '/dashboard/stores', label: 'إدارة المتاجر', icon: StoreManagement01Icon, roles: ['owner', 'employee'], section: 'user' },
-  { path: '/dashboard/support', label: 'الدعم الفني', icon: CustomerSupportIcon, roles: ['support', 'owner'], section: 'user' },
+  { path: '/dashboard/support', label: 'الدعم الفني', icon: CustomerSupportIcon, roles: ['support', 'owner'], section: 'user', dynamicBadge: 'support-unread' },
   { path: '/dashboard/payments', label: 'بوابات الدفع', icon: CreditCardIcon, roles: ['owner'], section: 'user' },
   { path: '/dashboard/plans', label: 'باقات الاشتراك', icon: Wallet02Icon, roles: ['owner'], section: 'user' },
   { path: '/developer', label: 'مطور النظام', icon: CodeIcon, roles: ['developer'], section: 'user' },
@@ -64,6 +65,7 @@ const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { state, toggleSidebar } = useShadcnSidebar();
+  const { unreadTotal } = useSupportUnread();
 
   const handleLogout = () => {
     logout();
@@ -91,6 +93,13 @@ const AppSidebar = () => {
 
   const isCollapsed = state === 'collapsed';
 
+  const getItemBadge = (item: AppMenuItem) => {
+    if (item.dynamicBadge === 'support-unread' && unreadTotal > 0) {
+      return unreadTotal > 99 ? '99+' : String(unreadTotal);
+    }
+    return item.badge;
+  };
+
   return (
     <Sidebar
       side="right"
@@ -98,48 +107,52 @@ const AppSidebar = () => {
       variant="sidebar"
       className="border-l border-slate-100 bg-white  [--sidebar:#ffffff] shadow-[0_20px_70px_rgba(15,23,42,0.06)]"
     >
-      <SidebarHeader className={cn("bg-white p-4", isCollapsed && "px-2")}>
+      <SidebarHeader className={cn("bg-white px-3 py-3", isCollapsed && "px-2")}>
         <div className={cn(
-          isCollapsed ? "flex flex-col items-center gap-4 " : "grid grid-cols-[auto_1fr_auto] items-center  gap-3"
+          isCollapsed ? "flex flex-col items-center gap-3" : "flex h-16 items-center justify-between rounded-2xl border border-slate-100 bg-white px-3 shadow-sm"
         )}>
-          <Link
-            to="/dashboard"
-            className={cn(
-              "flex items-center justify-center rounded-full bg-[#112C71]",
-              isCollapsed ? "h-9 w-9 p-1.5" : "h-12 w-12"
-            )}
-            aria-label="mel.iq"
-          >
-            <BrandLogo variant="mark" imageClassName="h-full w-full brightness-0 invert" />
-          </Link>
+          {!isCollapsed && (
+            <div className="flex items-center gap-2 text-slate-400">
+              <button
+                onClick={toggleSidebar}
+                className="grid h-8 w-8 place-items-center rounded-xl transition hover:bg-violet-50 hover:text-[#7D26F7]"
+                aria-label="إغلاق القائمة"
+              >
+                <SidebarToggleIcon className="h-5 w-5" />
+              </button>
+              <span className="h-6 w-px rounded-full bg-slate-200" />
+            </div>
+          )}
 
           {!isCollapsed && (
-            <Link to="/dashboard" className="flex flex-col items-start justify-start">
-              <BrandLogo variant="dark" imageClassName="h-8" />
-              <p className="mt-1 text-xs font-semibold text-slate-400">نظام إدارة المتاجر</p>
+            <Link to="/dashboard" className="flex min-w-0 flex-1 items-center justify-end gap-3">
+              <div className="min-w-0 text-right">
+                <p className="text-lg font-black leading-6 text-slate-950" dir="ltr">mel.iq</p>
+                <p className="text-xs font-bold leading-5 text-slate-400">نظام إدارة المتاجر</p>
+              </div>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-50 text-[#7D26F7]">
+                <HugeiconsIcon icon={StoreManagement01Icon} size={24} strokeWidth={2.2} />
+              </span>
             </Link>
           )}
 
-
-
-          {!isCollapsed && (
-            <button
-              onClick={toggleSidebar}
-              className="grid h-10 w-10 place-items-center rounded-xl transition hover:scale-105"
-              aria-label="إغلاق القائمة"
-            >
-              <SidebarToggleIcon />
-            </button>
-          )}
-
           {isCollapsed && (
-            <button
-              onClick={toggleSidebar}
-              className="grid h-10 w-10 place-items-center rounded-xl transition hover:scale-105"
-              aria-label="فتح القائمة"
-            >
-              <SidebarToggleIcon />
-            </button>
+            <>
+              <Link
+                to="/dashboard"
+                className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-[#7D26F7]"
+                aria-label="mel.iq"
+              >
+                <HugeiconsIcon icon={StoreManagement01Icon} size={24} strokeWidth={2.2} />
+              </Link>
+              <button
+                onClick={toggleSidebar}
+                className="grid h-10 w-10 place-items-center rounded-xl transition hover:scale-105"
+                aria-label="فتح القائمة"
+              >
+                <SidebarToggleIcon />
+              </button>
+            </>
           )}
         </div>
       </SidebarHeader>
@@ -155,6 +168,7 @@ const AppSidebar = () => {
                 const isActive = item.path === '/dashboard'
                   ? location.pathname === item.path
                   : location.pathname.startsWith(item.path);
+                const badge = getItemBadge(item);
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
@@ -169,12 +183,12 @@ const AppSidebar = () => {
                       )}
                     >
                       <Link to={item.path} className={cn("relative z-10 flex w-full items-center justify-end gap-3", isCollapsed && "justify-center")}>
-                        {item.badge && (
+                        {badge && (
                           <span className={cn(
                             "absolute flex h-8 min-w-10 items-center justify-center rounded-full bg-red-500 px-2 text-sm font-black text-white shadow-[0_10px_26px_rgba(239,68,68,0.5)]",
                             isCollapsed ? "-right-2 -top-2" : "left-3"
                           )}>
-                            {item.badge}
+                            {badge}
                           </span>
                         )}
                         {!isCollapsed && <span className="text-base font-black">{item.label}</span>}
@@ -202,7 +216,7 @@ const AppSidebar = () => {
           <div
             onDoubleClick={handleLogout}
             title="انقر مرتين لتسجيل الخروج"
-            className="flex h-[72px] cursor-pointer items-center justify-between rounded-[1.7rem] bg-linear-to-r from-cyan-400 via-sky-500 to-violet-500 px-4 text-white shadow-[0_18px_45px_rgba(56,189,248,0.24)]"
+            className="flex h-18 cursor-pointer items-center justify-between rounded-[1.7rem] bg-linear-to-r from-cyan-400 via-sky-500 to-violet-500 px-4 text-white shadow-[0_18px_45px_rgba(56,189,248,0.24)]"
           >
             <ChevronDown className="h-4 w-4 shrink-0 stroke-3 text-white" />
             <div className="min-w-0 flex-1 px-3 text-right">

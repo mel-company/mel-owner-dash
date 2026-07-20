@@ -62,6 +62,11 @@ export interface SupportTicket {
   updatedAt: string;
   userId?: string;
   storeId?: string;
+  unreadCount?: number;
+  unreadMessages?: number;
+  unread_count?: number;
+  lastMessageAt?: string | null;
+  lastMessagePreview?: string | null;
 }
 
 export interface TicketsListResponse {
@@ -88,13 +93,14 @@ export interface SupportTicketStoreOption {
 
 export interface SupportTicketAttachment {
   id: string;
-  url?: string;
-  fileUrl?: string;
+  url?: string | null;
+  fileUrl?: string | null;
   name?: string;
   fileName?: string;
   mimeType?: string;
   size?: number;
   createdAt?: string;
+  available?: boolean;
 }
 
 export interface SupportTicketStoresResponse {
@@ -110,9 +116,16 @@ const isNotFoundError = (error: unknown) => {
   return possibleError.response?.status === 404;
 };
 
-const normalizeAttachmentsResponse = (response: SupportTicketAttachment[] | { data: SupportTicketAttachment[] }) => (
-  Array.isArray(response) ? response : response.data || []
-);
+const normalizeAttachmentsResponse = (response: unknown): SupportTicketAttachment[] => {
+  if (Array.isArray(response)) return response as SupportTicketAttachment[];
+  if (response && typeof response === 'object') {
+    const payload = response as { data?: SupportTicketAttachment[] | { data?: SupportTicketAttachment[] }; attachments?: SupportTicketAttachment[] };
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.attachments)) return payload.attachments;
+    if (payload.data && typeof payload.data === 'object' && Array.isArray(payload.data.data)) return payload.data.data;
+  }
+  return [];
+};
 
 /**
  * Support Tickets Service
@@ -137,16 +150,22 @@ export const supportTicketsService = {
    * الحصول على جميع تذاكر الدعم (System User)
    * GET /api/v1/support-ticket/system
    */
-  getAllSystemTickets: async (params?: { page?: number; limit?: number }): Promise<TicketsListResponse> => {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-
-    const queryString = queryParams.toString();
-    const url = `/support-ticket/system${queryString ? `?${queryString}` : ''}`;
-
-    const response = await axiosInstance.get<TicketsListResponse>(url);
-    return response as unknown as TicketsListResponse;
+  getAllSystemTickets: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+  }): Promise<TicketsListResponse> => {
+    const response = await axiosInstance.get('/support-ticket/system', { params });
+    if (Array.isArray(response)) {
+      return { data: response as SupportTicket[], total: response.length };
+    }
+    const payload = response as unknown as TicketsListResponse;
+    return {
+      ...payload,
+      data: payload.data || [],
+      total: payload.total ?? payload.data?.length ?? 0,
+    };
   },
 
   /**
@@ -171,8 +190,8 @@ export const supportTicketsService = {
 
     for (const path of paths) {
       try {
-        const response = await axiosInstance.get<SupportTicketAttachment[] | { data: SupportTicketAttachment[] }>(path);
-        return normalizeAttachmentsResponse(response as unknown as SupportTicketAttachment[] | { data: SupportTicketAttachment[] });
+        const response = await axiosInstance.get(path);
+        return normalizeAttachmentsResponse(response);
       } catch (error) {
         if (!isNotFoundError(error)) throw error;
       }
@@ -197,12 +216,12 @@ export const supportTicketsService = {
     let lastError: unknown;
     for (const path of paths) {
       try {
-        const response = await axiosInstance.post<SupportTicketAttachment[] | { data: SupportTicketAttachment[] }>(
+        const response = await axiosInstance.post(
           path,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
-        return normalizeAttachmentsResponse(response as unknown as SupportTicketAttachment[] | { data: SupportTicketAttachment[] });
+        return normalizeAttachmentsResponse(response);
       } catch (error) {
         lastError = error;
         if (!isNotFoundError(error)) throw error;
@@ -235,6 +254,22 @@ export const supportTicketsService = {
     }
 
     throw lastError;
+  },
+
+  /**
+   * إصلاح مفاتيح المرفقات القديمة (أسماء غير ASCII)
+   * POST /api/v1/support-ticket/system/repair-attachments
+   */
+  repairTicketAttachments: async (ticketId?: string): Promise<{
+    repairedIds?: string[];
+    missingIds?: string[];
+  }> => {
+    const response = await axiosInstance.post(
+      '/support-ticket/system/repair-attachments',
+      undefined,
+      { params: ticketId ? { ticketId } : undefined }
+    );
+    return response as unknown as { repairedIds?: string[]; missingIds?: string[] };
   },
 
   /**

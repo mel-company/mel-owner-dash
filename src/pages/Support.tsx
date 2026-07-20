@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   ChevronDown,
   ChevronLeft,
@@ -27,6 +27,8 @@ import {
   DepartmentEnum,
 } from '../services/supportTicketsService';
 import { supportMessagesService, type SupportMessage } from '../services/supportMessagesService';
+import { useSupportUnread } from '../contexts/SupportUnreadContext';
+import { markTicketReadLocally } from '../utils/supportUnread';
 import { cn } from '@/lib/utils';
 
 type TicketFilters = {
@@ -107,6 +109,7 @@ const fallbackTickets: SupportTicket[] = [
 const pageSizeOptions = [10, 20, 50];
 
 const Support = () => {
+  const { setUnreadTotal, refreshUnreadTotal } = useSupportUnread();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -118,6 +121,7 @@ const Support = () => {
   const [ticketStores, setTicketStores] = useState<SupportTicketStoreOption[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [reply, setReply] = useState('');
+  const [ticketUnreadMap, setTicketUnreadMap] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<TicketFilters>({
     status: '',
     priority: '',
@@ -127,25 +131,46 @@ const Support = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [formData, setFormData] = useState<CreateTicketRequest>(defaultTicketForm);
+  const selectedTicketIdRef = useRef<string | null>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchTickets();
     fetchTicketStores();
   }, []);
 
-  const fetchTickets = useCallback(async () => {
+  useEffect(() => {
+    selectedTicketIdRef.current = selectedTicket?.id || null;
+  }, [selectedTicket?.id]);
+
+  const fetchTickets = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError('');
-      const response = await supportTicketsService.getAllSystemTickets({ page: 1, limit: 100 });
-      setTickets(response.data || []);
+      const response = await supportTicketsService.getAllSystemTickets({
+        page: 1,
+        limit: 100,
+        status: filters.status || undefined,
+        search: filters.search || undefined,
+      });
+      const list = response.data || [];
+      setTickets(list);
+
+      const nextMap: Record<string, number> = {};
+      list.forEach((ticket) => {
+        nextMap[ticket.id] = getTicketUnreadCount(ticket);
+      });
+      setTicketUnreadMap(nextMap);
+
+      const apiUnread = await supportMessagesService.getSystemUnreadCount();
+      setUnreadTotal(apiUnread);
     } catch (err) {
       setError('فشل في جلب تذاكر الدعم. يرجى المحاولة مرة أخرى.');
       console.error('Error fetching tickets:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, []);
+  }, [filters.search, filters.status, setUnreadTotal]);
 
   const fetchTicketStores = useCallback(async () => {
     try {
@@ -155,6 +180,86 @@ const Support = () => {
       console.error('Error fetching ticket stores:', err);
     }
   }, []);
+
+  const clearTicketUnread = useCallback((ticketId: string) => {
+    setTicketUnreadMap((current) => ({ ...current, [ticketId]: 0 }));
+    setTickets((current) => current.map((ticket) => (
+      ticket.id === ticketId
+        ? { ...ticket, unreadCount: 0, unreadMessages: 0, unread_count: 0 }
+        : ticket
+    )));
+  }, []);
+
+  const markTicketRead = useCallback(async (ticketId: string) => {
+    markTicketReadLocally(ticketId);
+    clearTicketUnread(ticketId);
+    try {
+      const remaining = await supportMessagesService.markSystemTicketRead(ticketId);
+      setUnreadTotal(remaining);
+      await refreshUnreadTotal();
+    } catch (err) {
+      console.error('Error marking ticket as read:', err);
+      refreshUnreadTotal();
+    }
+  }, [clearTicketUnread, refreshUnreadTotal, setUnreadTotal]);
+
+  const loadTicketMessages = useCallback(async (ticketId: string) => {
+    const messagesResponse = await supportMessagesService.getSystemTicketMessages(ticketId, { limit: 100 });
+    const nextMessages = messagesResponse.data || [];
+    setMessages(nextMessages);
+    lastMessageIdRef.current = nextMessages[nextMessages.length - 1]?.id || null;
+    return nextMessages;
+  }, []);
+
+  const pollTicketMessages = useCallback(async (ticketId: string) => {
+    const afterId = lastMessageIdRef.current || undefined;
+    const messagesResponse = await supportMessagesService.getSystemTicketMessages(ticketId, {
+      afterId,
+      limit: 50,
+    });
+    const incoming = messagesResponse.data || [];
+    if (incoming.length === 0) return [];
+
+    setMessages((current) => {
+      const existingIds = new Set(current.map((item) => item.id));
+      const unique = incoming.filter((item) => !existingIds.has(item.id));
+      if (unique.length === 0) return current;
+      const merged = [...current, ...unique];
+      lastMessageIdRef.current = merged[merged.length - 1]?.id || lastMessageIdRef.current;
+      return merged;
+    });
+
+    const hasIncomingStoreMessage = incoming.some((message) => (
+      message.senderType === 'STORE_USER' || message.senderType === 'CUSTOMER' || message.senderType === 'USER'
+    ));
+    if (hasIncomingStoreMessage) {
+      await markTicketRead(ticketId);
+    }
+
+    return incoming;
+  }, [markTicketRead]);
+
+  useEffect(() => {
+    if (modalMode !== 'details' || !selectedTicket) return;
+
+    const timer = window.setInterval(async () => {
+      try {
+        await pollTicketMessages(selectedTicket.id);
+      } catch (err) {
+        console.error('Error polling ticket messages:', err);
+      }
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [modalMode, selectedTicket, pollTicketMessages]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (selectedTicketIdRef.current) return;
+      fetchTickets(true);
+    }, 20000);
+    return () => window.clearInterval(timer);
+  }, [fetchTickets]);
 
   const openCreateModal = () => {
     resetForm();
@@ -166,16 +271,22 @@ const Support = () => {
     setSelectedTicket(ticket);
     setModalMode('details');
     setMessages([]);
+    setAttachments([]);
+    lastMessageIdRef.current = null;
 
     try {
-      const [messagesResponse, attachmentsResponse] = await Promise.all([
-        supportMessagesService.getSystemTicketMessages(ticket.id, { page: 1, limit: 100 }),
-        supportTicketsService.getTicketAttachments(ticket.id),
-      ]);
-      setMessages(messagesResponse.data || []);
-      setAttachments(attachmentsResponse);
+      await loadTicketMessages(ticket.id);
+      await markTicketRead(ticket.id);
     } catch (err) {
-      console.error('Error fetching ticket details:', err);
+      console.error('Error fetching ticket messages:', err);
+    }
+
+    try {
+      const attachmentsResponse = await supportTicketsService.getTicketAttachments(ticket.id);
+      setAttachments(attachmentsResponse || []);
+    } catch (err) {
+      console.error('Error fetching ticket attachments:', err);
+      setAttachments([]);
     }
   };
 
@@ -186,6 +297,7 @@ const Support = () => {
     setAttachments([]);
     setSelectedFiles([]);
     setReply('');
+    lastMessageIdRef.current = null;
   };
 
   const handleCreateTicket = async (e: FormEvent) => {
@@ -214,6 +326,19 @@ const Support = () => {
     } catch (err) {
       setError('فشل في رفع المرفقات.');
       console.error('Error uploading attachments:', err);
+    }
+  };
+
+  const handleRepairAttachments = async () => {
+    if (!selectedTicket) return;
+    try {
+      setError('');
+      await supportTicketsService.repairTicketAttachments(selectedTicket.id);
+      const attachmentsResponse = await supportTicketsService.getTicketAttachments(selectedTicket.id);
+      setAttachments(attachmentsResponse || []);
+    } catch (err) {
+      setError('فشل في إصلاح المرفقات. قد تحتاج إعادة رفع الملف.');
+      console.error('Error repairing attachments:', err);
     }
   };
 
@@ -248,10 +373,16 @@ const Support = () => {
     try {
       const message = await supportMessagesService.replySystemTicket({
         ticketId: selectedTicket.id,
+        message: reply.trim(),
         content: reply.trim(),
       });
       setMessages((current) => [...current, message]);
+      lastMessageIdRef.current = message.id;
       setReply('');
+      // Backend auto-marks ticket read for this agent on system reply
+      clearTicketUnread(selectedTicket.id);
+      markTicketReadLocally(selectedTicket.id);
+      refreshUnreadTotal();
     } catch (err) {
       setError('فشل في إرسال الرد.');
       console.error('Error sending reply:', err);
@@ -266,7 +397,12 @@ const Support = () => {
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   const filteredTickets = useMemo(() => sourceTickets.filter(ticket => {
-    const searchable = [ticket.id, ticket.title, ticket.description].join(' ').toLowerCase();
+    const searchable = [
+      ticket.id,
+      ticket.title,
+      ticket.description,
+      ticket.lastMessagePreview || '',
+    ].join(' ').toLowerCase();
     if (filters.status && ticket.status !== filters.status) return false;
     if (filters.priority && ticket.priority !== filters.priority) return false;
     if (filters.department && ticket.department !== filters.department) return false;
@@ -370,6 +506,7 @@ const Support = () => {
 
       <TicketTable
         tickets={paginatedTickets}
+        unreadMap={ticketUnreadMap}
         page={currentPage}
         pageSize={pageSize}
         totalPages={totalPages}
@@ -405,6 +542,7 @@ const Support = () => {
           onSendReply={handleSendReply}
           onUploadAttachments={handleUploadAttachments}
           onDeleteAttachment={handleDeleteAttachment}
+          onRepairAttachments={handleRepairAttachments}
           onClose={closeDrawer}
         />
       )}
@@ -450,6 +588,7 @@ const StatCard = ({ title, value, tone, icon }: { title: string; value: number; 
 
 const TicketTable = ({
   tickets,
+  unreadMap,
   page,
   pageSize,
   totalPages,
@@ -459,6 +598,7 @@ const TicketTable = ({
   onDelete,
 }: {
   tickets: SupportTicket[];
+  unreadMap: Record<string, number>;
   page: number;
   pageSize: number;
   totalPages: number;
@@ -477,16 +617,19 @@ const TicketTable = ({
             <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
               <th className="px-5 py-5 text-right">رقم التذكرة</th>
               <th className="px-5 py-5 text-right">المتجر</th>
-              <th className="px-5 py-5 text-right">العنوان</th>
+              <th className="px-5 py-5 text-right">آخر رسالة</th>
               <th className="px-5 py-5 text-right">القسم</th>
-              <th className="px-5 py-5 text-right">تاريخ</th>
+              <th className="px-5 py-5 text-right">آخر نشاط</th>
+              <th className="px-5 py-5 text-right">غير مقروء</th>
               <th className="px-5 py-5 text-right">الأولوية</th>
               <th className="px-5 py-5 text-right">الحالة</th>
               <th className="px-5 py-5 text-right">العمليات</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {tickets.map((ticket, index) => (
+            {tickets.map((ticket, index) => {
+              const unread = unreadMap[ticket.id] ?? getTicketUnreadCount(ticket);
+              return (
               <tr key={ticket.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-4">
@@ -502,12 +645,23 @@ const TicketTable = ({
                 </td>
                 <td className="max-w-[280px] px-5 py-4">
                   <p className="font-bold text-slate-900">{ticket.title}</p>
-                  <p className="mt-1 truncate text-xs font-medium text-slate-400">{ticket.description}</p>
+                  <p className="mt-1 truncate text-xs font-medium text-slate-400">
+                    {ticket.lastMessagePreview || ticket.description || '—'}
+                  </p>
                 </td>
                 <td className="px-5 py-4 font-semibold text-slate-700">{getDepartmentText(ticket.department)}</td>
                 <td className="px-5 py-4 text-slate-600">
-                  <p className="font-bold">{formatDate(ticket.createdAt)}</p>
-                  <p className="text-xs text-slate-400">{formatTime(ticket.createdAt)}</p>
+                  <p className="font-bold">{formatDate(ticket.lastMessageAt || ticket.updatedAt || ticket.createdAt)}</p>
+                  <p className="text-xs text-slate-400">{formatTime(ticket.lastMessageAt || ticket.updatedAt || ticket.createdAt)}</p>
+                </td>
+                <td className="px-5 py-4">
+                  {unread > 0 ? (
+                    <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-red-500 px-2 py-1 text-xs font-black text-white">
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-slate-300">0</span>
+                  )}
                 </td>
                 <td className="px-5 py-4"><PriorityMeter priority={ticket.priority} /></td>
                 <td className="px-5 py-4"><StatusBadge status={ticket.status} /></td>
@@ -519,8 +673,9 @@ const TicketTable = ({
                     <button className="text-slate-400 transition hover:text-blue-500" aria-label="تعديل">
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button onClick={() => onView(ticket)} className="text-slate-400 transition hover:text-violet-600" aria-label="تفاصيل">
+                    <button onClick={() => onView(ticket)} className="relative text-slate-400 transition hover:text-violet-600" aria-label="تفاصيل">
                       <MessageCircle className="h-4 w-4" />
+                      {unread > 0 && <span className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />}
                     </button>
                     <button className="text-slate-400 transition hover:text-amber-500" aria-label="مرفقات">
                       <FileText className="h-4 w-4" />
@@ -528,10 +683,10 @@ const TicketTable = ({
                   </div>
                 </td>
               </tr>
-            ))}
+            )})}
             {tickets.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-sm font-bold text-slate-400">لا توجد تذاكر</td>
+                <td colSpan={9} className="px-5 py-12 text-center text-sm font-bold text-slate-400">لا توجد تذاكر</td>
               </tr>
             )}
           </tbody>
@@ -668,6 +823,7 @@ const TicketDetailsDrawer = ({
   onSendReply,
   onUploadAttachments,
   onDeleteAttachment,
+  onRepairAttachments,
   onClose,
 }: {
   ticket: SupportTicket;
@@ -679,14 +835,11 @@ const TicketDetailsDrawer = ({
   onSendReply: () => void;
   onUploadAttachments: (files: FileList | File[]) => void;
   onDeleteAttachment: (attachmentId: string) => void;
+  onRepairAttachments: () => void;
   onClose: () => void;
 }) => {
-  const displayMessages = messages.length > 0 ? messages : [
-    { id: '1', content: 'Hey there! 👋', ticketId: ticket.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    { id: '2', content: 'This is your support update. We are checking your ticket details now.', ticketId: ticket.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    { id: '3', content: 'Awesome, thanks for letting me know! Can’t wait for the update.', ticketId: ticket.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  ];
   const storeName = stores.find((store) => store.id === ticket.storeId)?.name || ticket.title;
+  const hasUnavailableAttachments = attachments.some((attachment) => !isAttachmentAvailable(attachment));
 
   return (
     <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
@@ -700,21 +853,58 @@ const TicketDetailsDrawer = ({
               <SelectField label="الحالة" value={ticket.status} options={statusOptions} disabled />
               <SelectField label="القسم" value={ticket.department || ''} options={departmentOptions} disabled />
             </div>
-            <h3 className="mb-3 mt-8 text-lg font-black text-slate-800">المرفقات</h3>
-            <div className="min-h-0 flex-1 rounded-3xl bg-slate-50 p-4">
-              {attachments.map((attachment) => (
-                <div key={attachment.id} className="mb-3 flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <button type="button" onClick={() => onDeleteAttachment(attachment.id)} className="text-red-400"><Trash2 className="h-4 w-4" /></button>
-                    <a href={getAttachmentUrl(attachment)} target="_blank" rel="noreferrer" className="text-slate-400"><Download className="h-4 w-4" /></a>
+            <div className="mb-3 mt-8 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-black text-slate-800">المرفقات</h3>
+              {hasUnavailableAttachments && (
+                <button
+                  type="button"
+                  onClick={onRepairAttachments}
+                  className="rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-600"
+                >
+                  إصلاح المرفقات
+                </button>
+              )}
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-3xl bg-slate-50 p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {attachments.map((attachment) => {
+                const available = isAttachmentAvailable(attachment);
+                const fileUrl = getAttachmentUrl(attachment);
+                const fileName = decodeAttachmentName(attachment.fileName || attachment.name || 'Attachment');
+                const isImage = isImageAttachment(attachment);
+
+                return (
+                  <div key={attachment.id} className="rounded-2xl bg-white p-3 shadow-sm">
+                    {!available ? (
+                      <div className="mb-3 grid h-28 place-items-center rounded-2xl bg-red-50 px-4 text-center">
+                        <p className="text-sm font-black text-red-500">الملف غير متوفر في التخزين</p>
+                        <p className="mt-1 text-xs font-semibold text-red-400">جرّب إصلاح المرفقات أو أعد رفع الملف</p>
+                      </div>
+                    ) : isImage && fileUrl ? (
+                      <AttachmentImagePreview url={fileUrl} alt={fileName} />
+                    ) : null}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => onDeleteAttachment(attachment.id)} className="text-red-400"><Trash2 className="h-4 w-4" /></button>
+                        {available && fileUrl ? (
+                          <a href={fileUrl} target="_blank" rel="noreferrer" className="text-slate-400"><Download className="h-4 w-4" /></a>
+                        ) : (
+                          <span className="text-slate-300"><Download className="h-4 w-4" /></span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 text-right">
+                        <p className="truncate font-black text-slate-800">{fileName}</p>
+                        <p className="text-xs font-semibold text-slate-400">
+                          {formatFileSize(attachment.size)} . {attachment.createdAt ? formatDate(attachment.createdAt) : '-'}
+                          {!available ? ' . غير متوفر' : ''}
+                        </p>
+                      </div>
+                      <span className={cn('rounded px-2 py-1 text-[10px] font-black', available ? 'bg-violet-50 text-violet-600' : 'bg-red-50 text-red-500')}>
+                        {available ? getAttachmentType(attachment) : 'MISSING'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-black text-slate-800">{attachment.fileName || attachment.name || 'Attachment'}</p>
-                    <p className="text-xs font-semibold text-slate-400">{formatFileSize(attachment.size)} . {attachment.createdAt ? formatDate(attachment.createdAt) : '-'}</p>
-                  </div>
-                  <span className="rounded bg-violet-50 px-2 py-1 text-[10px] font-black text-violet-600">{getAttachmentType(attachment)}</span>
-                </div>
-              ))}
+                );
+              })}
               {attachments.length === 0 && (
                 <p className="py-8 text-center text-sm font-bold text-slate-400">لا توجد مرفقات</p>
               )}
@@ -729,12 +919,71 @@ const TicketDetailsDrawer = ({
           <div className="flex min-h-0 flex-col">
             <h3 className="mb-3 text-lg font-black text-slate-800">المحادثة</h3>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-3xl bg-slate-50 p-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {displayMessages.map((message, index) => (
-                <div key={message.id} className={cn('max-w-[75%] rounded-3xl px-5 py-4 text-sm font-semibold shadow-sm', index % 3 === 2 ? 'mr-auto bg-violet-600 text-white' : 'bg-white text-slate-700')}>
-                  <p>{message.content || message.message}</p>
-                  <p className={cn('mt-2 text-[10px]', index % 3 === 2 ? 'text-white/70' : 'text-slate-300')}>{formatTime(message.createdAt)}</p>
-                </div>
-              ))}
+              {messages.map((message) => {
+                const isStoreSide = message.senderType === 'STORE_USER' || message.senderType === 'CUSTOMER' || message.senderType === 'USER';
+                const senderName = getMessageSenderName(message);
+                const text = message.content || message.message || '';
+                const messageAttachments = message.attachments || [];
+
+                return (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      'max-w-[80%] rounded-3xl px-5 py-4 text-sm font-semibold shadow-sm',
+                      isStoreSide ? 'mr-auto bg-white text-slate-700' : 'ml-auto bg-violet-600 text-white'
+                    )}
+                  >
+                    {senderName && (
+                      <p className={cn('mb-2 text-[11px] font-black', isStoreSide ? 'text-violet-600' : 'text-white/80')}>
+                        {senderName}
+                      </p>
+                    )}
+                    {text ? <p className="whitespace-pre-wrap">{text}</p> : null}
+                    {messageAttachments.length > 0 && (
+                      <div className={cn('space-y-2', text && 'mt-3')}>
+                        {messageAttachments.map((attachment) => {
+                          const url = getAttachmentUrl(attachment);
+                          const name = decodeAttachmentName(attachment.fileName || attachment.name || 'Attachment');
+                          const available = isAttachmentAvailable(attachment);
+
+                          if (!available || !url) {
+                            return (
+                              <div key={attachment.id} className={cn('rounded-2xl px-3 py-2 text-xs font-bold', isStoreSide ? 'bg-red-50 text-red-500' : 'bg-white/15 text-white')}>
+                                مرفق غير متوفر: {name}
+                              </div>
+                            );
+                          }
+
+                          if (isImageAttachment(attachment)) {
+                            return (
+                              <a key={attachment.id} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl">
+                                <img src={url} alt={name} className="max-h-56 w-full object-cover" />
+                              </a>
+                            );
+                          }
+
+                          return (
+                            <a
+                              key={attachment.id}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={cn('inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-black', isStoreSide ? 'bg-slate-100 text-slate-700' : 'bg-white/15 text-white')}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {name}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className={cn('mt-2 text-[10px]', isStoreSide ? 'text-slate-300' : 'text-white/70')}>{formatTime(message.createdAt)}</p>
+                  </div>
+                );
+              })}
+              {messages.length === 0 && (
+                <p className="py-10 text-center text-sm font-bold text-slate-400">لا توجد رسائل بعد</p>
+              )}
             </div>
             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2">
               <button onClick={onSendReply} className="h-10 rounded-xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500">إرسال</button>
@@ -933,17 +1182,69 @@ const getVisiblePages = (page: number, totalPages: number): Array<number | 'elli
 
 const formatDate = (date: string) => new Date(date).toLocaleDateString('en-GB');
 const formatTime = (date: string) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+const getTicketUnreadCount = (ticket: SupportTicket) => (
+  ticket.unreadCount ?? ticket.unreadMessages ?? ticket.unread_count ?? 0
+);
 const formatFileSize = (size?: number) => {
   if (!size) return '-';
   if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const getAttachmentUrl = (attachment: SupportTicketAttachment) => attachment.url || attachment.fileUrl || '#';
+const AttachmentImagePreview = ({ url, alt }: { url: string; alt: string }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="mb-3 grid h-28 place-items-center rounded-2xl bg-red-50 px-4 text-center">
+        <p className="text-sm font-black text-red-500">تعذر تحميل الملف من التخزين</p>
+        <p className="mt-1 text-xs font-semibold text-red-400">المفتاح غير موجود أو رابط التوقيع غير صحيح</p>
+      </div>
+    );
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="mb-3 block overflow-hidden rounded-2xl bg-slate-50">
+      <img src={url} alt={alt} className="h-40 w-full object-cover" onError={() => setFailed(true)} />
+    </a>
+  );
+};
+
+const getAttachmentUrl = (attachment: SupportTicketAttachment) => attachment.url || attachment.fileUrl || null;
+const isAttachmentAvailable = (attachment: SupportTicketAttachment) => {
+  if (attachment.available === false) return false;
+  return Boolean(attachment.url || attachment.fileUrl);
+};
+const getMessageSenderName = (message: SupportMessage) => {
+  if (message.storeUser?.user?.name) return message.storeUser.user.name;
+  if (message.sender?.name) return message.sender.name;
+  if (message.senderType === 'SYSTEM_USER') return 'فريق الدعم';
+  if (message.senderType === 'STORE_USER') return 'مستخدم المتجر';
+  return '';
+};
 const getAttachmentType = (attachment: SupportTicketAttachment) => {
-  const source = attachment.mimeType || attachment.fileName || attachment.name || '';
-  const type = source.split('/').pop()?.split('.').pop();
+  if (attachment.mimeType?.includes('/')) return attachment.mimeType.split('/')[1].toUpperCase();
+  const source = attachment.fileName || attachment.name || '';
+  const type = source.split('.').pop();
   return type ? type.toUpperCase() : 'FILE';
+};
+const isImageAttachment = (attachment: SupportTicketAttachment) => {
+  if (attachment.mimeType?.startsWith('image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(attachment.fileName || attachment.name || '');
+};
+const decodeAttachmentName = (value: string) => {
+  try {
+    if (/[ØÙÃÂ]/.test(value)) {
+      return decodeURIComponent(escape(value));
+    }
+  } catch {
+    // keep original name if decoding fails
+  }
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 };
 
 const getPriorityText = (priority: string | undefined) => {
