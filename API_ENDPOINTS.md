@@ -1088,6 +1088,50 @@ PUT /subscription/system/{id}/renew
 
 ---
 
+## 🧠 Financial AI Endpoints
+
+كل هذه الـ endpoints محمية بـ `SystemUserJwtAuthGuard` (دور `owner` في الواجهة).
+
+كل مبلغ يرجع بالعملتين معاً — `{ "usd": number, "iqd": number }` — مع `rate` في الاستجابة،
+لأن كلفة النماذج بالدولار بينما الباقات والاشتراكات بالدينار. سعر الصرف من متغير البيئة
+`USD_TO_IQD_RATE` (افتراضياً 1350)، والتبديل في الواجهة عرض فقط.
+
+### 1. ملخص مالي عام
+```
+GET /api/v1/financial-ai/summary?from&to
+```
+يرجع: `cost`, `creditRevenue`, `subscriptionRevenue`, `revenue`, `margin`, `marginPercent`,
+`deferredLiability` (رصيد مدفوع غير مستهلك — التزام وليس ربحاً)، `deferredCredits`,
+`usage` (تشغيلات، إنشاء متاجر، طلبات محرر، رموز، نسبة الذاكرة المؤقتة، تشغيلات فاشلة)،
+`fullyPriced`، `byModel`، و`monthly` (سلسلة شهرية للإيراد مقابل الكلفة).
+
+### 2. الكلفة والإيراد لكل متجر
+```
+GET /api/v1/financial-ai/stores?page&limit&search&sort&from&to
+```
+`sort`: `cost` (افتراضي) | `revenue` | `margin` | `generations`.
+
+الكلفة مأخوذة من عدّاد الرموز الفعلي لكل تشغيل. إيراد الاشتراك دقيق لكل متجر. أما إيراد
+الرصيد فيُوزَّع: الباقات تُشترى باسم المستخدم لا باسم المتجر، فيُقسَّم على متاجره بنسبة ما
+كلّفه كل متجر خلال الفترة (وبالتساوي إن لم تكن هناك كلفة). عند وجود متجر واحد — وهي الحالة
+الشائعة — التوزيع دقيق. صف `غير مرتبط بمتجر` يجمع التشغيلات التي لا متجر لها (اقتراح تصميم
+مرفوض، أو تشغيل فشل قبل تجهيز المتجر) حتى تبقى الصفوف مطابقة للملخص.
+
+### 3. تفاصيل متجر واحد
+```
+GET /api/v1/financial-ai/stores/:storeId?from&to
+```
+يرجع التوزيع حسب النموذج، آخر 100 تشغيل، ومشتريات مالك المتجر.
+
+### 4. سجل شراء الرصيد
+```
+GET /api/v1/financial-ai/purchases?page&limit&search&status&from&to
+```
+`status`: `PENDING` | `PAID` | `FAILED` | `EXPIRED`. عملية `PAID` بلا `fulfilledAt` تعني
+رصيداً قُبض ثمنه ولم يُسلَّم — تظهر في الواجهة كتنبيه مستقل.
+
+---
+
 ## 🔒 Authorization & Permissions
 
 ### Roles:

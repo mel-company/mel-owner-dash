@@ -9,6 +9,7 @@ import Stores from './pages/Stores';
 import StoreDetails from './pages/StoreDetails';
 import Employees from './pages/Employees';
 import Accounting from './pages/Accounting';
+import FinancialAi from './pages/FinancialAi';
 import SubscriptionPlans from './pages/SubscriptionPlans';
 import Support from './pages/Support';
 import DeliveryCompanies from './pages/DeliveryCompanies';
@@ -61,6 +62,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['owner', 'employee']}>
                   <Accounting />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="financial-ai"
+              element={
+                <ProtectedRoute requiredRoles={['owner']}>
+                  <FinancialAi />
                 </ProtectedRoute>
               }
             />
