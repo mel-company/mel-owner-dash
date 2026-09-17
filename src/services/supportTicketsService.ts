@@ -36,6 +36,13 @@ export const DepartmentEnum = {
   OTHER: 'OTHER',
 } as const;
 
+/** Which surface opened the ticket. Null on rows created before we tracked it. */
+export const TicketSourceEnum = {
+  DASHBOARD: 'DASHBOARD',
+  ADMIN: 'ADMIN',
+  LANDING_PAGE: 'LANDING_PAGE',
+} as const;
+
 export const TicketMessageSenderType = {
   SYSTEM_USER: 'SYSTEM_USER',
   STORE_USER: 'STORE_USER',
@@ -48,6 +55,7 @@ export type TicketStatusEnum = typeof TicketStatusEnum[keyof typeof TicketStatus
 export type TicketTypeEnum = typeof TicketTypeEnum[keyof typeof TicketTypeEnum];
 export type DepartmentEnum = typeof DepartmentEnum[keyof typeof DepartmentEnum];
 export type TicketMessageSenderType = typeof TicketMessageSenderType[keyof typeof TicketMessageSenderType];
+export type TicketSourceEnum = typeof TicketSourceEnum[keyof typeof TicketSourceEnum];
 
 export interface SupportTicket {
   id: string;
@@ -67,6 +75,17 @@ export interface SupportTicket {
   unread_count?: number;
   lastMessageAt?: string | null;
   lastMessagePreview?: string | null;
+  /** The list endpoint returns this; the table just never read it. */
+  store?: { id: string; name: string; domain?: string | null } | null;
+  /**
+   * Set only on tickets from the mel.iq contact form (`source: LANDING_PAGE`).
+   * A visitor has no account, so the ticket carries its own reply address —
+   * this is how support reaches them.
+   */
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  source?: TicketSourceEnum | null;
 }
 
 export interface TicketsListResponse {

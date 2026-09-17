@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Building2, ExternalLink, Mail, MapPin, PackageCheck, Phone, Plus, Star, Truck, Trash2 } from 'lucide-react';
 import {
   ConfirmDeleteModal,
@@ -29,7 +30,23 @@ const defaultForm: DeliveryCompanyPayload = {
   zip: '',
   status: 'ACTIVE',
   rating: 0,
+  // Shipping rules. The base fee is what checkout falls back to whenever the
+  // courier cannot be asked for a live price.
+  baseFee: 5000,
+  sameStateFee: null,
+  maxWeightGrams: null,
+  maxVolumeCm3: null,
+  maxQty: null,
+  weightStepGrams: 1000,
+  weightStepFee: 0,
+  volumeStepCm3: 10000,
+  volumeStepFee: 0,
+  qtyStepFee: 0,
 };
+
+/** '' clears a ceiling; a number sets it. */
+const toOptionalNumber = (value: string): number | null =>
+  value.trim() === '' ? null : Number(value);
 
 const DeliveryCompanies = () => {
   const [companies, setCompanies] = useState<DeliveryCompany[]>([]);
@@ -92,6 +109,17 @@ const DeliveryCompanies = () => {
       zip: company.zip || '',
       status: company.status,
       rating: company.rating || 0,
+      // `??` rather than `||`: a deliberate 0 surcharge is not "unset".
+      baseFee: company.baseFee ?? 5000,
+      sameStateFee: company.sameStateFee ?? null,
+      maxWeightGrams: company.maxWeightGrams ?? null,
+      maxVolumeCm3: company.maxVolumeCm3 ?? null,
+      maxQty: company.maxQty ?? null,
+      weightStepGrams: company.weightStepGrams ?? 1000,
+      weightStepFee: company.weightStepFee ?? 0,
+      volumeStepCm3: company.volumeStepCm3 ?? 10000,
+      volumeStepFee: company.volumeStepFee ?? 0,
+      qtyStepFee: company.qtyStepFee ?? 0,
     });
     setShowDrawer(true);
   };
@@ -202,7 +230,12 @@ const DeliveryCompanies = () => {
             <div className="mt-5 flex gap-2">
               <button onClick={() => setCompanyToDelete(company)} className="grid h-10 w-10 place-items-center rounded-xl bg-red-50 text-red-500"><Trash2 className="h-4 w-4" /></button>
               <button onClick={() => openEditDrawer(company)} className="flex-1 rounded-xl bg-slate-50 py-2 text-sm font-black text-slate-600">تعديل</button>
-              <button className="flex-1 rounded-xl bg-violet-600 py-2 text-sm font-black text-white">عرض التفاصيل</button>
+              <Link
+                to={`/dashboard/delivery/${company.id}/zones`}
+                className="flex-1 rounded-xl bg-violet-600 py-2 text-center text-sm font-black text-white"
+              >
+                المناطق والأكواد
+              </Link>
             </div>
           </div>
         ))}
@@ -227,6 +260,78 @@ const DeliveryCompanies = () => {
               <FormField label="العنوان" value={formData.address} onChange={(value) => setFormData((current) => ({ ...current, address: value }))} />
               <FormField label="الرمز البريدي" value={formData.zip} onChange={(value) => setFormData((current) => ({ ...current, zip: value }))} />
               <FormField label="التقييم" type="number" value={formData.rating} onChange={(value) => setFormData((current) => ({ ...current, rating: Number(value) }))} />
+              <div className="sm:col-span-2 pt-2">
+                <h4 className="text-sm font-black text-slate-950">تسعير الشحن</h4>
+                <p className="mt-1 text-xs text-slate-500">
+                  تُستخدم هذه القيم عندما يتعذر الحصول على سعر مباشر من شركة الشحن — أو
+                  عندما لا تكون مدينة الزبون مربوطة بكود لدى الشركة.
+                </p>
+              </div>
+
+              <FormField
+                label="السعر الافتراضي (د.ع)"
+                type="number"
+                value={formData.baseFee ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, baseFee: Number(value) }))}
+              />
+              <FormField
+                label="السعر داخل نفس المحافظة (د.ع)"
+                type="number"
+                value={formData.sameStateFee ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, sameStateFee: toOptionalNumber(value) }))}
+              />
+
+              <FormField
+                label="أقصى وزن (غرام)"
+                type="number"
+                value={formData.maxWeightGrams ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, maxWeightGrams: toOptionalNumber(value) }))}
+              />
+              <FormField
+                label="رسوم كل وحدة وزن إضافية (د.ع)"
+                type="number"
+                value={formData.weightStepFee ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, weightStepFee: Number(value) }))}
+              />
+              <FormField
+                label="وحدة الوزن (غرام)"
+                type="number"
+                value={formData.weightStepGrams ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, weightStepGrams: Number(value) }))}
+              />
+
+              <FormField
+                label="أقصى حجم (سم³)"
+                type="number"
+                value={formData.maxVolumeCm3 ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, maxVolumeCm3: toOptionalNumber(value) }))}
+              />
+              <FormField
+                label="رسوم كل وحدة حجم إضافية (د.ع)"
+                type="number"
+                value={formData.volumeStepFee ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, volumeStepFee: Number(value) }))}
+              />
+              <FormField
+                label="وحدة الحجم (سم³)"
+                type="number"
+                value={formData.volumeStepCm3 ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, volumeStepCm3: Number(value) }))}
+              />
+
+              <FormField
+                label="أقصى عدد قطع"
+                type="number"
+                value={formData.maxQty ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, maxQty: toOptionalNumber(value) }))}
+              />
+              <FormField
+                label="رسوم كل قطعة إضافية (د.ع)"
+                type="number"
+                value={formData.qtyStepFee ?? ''}
+                onChange={(value) => setFormData((current) => ({ ...current, qtyStepFee: Number(value) }))}
+              />
+
               <SelectField
                 label="الحالة"
                 value={formData.status}

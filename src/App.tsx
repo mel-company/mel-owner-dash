@@ -13,6 +13,7 @@ import FinancialAi from './pages/FinancialAi';
 import SubscriptionPlans from './pages/SubscriptionPlans';
 import Support from './pages/Support';
 import DeliveryCompanies from './pages/DeliveryCompanies';
+import DeliveryZones from './pages/DeliveryZones';
 import PaymentMethods from './pages/PaymentMethods';
 import Developer from './pages/Developer';
 
@@ -94,6 +95,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['owner']}>
                   <DeliveryCompanies />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="delivery/:deliveryCompanyId/zones"
+              element={
+                <ProtectedRoute requiredRoles={['owner']}>
+                  <DeliveryZones />
                 </ProtectedRoute>
               }
             />

@@ -25,6 +25,7 @@ import {
   TicketStatusEnum,
   TicketTypeEnum,
   DepartmentEnum,
+  TicketSourceEnum,
 } from '../services/supportTicketsService';
 import { supportMessagesService, type SupportMessage } from '../services/supportMessagesService';
 import { useSupportUnread } from '../contexts/SupportUnreadContext';
@@ -47,64 +48,6 @@ const defaultTicketForm: CreateTicketRequest = {
   type: TicketTypeEnum.SUPPORT,
   department: DepartmentEnum.IT,
 };
-
-const fallbackTickets: SupportTicket[] = [
-  {
-    id: '4322A2A',
-    title: 'ستور اوريوس للتجهيز الالكتروني',
-    description: 'اشرح هنا تفاصيل المشكلة بصورة مختصرة حتى يتمكن فريق الدعم من المتابعة.',
-    status: TicketStatusEnum.CANCELLED,
-    priority: TicketPriorityEnum.HIGH,
-    type: TicketTypeEnum.SUPPORT,
-    department: DepartmentEnum.CUSTOMER_SERVICE,
-    createdAt: '2026-10-14T15:52:00.000Z',
-    updatedAt: '2026-10-14T15:52:00.000Z',
-  },
-  {
-    id: '4322A3',
-    title: 'سنتر ماي مارت',
-    description: 'مشكلة اتصال في المتجر وتحتاج متابعة من فريق الدعم الفني.',
-    status: TicketStatusEnum.ON_HOLD,
-    priority: TicketPriorityEnum.MEDIUM,
-    type: TicketTypeEnum.BUG,
-    department: DepartmentEnum.CUSTOMER_SERVICE,
-    createdAt: '2026-10-14T15:52:00.000Z',
-    updatedAt: '2026-10-14T15:52:00.000Z',
-  },
-  {
-    id: '4322A4',
-    title: 'الجواهر للاكسسوارات النسائية',
-    description: 'طلب دعم متعلق بإعدادات المتجر وربط المنتجات.',
-    status: TicketStatusEnum.RESOLVED,
-    priority: TicketPriorityEnum.LOW,
-    type: TicketTypeEnum.QUESTION,
-    department: DepartmentEnum.CUSTOMER_SERVICE,
-    createdAt: '2026-10-14T15:52:00.000Z',
-    updatedAt: '2026-10-14T15:52:00.000Z',
-  },
-  {
-    id: '4322A5',
-    title: 'عين الصقر للموبايلات',
-    description: 'طلب تغيير بيانات واحتياج لإجراء مراجعة.',
-    status: TicketStatusEnum.OPEN,
-    priority: TicketPriorityEnum.MEDIUM,
-    type: TicketTypeEnum.SUPPORT,
-    department: DepartmentEnum.OTHER,
-    createdAt: '2026-10-14T15:52:00.000Z',
-    updatedAt: '2026-10-14T15:52:00.000Z',
-  },
-  {
-    id: '4322A6',
-    title: 'بوينت أي كيو',
-    description: 'ملاحظات على لوحة التحكم وتحتاج متابعة.',
-    status: TicketStatusEnum.CANCELLED,
-    priority: TicketPriorityEnum.MEDIUM,
-    type: TicketTypeEnum.FEEDBACK,
-    department: DepartmentEnum.OTHER,
-    createdAt: '2026-10-14T15:52:00.000Z',
-    updatedAt: '2026-10-14T15:52:00.000Z',
-  },
-];
 
 const pageSizeOptions = [10, 20, 50];
 
@@ -393,7 +336,7 @@ const Support = () => {
     setFormData(defaultTicketForm);
   };
 
-  const sourceTickets = tickets.length > 0 ? tickets : fallbackTickets;
+  const sourceTickets = tickets;
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   const filteredTickets = useMemo(() => sourceTickets.filter(ticket => {
@@ -402,6 +345,9 @@ const Support = () => {
       ticket.title,
       ticket.description,
       ticket.lastMessagePreview || '',
+      ticket.contactName || '',
+      ticket.contactEmail || '',
+      ticket.contactPhone || '',
     ].join(' ').toLowerCase();
     if (filters.status && ticket.status !== filters.status) return false;
     if (filters.priority && ticket.priority !== filters.priority) return false;
@@ -635,11 +581,25 @@ const TicketTable = ({
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-semibold text-slate-500">{String(index + 1).padStart(2, '0')}</span>
                     <span className="font-black text-indigo-900">#{ticket.id.slice(0, 7)}</span>
+                    {ticket.source === TicketSourceEnum.LANDING_PAGE && (
+                      <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-600">
+                        صفحة الهبوط
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center justify-end gap-3">
-                    <span className="font-bold text-slate-900">{ticket.title}</span>
+                    {/* The column header says المتجر, so show the store — the
+                        list endpoint has returned it all along. A contact-form
+                        ticket has no store, so it shows the visitor instead;
+                        falling back to the title here rendered the subject
+                        twice, once under a header claiming it was a store. */}
+                    <span className="font-bold text-slate-900">
+                      {ticket.source === TicketSourceEnum.LANDING_PAGE
+                        ? ticket.contactName || 'زائر — صفحة الهبوط'
+                        : ticket.store?.name || ticket.title}
+                    </span>
                     <TicketLogo index={index} />
                   </div>
                 </td>
@@ -838,7 +798,10 @@ const TicketDetailsDrawer = ({
   onRepairAttachments: () => void;
   onClose: () => void;
 }) => {
-  const storeName = stores.find((store) => store.id === ticket.storeId)?.name || ticket.title;
+  const storeName =
+    stores.find((store) => store.id === ticket.storeId)?.name ||
+    ticket.store?.name ||
+    '—';
   const hasUnavailableAttachments = attachments.some((attachment) => !isAttachmentAvailable(attachment));
 
   return (
@@ -847,6 +810,39 @@ const TicketDetailsDrawer = ({
         <DrawerHeader title="تفاصيل التذكرة" subtitle={`#${ticket.id.slice(0, 8)}`} onClose={onClose} />
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-hidden lg:grid-cols-[360px_1fr]">
           <div className="flex min-h-0 flex-col">
+            {/* A contact-form visitor has no account and never sees this
+                thread — a reply reaches them by email or WhatsApp, so the
+                address has to be one click away, not buried in the body. */}
+            {ticket.contactEmail && (
+              <div className="mb-4 rounded-3xl bg-violet-50/60 p-4 text-right ring-1 ring-violet-100">
+                <p className="text-[11px] font-black text-violet-600">وارد من صفحة الهبوط</p>
+                <p className="mt-2 font-black text-slate-800">{ticket.contactName || '—'}</p>
+                <a
+                  href={`mailto:${ticket.contactEmail}`}
+                  dir="ltr"
+                  className="mt-1 block text-sm font-bold text-violet-600 underline"
+                >
+                  {ticket.contactEmail}
+                </a>
+                {ticket.contactPhone && (
+                  <div className="mt-3 flex items-center justify-end gap-3">
+                    {/* wa.me takes bare digits — no "+", no spaces. */}
+                    <a
+                      href={`https://wa.me/${ticket.contactPhone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-600"
+                    >
+                      واتساب
+                    </a>
+                    <a href={`tel:${ticket.contactPhone}`} dir="ltr" className="text-sm font-bold text-slate-600">
+                      {ticket.contactPhone}
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-4">
               <SelectField label="الأولوية" value={ticket.priority || ''} options={priorityOptions} disabled />
               <SelectField label="اسم المتجر" value={ticket.storeId || ''} placeholder={storeName} options={stores.map((store) => ({ value: store.id, label: store.name }))} disabled />
@@ -1220,6 +1216,8 @@ const getMessageSenderName = (message: SupportMessage) => {
   if (message.sender?.name) return message.sender.name;
   if (message.senderType === 'SYSTEM_USER') return 'فريق الدعم';
   if (message.senderType === 'STORE_USER') return 'مستخدم المتجر';
+  // The contact form. No account behind it, so no name comes back on the row.
+  if (message.senderType === 'USER') return 'زائر الموقع';
   return '';
 };
 const getAttachmentType = (attachment: SupportTicketAttachment) => {
