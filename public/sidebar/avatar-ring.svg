@@ -1,0 +1,13 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="41.25" height="41.25" viewBox="0 0 41.25 41.25" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle id="Ellipse 16" opacity="0.14" cx="20.625" cy="20.625" r="20.1667" fill="url(#paint0_linear_0_974)" stroke="url(#paint1_linear_0_974)" stroke-width="0.916667"/>
+<defs>
+<linearGradient id="paint0_linear_0_974" x1="39.325" y1="20.625" x2="14.85" y2="38.4313" gradientUnits="userSpaceOnUse">
+<stop stop-color="#B657FF"/>
+<stop offset="1" stop-color="#00BFFF"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_974" x1="20.625" y1="0" x2="20.625" y2="41.25" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="white" stop-opacity="0.44"/>
+</linearGradient>
+</defs>
+</svg>

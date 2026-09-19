@@ -1,268 +1,294 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { HugeiconsIcon } from '@hugeicons/react';
-import type { IconSvgElement } from '@hugeicons/react';
-import {
-  ArrowLeft01Icon,
-  CodeIcon,
-  CreditCardIcon,
-  CustomerSupportIcon,
-  DashboardSquare03Icon,
-  DeliveryTruck01Icon,
-  ChartLineData01Icon,
-  Invoice03Icon,
-  StoreManagement01Icon,
-  UserGroupIcon,
-  Wallet02Icon,
-} from '@hugeicons-pro/core-stroke-rounded';
 import { useAuth } from '../contexts/AuthContext';
-import { useSupportUnread } from '../contexts/SupportUnreadContext';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  useSidebar as useShadcnSidebar,
-} from '@/components/ui/sidebar';
+import { SidebarProvider, useSidebar as useShadcnSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import {
-  ChevronDown,
-} from 'lucide-react';
-
-type MenuIcon = IconSvgElement;
 
 type AppMenuItem = {
   path: string;
   label: string;
-  icon: MenuIcon;
+  icon: string;
   roles: Array<'owner' | 'employee' | 'support' | 'developer'>;
   section: 'system' | 'user';
   badge?: string;
-  dynamicBadge?: 'support-unread';
+  flipIcon?: boolean;
 };
 
+/** Tabs: ادارة النظام + ادوات المستخدم (Figma) */
 const menuItems: AppMenuItem[] = [
-  { path: '/dashboard', label: 'لوحة التحكم', icon: DashboardSquare03Icon, roles: ['owner', 'employee', 'support'], section: 'system' },
-  { path: '/dashboard/employees', label: 'إدارة الموظفين', icon: UserGroupIcon, roles: ['owner'], section: 'system' },
-  { path: '/dashboard/accounting', label: 'الحسابات المالية', icon: Invoice03Icon, roles: ['owner', 'employee'], section: 'system' },
-  { path: '/dashboard/financial-ai', label: 'مالية الذكاء الاصطناعي', icon: ChartLineData01Icon, roles: ['owner'], section: 'system' },
-  { path: '/dashboard/delivery', label: 'شركات الشحن', icon: DeliveryTruck01Icon, roles: ['owner'], section: 'system' },
-  { path: '/dashboard/stores', label: 'إدارة المتاجر', icon: StoreManagement01Icon, roles: ['owner', 'employee'], section: 'user' },
-  { path: '/dashboard/support', label: 'الدعم الفني', icon: CustomerSupportIcon, roles: ['support', 'owner'], section: 'user', dynamicBadge: 'support-unread' },
-  { path: '/dashboard/payments', label: 'بوابات الدفع', icon: CreditCardIcon, roles: ['owner'], section: 'user' },
-  { path: '/dashboard/plans', label: 'باقات الاشتراك', icon: Wallet02Icon, roles: ['owner'], section: 'user' },
-  { path: '/developer', label: 'مطور النظام', icon: CodeIcon, roles: ['developer'], section: 'user' },
+  { path: '/dashboard', label: 'لوحة التحكم', icon: '/sidebar/icon-dashboard.svg', roles: ['owner', 'employee', 'support'], section: 'system', badge: '+1' },
+  { path: '/dashboard/employees', label: 'ادارة الموظفين', icon: '/sidebar/icon-employees.svg', roles: ['owner'], section: 'system' },
+  { path: '/dashboard/accounting', label: 'الحسابات المالية', icon: '/sidebar/icon-accounting.svg', roles: ['owner', 'employee'], section: 'system', flipIcon: true },
+  { path: '/dashboard/payments', label: 'بوابات الدفع', icon: '/sidebar/icon-payments.svg', roles: ['owner'], section: 'system' },
+  { path: '/dashboard/stores', label: 'أدارة المتجر', icon: '/sidebar/icon-stores.svg', roles: ['owner', 'employee'], section: 'user' },
+  { path: '/dashboard/delivery', label: 'شركات الشحن', icon: '/sidebar/icon-delivery.svg', roles: ['owner'], section: 'user' },
+  { path: '/dashboard/plans', label: 'باقات الاشتراك', icon: '/sidebar/icon-plans.svg', roles: ['owner'], section: 'user' },
 ];
-
-const sectionLabels = {
-  system: 'إدارة النظام',
-  user: 'أدوات المستخدم',
-} as const;
 
 const AppSidebar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { state, toggleSidebar } = useShadcnSidebar();
-  const { unreadTotal } = useSupportUnread();
+  const { state, toggleSidebar, isMobile, setOpenMobile, openMobile } = useShadcnSidebar();
+
+  const collapsed = !isMobile && state === 'collapsed';
+  const mobileOpen = isMobile && openMobile;
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const filteredMenuItems = menuItems.filter(item =>
+  const items = menuItems.filter((item) =>
     item.roles.includes(user?.role as 'owner' | 'employee' | 'support' | 'developer')
   );
+  const systemItems = items.filter((i) => i.section === 'system');
+  const userItems = items.filter((i) => i.section === 'user');
 
-  const groupedMenuItems = {
-    system: filteredMenuItems.filter((item) => item.section === 'system'),
-    user: filteredMenuItems.filter((item) => item.section === 'user'),
+  const roleLabel = ({
+    owner: 'مدير النظام',
+    employee: 'موظف',
+    support: 'دعم فني',
+    developer: 'مطور النظام',
+  } as Record<string, string>)[user?.role || 'owner'] || 'مدير النظام';
+
+  const initials = user?.name?.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'MA';
+
+  const isActive = (path: string) =>
+    path === '/dashboard' ? location.pathname === path : location.pathname.startsWith(path);
+
+  const onNav = () => {
+    if (isMobile) setOpenMobile(false);
   };
 
-  const getRoleLabel = (role: string) => {
-    const roles: { [key: string]: string } = {
-      'owner': 'مدير النظام',
-      'employee': 'موظف',
-      'support': 'دعم فني',
-      'developer': 'مطور النظام'
-    };
-    return roles[role] || role;
-  };
+  const renderNavItem = (item: AppMenuItem) => {
+    const active = isActive(item.path);
+    const badge = item.badge;
 
-  const isCollapsed = state === 'collapsed';
-
-  const getItemBadge = (item: AppMenuItem) => {
-    if (item.dynamicBadge === 'support-unread' && unreadTotal > 0) {
-      return unreadTotal > 99 ? '99+' : String(unreadTotal);
-    }
-    return item.badge;
-  };
-
-  return (
-    <Sidebar
-      side="right"
-      collapsible="icon"
-      variant="sidebar"
-      className="border-l border-slate-100 bg-white  [--sidebar:#ffffff] shadow-[0_20px_70px_rgba(15,23,42,0.06)]"
-    >
-      <SidebarHeader className={cn("bg-white px-3 py-3", isCollapsed && "px-2")}>
-        <div className={cn(
-          isCollapsed ? "flex flex-col items-center gap-3" : "flex h-16 items-center justify-between rounded-2xl border border-slate-100 bg-white px-3 shadow-sm"
-        )}>
-          {!isCollapsed && (
-            <div className="flex items-center gap-2 text-slate-400">
-              <button
-                onClick={toggleSidebar}
-                className="grid h-8 w-8 place-items-center rounded-xl transition hover:bg-violet-50 hover:text-[#7D26F7]"
-                aria-label="إغلاق القائمة"
-              >
-                <SidebarToggleIcon className="h-5 w-5" />
-              </button>
-              <span className="h-6 w-px rounded-full bg-slate-200" />
-            </div>
+    if (collapsed) {
+      return (
+        <Link
+          key={item.path}
+          to={item.path}
+          onClick={onNav}
+          title={item.label}
+          className={cn(
+            'relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px] transition',
+            active && 'bg-[#7d26f7]'
           )}
-
-          {!isCollapsed && (
-            <Link to="/dashboard" className="flex min-w-0 flex-1 items-center justify-end gap-3">
-              <div className="min-w-0 text-right">
-                <p className="text-lg font-black leading-6 text-slate-950" dir="ltr">mel.iq</p>
-                <p className="text-xs font-bold leading-5 text-slate-400">نظام إدارة المتاجر</p>
-              </div>
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-50 text-[#7D26F7]">
-                <HugeiconsIcon icon={StoreManagement01Icon} size={24} strokeWidth={2.2} />
-              </span>
-            </Link>
-          )}
-
-          {isCollapsed && (
+        >
+          {active && (
             <>
-              <Link
-                to="/dashboard"
-                className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-[#7D26F7]"
-                aria-label="mel.iq"
-              >
-                <HugeiconsIcon icon={StoreManagement01Icon} size={24} strokeWidth={2.2} />
-              </Link>
-              <button
-                onClick={toggleSidebar}
-                className="grid h-10 w-10 place-items-center rounded-xl transition hover:scale-105"
-                aria-label="فتح القائمة"
-              >
-                <SidebarToggleIcon />
-              </button>
+              <img src="/sidebar/glow-a.svg" alt="" className="pointer-events-none absolute -bottom-4 right-[-20px] size-[120px] max-w-none" />
+              <img src="/sidebar/glow-b.svg" alt="" className="pointer-events-none absolute -right-6 -top-2 size-[120px] max-w-none" />
             </>
           )}
-        </div>
-      </SidebarHeader>
+          <span className="relative size-6">
+            <img
+              src={item.icon}
+              alt=""
+              width={24}
+              height={24}
+              className={cn('absolute inset-0 size-full', item.flipIcon && '-scale-x-100 rotate-180', active && 'brightness-0 invert')}
+            />
+          </span>
+          {badge && (
+            <span className="absolute left-1/2 top-[38px] z-10 flex h-4 min-w-[26px] -translate-x-1/2 items-center justify-center rounded-full bg-[#ff0808] px-1.5 text-[12px] font-bold leading-none text-white shadow-[0_0_12.5px_rgba(255,8,8,0.25)]">
+              {badge}
+            </span>
+          )}
+        </Link>
+      );
+    }
 
-      <SidebarContent className={cn("bg-white px-4 py-4", isCollapsed && "px-2")}>
-        {(Object.keys(groupedMenuItems) as Array<keyof typeof groupedMenuItems>).map((section) => (
-          <div key={section} className="mb-8 last:mb-0">
-            {!isCollapsed && groupedMenuItems[section].length > 0 && (
-              <p className="mb-4 px-3 text-sm font-black text-slate-400">{sectionLabels[section]}</p>
+    // RTL: أيقونة + نص يمين، الشارة يسار
+    return (
+      <Link
+        key={item.path}
+        to={item.path}
+        onClick={onNav}
+        className={cn(
+          'relative flex h-12 w-full shrink-0 items-center justify-between overflow-hidden rounded-[14px] px-3.5 py-3 transition',
+          active ? 'bg-[#7d26f7]' : 'hover:bg-slate-50'
+        )}
+      >
+        {active && (
+          <>
+            <img src="/sidebar/glow-a.svg" alt="" className="pointer-events-none absolute -bottom-[17px] right-[141px] size-[245px] max-w-none" />
+            <img src="/sidebar/glow-b.svg" alt="" className="pointer-events-none absolute -right-10 -top-1.5 size-[245px] max-w-none" />
+          </>
+        )}
+
+        <span className="relative z-10 flex items-center gap-2.5">
+          <span className="relative size-6 shrink-0">
+            <img
+              src={item.icon}
+              alt=""
+              width={24}
+              height={24}
+              className={cn('absolute inset-0 size-full', item.flipIcon && '-scale-x-100 rotate-180', active && 'brightness-0 invert')}
+            />
+          </span>
+          <span
+            className={cn(
+              'whitespace-nowrap text-right text-[16px] leading-[18px]',
+              active ? 'font-bold text-white' : 'font-normal text-[#3b4656]'
             )}
-            <SidebarMenu className={cn("gap-4", isCollapsed && "items-center gap-5")}>
-              {groupedMenuItems[section].map((item) => {
-                const isActive = item.path === '/dashboard'
-                  ? location.pathname === item.path
-                  : location.pathname.startsWith(item.path);
-                const badge = getItemBadge(item);
-                return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={isCollapsed ? item.label : undefined}
-                      className={cn(
-                        "group relative h-14 overflow-visible  flex-row-reverse justify-end rounded-2xl px-4 text-slate-500",
-                        isCollapsed && "mx-auto h-12 w-12 items-center justify-center rounded-2xl p-0",
-                        isActive && "data-[active=true]:bg-[#7D26F7]! bg-[#7D26F7]! text-white shadow-[0_16px_42px_rgba(125,38,247,0.45)] before:pointer-events-none before:absolute before:inset-y-0 before:right-0 before:w-2/3 before:rounded-2xl before:bg-white/10 after:pointer-events-none after:absolute after:inset-y-0 after:right-10 after:w-16 after:-skew-x-28 after:bg-white/10",
-                        !isActive && "hover:bg-slate-50 hover:text-slate-700"
-                      )}
-                    >
-                      <Link to={item.path} className={cn("relative z-10 flex w-full items-center justify-end gap-3", isCollapsed && "justify-center")}>
-                        {badge && (
-                          <span className={cn(
-                            "absolute flex h-8 min-w-10 items-center justify-center rounded-full bg-red-500 px-2 text-sm font-black text-white shadow-[0_10px_26px_rgba(239,68,68,0.5)]",
-                            isCollapsed ? "-right-2 -top-2" : "left-3"
-                          )}>
-                            {badge}
-                          </span>
-                        )}
-                        {!isCollapsed && <span className="text-base font-black">{item.label}</span>}
-                        <HugeiconsIcon
-                          icon={item.icon}
-                          size={24}
-                          strokeWidth={2.1}
-                          className={cn(
-                          "h-6 w-6 transition-transform",
-                          isActive ? "text-white" : "text-slate-400 group-hover:text-slate-700"
-                          )}
-                        />
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </div>
-        ))}
-      </SidebarContent>
-
-      <SidebarFooter className={cn("bg-white p-4", isCollapsed && "px-2")}>
-        {!isCollapsed ? (
-          <div
-            onDoubleClick={handleLogout}
-            title="انقر مرتين لتسجيل الخروج"
-            className="flex h-18 cursor-pointer items-center justify-between rounded-[1.7rem] bg-linear-to-r from-cyan-400 via-sky-500 to-violet-500 px-4 text-white shadow-[0_18px_45px_rgba(56,189,248,0.24)]"
           >
-            <ChevronDown className="h-4 w-4 shrink-0 stroke-3 text-white" />
-            <div className="min-w-0 flex-1 px-3 text-right">
-              <p className="truncate text-sm font-semibold leading-5">{user?.name || 'محمد علي يوسف'}</p>
-              <p className="mt-0.5 text-xs font-medium leading-4 text-white/85">{getRoleLabel(user?.role || 'owner')}</p>
-            </div>
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/10 ring-2 ring-white/15">
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-white/15 text-sm font-bold text-white shadow-[inset_0_0_18px_rgba(255,255,255,0.16)]">
-                {user?.name?.split(' ').map((part) => part[0]).join('').slice(0, 2) || 'MA'}
+            {item.label}
+          </span>
+        </span>
+
+        {badge ? (
+          <span className="relative z-10 flex h-4 items-center justify-center rounded-full bg-[#ff0808] px-1.5 text-[12px] font-bold leading-none text-white shadow-[0_0_12.5px_rgba(255,8,8,0.25)]">
+            {badge}
+          </span>
+        ) : (
+          <span className="w-0" aria-hidden />
+        )}
+      </Link>
+    );
+  };
+
+  const panel = (
+    <aside
+      className={cn(
+        'flex h-full flex-col items-center overflow-hidden bg-white p-4',
+        collapsed ? 'w-[92px]' : 'w-[277px]'
+      )}
+    >
+      <div className={cn('flex min-h-0 w-full flex-1 flex-col gap-[18px]', !collapsed && 'w-[239px]')}>
+        <div className="flex min-h-0 flex-1 flex-col gap-9">
+          {/* RTL: الشعار يمين، زر الطي يسار */}
+          <div
+            className={cn(
+              'flex shrink-0 overflow-hidden rounded-[20px] bg-linear-to-r from-[#f4f9fd] to-[#ebf6ff]',
+              collapsed ? 'flex-col items-center gap-6 px-3 py-2' : 'items-center justify-between px-3 py-2'
+            )}
+          >
+            <Link to="/dashboard" onClick={onNav} className="flex items-center gap-2.5" aria-label="mel.iq">
+              <BrandLogo />
+              {!collapsed && (
+                <div className="flex flex-col items-end gap-0.5 text-right">
+                  <p className="text-sm font-bold leading-none text-[#04111c]" dir="ltr">mel.iq</p>
+                  <p className="text-xs font-light text-[#6c809d]">نظام إدارة المتاجر</p>
+                </div>
+              )}
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => (isMobile ? setOpenMobile(false) : toggleSidebar())}
+              className="relative size-8 shrink-0 overflow-hidden rounded-lg"
+              aria-label={collapsed ? 'فتح القائمة' : 'إغلاق القائمة'}
+            >
+              <span className="absolute inset-[22%_-50%_20%_16%] flex items-center justify-center">
+                <img
+                  src={collapsed ? '/sidebar/toggle-closed.svg' : '/sidebar/toggle.svg'}
+                  alt=""
+                  className="-rotate-90 size-full max-w-none"
+                />
+              </span>
+            </button>
+          </div>
+
+          {/* Nav sections */}
+          <div className="flex min-h-0 flex-1 flex-col gap-9 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {systemItems.length > 0 && (
+              <div className={cn('flex flex-col gap-2', collapsed ? 'items-center px-1.5' : 'items-end px-1.5')}>
+                {!collapsed && (
+                  <p className="w-full px-1 text-right text-sm font-normal leading-[18px] text-[#6c809d]">ادارة النظام</p>
+                )}
+                <nav className={cn('flex w-full flex-col gap-3', collapsed && 'items-center')}>
+                  {systemItems.map(renderNavItem)}
+                </nav>
+              </div>
+            )}
+
+            {userItems.length > 0 && (
+              <div className={cn('flex flex-col gap-2', collapsed ? 'items-center px-1.5' : 'items-end px-1.5')}>
+                {!collapsed && (
+                  <div className="flex w-full items-center gap-4 px-1">
+                    <p className="shrink-0 text-right text-sm font-normal leading-[18px] text-[#6c809d]">ادوات المستخدم</p>
+                    <img src="/sidebar/divider.svg" alt="" className="h-px min-w-0 flex-1" />
+                  </div>
+                )}
+                <nav className={cn('flex flex-col gap-3', collapsed ? 'w-12 items-center' : 'w-full')}>
+                  {userItems.map(renderNavItem)}
+                </nav>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* User card */}
+        <button
+          type="button"
+          onDoubleClick={handleLogout}
+          title="انقر مرتين لتسجيل الخروج"
+          className={cn(
+            'flex shrink-0 items-center justify-center px-3 py-2',
+            collapsed ? 'w-[60px] rounded-[22px]' : 'w-full rounded-[22px]'
+          )}
+          style={{ backgroundImage: 'linear-gradient(199deg, rgb(182, 87, 255) 24%, rgb(0, 191, 255) 76%)' }}
+        >
+          {collapsed ? (
+            <UserThumb initials={initials} />
+          ) : (
+            <div className="flex w-full flex-1 items-center justify-between gap-[7px]">
+              <UserThumb initials={initials} />
+              <div className="flex min-w-0 flex-1 items-center justify-between">
+                <div className="flex flex-col items-end gap-0.5 text-right text-xs text-white">
+                  <p className="font-bold">{user?.name || 'محمد علي يوسف'}</p>
+                  <p className="font-normal">{roleLabel}</p>
+                </div>
+                <img src="/sidebar/chevron.svg" alt="" width={19} height={19} className="-scale-y-100" />
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3">
-            <button
-              onClick={toggleSidebar}
-              className="rounded-xl bg-slate-50 p-2 text-slate-400 transition hover:bg-violet-50 hover:text-violet-600"
-              aria-label="فتح القائمة"
-            >
-              <SidebarToggleIcon className="h-5 w-5 text-[#04496D]" />
-            </button>
-            <div
-              onDoubleClick={handleLogout}
-              title="انقر مرتين لتسجيل الخروج"
-              className="grid h-12 w-12 cursor-pointer place-items-center rounded-2xl bg-linear-to-l from-violet-500 via-sky-500 to-cyan-400 shadow-[0_18px_45px_rgba(56,189,248,0.22)]"
-            >
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-linear-to-br from-cyan-400 to-violet-600 text-xs font-black text-white">
-                {user?.name?.split(' ').map((part) => part[0]).join('').slice(0, 2) || 'MA'}
-              </span>
-            </div>
-          </div>
-        )}
-      </SidebarFooter>
-    </Sidebar>
+          )}
+        </button>
+      </div>
+    </aside>
+  );
+
+  return (
+    <>
+      <div
+        className={cn('hidden shrink-0 transition-[width] duration-200 md:block', collapsed ? 'w-[92px]' : 'w-[277px]')}
+        aria-hidden
+      />
+
+      <div className="fixed inset-y-0 right-0 z-30 hidden h-svh md:block">{panel}</div>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button type="button" className="absolute inset-0 bg-black/40" aria-label="إغلاق" onClick={() => setOpenMobile(false)} />
+          <div className="absolute inset-y-0 right-0 shadow-2xl">{panel}</div>
+        </div>
+      )}
+    </>
   );
 };
 
-const SidebarToggleIcon = ({ className }: { className?: string }) => (
-  <HugeiconsIcon
-    icon={ArrowLeft01Icon}
-    size={19}
-    strokeWidth={2.2}
-    className={cn("text-[#04496D]", className)}
-  />
+const BrandLogo = () => (
+  <span
+    className="relative size-[42px] shrink-0 overflow-hidden rounded-full shadow-[0_0_25px_rgba(125,38,247,0.25)]"
+    style={{ backgroundImage: 'linear-gradient(234deg, rgb(182, 87, 255) 24%, rgb(0, 191, 255) 76%)' }}
+  >
+    <span className="absolute inset-[23.8%_23.7%]">
+      <img src="/sidebar/logo-a.svg" alt="" className="absolute inset-0 size-full" />
+    </span>
+    <span className="absolute inset-[45.7%_36.9%_36.9%_40.5%]">
+      <img src="/sidebar/logo-c.svg" alt="" className="absolute inset-0 size-full" />
+    </span>
+  </span>
+);
+
+const UserThumb = ({ initials }: { initials: string }) => (
+  <span className="relative size-11 shrink-0 overflow-hidden">
+    <img src="/sidebar/avatar-ring.svg" alt="" className="absolute inset-[3%]" />
+    <img src="/sidebar/avatar-inner.svg" alt="" className="absolute inset-[18%_19%]" />
+    <span className="absolute inset-0 grid place-items-center text-xs font-black text-white">{initials}</span>
+  </span>
 );
 
 export default AppSidebar;
