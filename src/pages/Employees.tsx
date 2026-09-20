@@ -241,11 +241,11 @@ const Employees = () => {
   if (loading && employees.length === 0) return <LoadingState />;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="ادارة الموظفين"
         description={<>هناك <span className="font-black text-violet-600">{employees.length}</span> موظف في قائمة الموظفين</>}
-        icon={<Users className="h-6 w-6" />}
+        icon={<Users className="h-5 w-5 sm:h-6 sm:w-6" />}
         action={(
           <PrimaryActionButton onClick={openCreateDrawer}>
             اضافة موظف جديد
@@ -258,7 +258,7 @@ const Employees = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr_1.4fr]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[1fr_1fr_1.4fr]">
         <StatCard
           title="أجمالي الموظفين"
           value={employees.length.toLocaleString()}
@@ -273,31 +273,31 @@ const Employees = () => {
           tone="amber"
           hint="0% ↗"
         />
-        <div className="flex min-h-[88px] items-center justify-between gap-4 rounded-[1.45rem] bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.04)] ring-1 ring-slate-100">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-500 shadow-lg shadow-emerald-100">
-            <UserRound className="h-6 w-6" />
+        <div className="flex min-h-[72px] items-center justify-between gap-3 rounded-[1.25rem] bg-white px-4 py-3 shadow-[0_12px_35px_rgba(15,23,42,0.04)] ring-1 ring-slate-100 sm:col-span-2 sm:min-h-[78px] sm:gap-4 sm:rounded-[1.45rem] sm:px-5 sm:py-4 xl:col-span-1">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-500 shadow-lg shadow-emerald-100 sm:h-12 sm:w-12">
+            <UserRound className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0 flex-1 text-right">
-            <p className="text-sm font-black text-slate-700">أعداد الموظفين حسب دور</p>
-            <div className="mt-2 flex flex-wrap items-center justify-end gap-3" dir="ltr">
+            <p className="text-xs font-black text-slate-700 sm:text-sm">أعداد الموظفين حسب دور</p>
+            <div className="mt-2 flex flex-wrap items-center justify-end gap-2 sm:gap-3" dir="ltr">
               <RoleCount label="دعم فني" value={roleCounts.support} className="text-pink-500" />
-              <span className="h-2 w-px bg-slate-200" />
+              <span className="hidden h-2 w-px bg-slate-200 sm:block" />
               <RoleCount label="مطور" value={roleCounts.developer} className="text-emerald-500" />
-              <span className="h-2 w-px bg-slate-200" />
+              <span className="hidden h-2 w-px bg-slate-200 sm:block" />
               <RoleCount label="المالك" value={roleCounts.owner} className="text-amber-500" />
-              <span className="h-2 w-px bg-slate-200" />
+              <span className="hidden h-2 w-px bg-slate-200 sm:block" />
               <RoleCount label="موظف" value={roleCounts.employee} className="text-sky-500" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-black text-slate-900">
+      <div className="toolbar-row">
+        <h2 className="text-lg font-black text-slate-900 sm:text-xl">
           {search || filterCount > 0 ? 'نتائج البحث والفلاتر' : 'جميع الموظفين'}
         </h2>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
           <button
             type="button"
             onClick={() => {
@@ -305,7 +305,7 @@ const Employees = () => {
               setShowFilters(true);
             }}
             className={cn(
-              'view-button relative inline-flex items-center gap-2',
+              'view-button relative inline-flex items-center justify-center gap-2',
               filterCount > 0 && 'border-violet-300 bg-violet-600 text-white'
             )}
           >
@@ -317,11 +317,11 @@ const Employees = () => {
             )}
           </button>
 
-          <div className="flex items-center gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100" dir="ltr">
-            <button type="button" className="h-10 rounded-xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500">
+          <div className="search-chip" dir="ltr">
+            <button type="button" className="h-9 shrink-0 rounded-xl bg-cyan-50 px-4 text-sm font-bold text-cyan-500 sm:h-10 sm:px-5">
               البحث
             </button>
-            <div className="relative min-w-[220px]">
+            <div className="relative min-w-0 flex-1 sm:min-w-[200px]">
               <input
                 value={search}
                 onChange={(event) => {
@@ -329,7 +329,7 @@ const Employees = () => {
                   setPage(1);
                 }}
                 placeholder="ابحث عن الموظفين"
-                className="h-10 w-full rounded-xl border-0 bg-transparent px-3 text-right text-sm font-semibold outline-none placeholder:text-slate-400"
+                className="h-9 w-full rounded-xl border-0 bg-transparent px-3 text-right text-sm font-semibold outline-none placeholder:text-slate-400 sm:h-10"
                 dir="rtl"
               />
             </div>
@@ -677,16 +677,16 @@ const ConfirmNameModal = ({
   const previewBg = accent === 'red' ? 'bg-red-50' : 'bg-orange-50';
 
   return (
-    <div className="fixed inset-0 z-9999 grid place-items-center bg-black/70 p-6" dir="rtl">
-      <div className="w-full max-w-3xl rounded-[2rem] bg-white p-8 text-center shadow-2xl">
-        <div className={cn('mx-auto mb-8 flex min-h-44 max-w-sm items-center justify-center rounded-[2rem] p-6', previewBg)}>
-          <div className="w-full rounded-3xl bg-white p-5 text-right shadow-sm">
+    <div className="fixed inset-0 z-9999 grid place-items-end bg-black/70 p-3 sm:place-items-center sm:p-6" dir="rtl">
+      <div className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-[1.5rem] bg-white p-5 text-center shadow-2xl sm:rounded-[2rem] sm:p-8">
+        <div className={cn('mx-auto mb-6 flex min-h-36 max-w-sm items-center justify-center rounded-[1.5rem] p-4 sm:mb-8 sm:min-h-44 sm:rounded-[2rem] sm:p-6', previewBg)}>
+          <div className="w-full rounded-3xl bg-white p-4 text-right shadow-sm sm:p-5">
             <div className="flex items-center gap-3">
               <div className="grid h-12 w-12 place-items-center rounded-full bg-violet-50 text-violet-600">
                 <UserRound className="h-6 w-6" />
               </div>
-              <div>
-                <p className="text-lg font-black text-slate-950">{employee.name}</p>
+              <div className="min-w-0">
+                <p className="truncate text-base font-black text-slate-950 sm:text-lg">{employee.name}</p>
                 <p className="mt-1 text-sm font-semibold text-violet-600">{getRoleMeta(employee.role).label}</p>
                 <p className="mt-1 text-xs font-medium text-slate-400">
                   تاريخ الانشاء {formatDisplayDate(employee.createdAt)}
@@ -696,23 +696,23 @@ const ConfirmNameModal = ({
           </div>
         </div>
 
-        <h2 className={cn('text-3xl font-black', titleColor)}>{title}</h2>
-        <p className="mx-auto mt-5 max-w-2xl text-lg font-semibold leading-8 text-slate-600">{description}</p>
+        <h2 className={cn('text-xl font-black sm:text-3xl', titleColor)}>{title}</h2>
+        <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">{description}</p>
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={employee.name}
-          className="mt-6 h-14 w-full rounded-2xl border border-slate-200 px-5 text-sm font-bold outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+          className="mt-5 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100 sm:mt-6 sm:h-14 sm:px-5"
         />
-        <div className="mt-8 grid grid-cols-[1fr_2fr] gap-5">
-          <button type="button" onClick={onClose} className="h-14 rounded-2xl bg-slate-100 text-lg font-black text-slate-600">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-[1fr_2fr] sm:gap-5">
+          <button type="button" onClick={onClose} className="h-12 rounded-2xl bg-slate-100 text-base font-black text-slate-600 sm:h-14 sm:text-lg">
             إلغاء
           </button>
           <button
             type="button"
             onClick={onConfirm}
             disabled={!canConfirm}
-            className={cn('h-14 rounded-2xl text-lg font-black text-white disabled:cursor-not-allowed disabled:opacity-50', buttonColor)}
+            className={cn('h-12 rounded-2xl text-base font-black text-white disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:text-lg', buttonColor)}
           >
             {confirmLabel}
           </button>

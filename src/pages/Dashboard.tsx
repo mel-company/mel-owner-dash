@@ -150,7 +150,7 @@ const Dashboard = () => {
   if (loading) return <LoadingState />;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="لوحة التحكم"
         description={<>أهلاً <span className="font-black text-violet-600">{user?.name || 'بك'}</span>، هذه نظرة شاملة على أداء المنصة</>}
@@ -168,7 +168,7 @@ const Dashboard = () => {
         )}
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <StatCard
           title="إجمالي المتاجر"
           value={(storeMetrics.totalStores || 0).toLocaleString('en-US')}

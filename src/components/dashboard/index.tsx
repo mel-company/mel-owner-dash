@@ -15,9 +15,9 @@ const statTones: Record<StatTone, { wrap: string; icon: string }> = {
 };
 
 export const PageIcon = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <div className={cn('relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-600', className)}>
+  <div className={cn('relative grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-600 sm:h-12 sm:w-12', className)}>
     {children}
-    <span className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-violet-200" />
+    <span className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full bg-violet-200 sm:h-3 sm:w-3" />
   </div>
 );
 
@@ -32,23 +32,36 @@ export const PageHeader = ({
   icon: ReactNode;
   action?: ReactNode;
 }) => (
-  <div className="flex flex-wrap items-center justify-between gap-4" dir="rtl">
-    <div className="flex items-center gap-3">
+  <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between" dir="rtl">
+    <div className="flex min-w-0 items-center gap-3">
       <PageIcon>{icon}</PageIcon>
-      <div className="text-right">
-        <h1 className="text-2xl font-black text-slate-950">{title}</h1>
-        <p className="text-sm font-medium text-slate-500">{description}</p>
+      <div className="min-w-0 text-right">
+        <h1 className="truncate text-xl font-black text-slate-950 sm:text-2xl">{title}</h1>
+        <p className="mt-0.5 text-xs font-medium text-slate-500 sm:text-sm">{description}</p>
       </div>
     </div>
-    {action}
+    {action && <div className="flex w-full shrink-0 sm:w-auto sm:justify-start [&_button]:w-full sm:[&_button]:w-auto">{action}</div>}
   </div>
 );
 
-export const PrimaryActionButton = ({ children, onClick, type = 'button' }: { children: ReactNode; onClick?: () => void; type?: 'button' | 'submit' }) => (
+export const PrimaryActionButton = ({
+  children,
+  onClick,
+  type = 'button',
+  className,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  type?: 'button' | 'submit';
+  className?: string;
+}) => (
   <button
     type={type}
     onClick={onClick}
-    className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 px-5 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:scale-[1.01]"
+    className={cn(
+      'inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 px-4 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:scale-[1.01] sm:h-12 sm:px-5',
+      className
+    )}
   >
     {children}
   </button>
@@ -58,15 +71,15 @@ export const StatCard = ({ title, value, icon, tone = 'blue', hint = '12.6% ↗'
   const color = statTones[tone];
 
   return (
-    <div className="flex min-h-[78px] items-center justify-between gap-4 rounded-[1.45rem] bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.04)] ring-1 ring-slate-100">
-      <div className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-2xl shadow-lg', color.wrap)}>
-        <div className={cn('[&_svg]:h-6 [&_svg]:w-6 [&_svg]:stroke-[2.4]', color.icon)}>{icon}</div>
+    <div className="flex min-h-[72px] items-center justify-between gap-3 rounded-[1.25rem] bg-white px-4 py-3 shadow-[0_12px_35px_rgba(15,23,42,0.04)] ring-1 ring-slate-100 sm:min-h-[78px] sm:gap-4 sm:rounded-[1.45rem] sm:px-5 sm:py-4">
+      <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl shadow-lg sm:h-12 sm:w-12', color.wrap)}>
+        <div className={cn('[&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.4] sm:[&_svg]:h-6 sm:[&_svg]:w-6', color.icon)}>{icon}</div>
       </div>
       <div className="min-w-0 flex-1 text-right">
-        <p className="truncate text-sm font-black text-slate-700">{title}</p>
+        <p className="truncate text-xs font-black text-slate-700 sm:text-sm">{title}</p>
         <div className="mt-1.5 flex items-center justify-start gap-2" dir="ltr">
-          {hint && <span className="text-xs font-bold text-emerald-500">{hint}</span>}
-          <span className="text-2xl font-black leading-none text-slate-950">{value}</span>
+          {hint && <span className="text-[10px] font-bold text-emerald-500 sm:text-xs">{hint}</span>}
+          <span className="text-xl font-black leading-none text-slate-950 sm:text-2xl">{value}</span>
         </div>
       </div>
     </div>
@@ -92,14 +105,14 @@ export const SearchFiltersBar = ({
   onFilterClick?: () => void;
   children?: ReactNode;
 }) => (
-  <div className="flex flex-wrap items-center justify-between gap-3">
+  <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
     <div className="flex flex-wrap items-center gap-2">
       {children}
       <button
         type="button"
         onClick={onFilterClick}
         className={cn(
-          'inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-100 bg-white px-5 text-sm font-bold text-slate-600 shadow-sm',
+          'inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-100 bg-white px-4 text-sm font-bold text-slate-600 shadow-sm sm:h-12 sm:px-5',
           filterCount > 0 && 'border-violet-300 bg-violet-600 text-white'
         )}
       >
@@ -108,15 +121,15 @@ export const SearchFiltersBar = ({
         <SlidersHorizontal className="h-4 w-4" />
       </button>
     </div>
-    <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-      <button type="button" className="h-12 rounded-2xl bg-cyan-50 px-6 text-sm font-bold text-cyan-500">البحث</button>
-      <div className="relative min-w-[260px] max-w-md flex-1">
+    <div className="flex w-full flex-1 flex-wrap items-center gap-2 sm:min-w-[260px] sm:max-w-md sm:justify-end">
+      <button type="button" className="h-11 shrink-0 rounded-2xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500 sm:h-12 sm:px-6">البحث</button>
+      <div className="relative min-w-0 flex-1">
         <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={placeholder}
-          className="h-12 w-full rounded-2xl border border-slate-100 bg-white pr-11 pl-4 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+          className="h-11 w-full rounded-2xl border border-slate-100 bg-white pr-11 pl-4 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100 sm:h-12"
         />
       </div>
     </div>
@@ -124,8 +137,8 @@ export const SearchFiltersBar = ({
 );
 
 export const TableShell = ({ children, footer }: { children: ReactNode; footer?: ReactNode }) => (
-  <div className="overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-100">
-    <div className="overflow-x-auto">{children}</div>
+  <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-sm ring-1 ring-slate-100 sm:rounded-[2rem]">
+    <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">{children}</div>
     {footer}
   </div>
 );
@@ -145,12 +158,14 @@ export const Pagination = ({
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }) => {
-  const pages = totalPages <= 5 ? Array.from({ length: totalPages }, (_, index) => index + 1) : [1, 2, 3, 4, 5, totalPages];
+  const pages = totalPages <= 5
+    ? Array.from({ length: totalPages }, (_, index) => index + 1)
+    : [1, 2, 3, '...', totalPages].filter((item, index, arr) => arr.indexOf(item) === index);
 
   return (
-    <div className="flex flex-row-reverse items-center justify-between border-t border-slate-100 px-5 py-4 text-xs text-slate-500">
-      <label className="flex items-center gap-2 font-bold text-slate-600">
-        العناصر لكل صفحة
+    <div className="flex flex-col-reverse gap-4 border-t border-slate-100 px-3 py-4 text-xs text-slate-500 sm:flex-row-reverse sm:items-center sm:justify-between sm:px-5">
+      <label className="flex items-center justify-center gap-2 font-bold text-slate-600 sm:justify-start">
+        <span className="whitespace-nowrap">العناصر لكل صفحة</span>
         <select
           value={pageSize}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
@@ -159,21 +174,25 @@ export const Pagination = ({
           {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
       </label>
-      <div className="flex flex-row-reverse items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-1.5 sm:flex-row-reverse sm:gap-2">
         {totalPages > 1 && (
           <button type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page === 1} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-50 text-slate-500 disabled:opacity-40">
             <ChevronLeft className="h-4 w-4" />
           </button>
         )}
         {pages.map((item, index) => (
-          <button
-            key={`${item}-${index}`}
-            type="button"
-            onClick={() => onPageChange(item)}
-            className={cn('grid h-8 w-8 place-items-center rounded-xl font-bold', item === page ? 'bg-violet-600 text-white' : 'bg-slate-50 text-slate-500')}
-          >
-            {item}
-          </button>
+          typeof item === 'number' ? (
+            <button
+              key={`${item}-${index}`}
+              type="button"
+              onClick={() => onPageChange(item)}
+              className={cn('grid h-8 w-8 place-items-center rounded-xl font-bold', item === page ? 'bg-violet-600 text-white' : 'bg-slate-50 text-slate-500')}
+            >
+              {item}
+            </button>
+          ) : (
+            <span key={`dots-${index}`} className="px-1 font-bold text-slate-400">…</span>
+          )
         ))}
         {totalPages > 1 && (
           <button type="button" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-50 text-slate-500 disabled:opacity-40">
@@ -203,29 +222,35 @@ export const SideDrawer = ({
   maxWidth?: string;
 }) => (
   <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
-    <div onMouseDown={(event) => event.stopPropagation()} className={cn('fixed inset-y-0 left-0 z-10000 flex h-dvh w-full flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8', maxWidth)}>
-      <div className="mb-8 flex shrink-0 items-start justify-between">
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <h2 className="text-3xl font-black text-violet-700">{title}</h2>
+    <div
+      onMouseDown={(event) => event.stopPropagation()}
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-10000 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-white px-4 py-5 shadow-2xl sm:inset-y-0 sm:left-0 sm:right-auto sm:max-h-none sm:rounded-none sm:px-6 sm:py-8 md:px-8',
+        maxWidth
+      )}
+    >
+      <div className="mb-5 flex shrink-0 items-start justify-between gap-3 sm:mb-8">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <div className="min-w-0 text-right">
+            <h2 className="text-xl font-black text-violet-700 sm:text-3xl">{title}</h2>
             {subtitle && <p className="mt-1 text-sm font-bold text-violet-500">{subtitle}</p>}
           </div>
           <PageIcon>{icon}</PageIcon>
         </div>
-        <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-slate-50 text-slate-400">
+        <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-50 text-slate-400">
           <X className="h-5 w-5" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{children}</div>
-      {footer && <div className="shrink-0 pt-7">{footer}</div>}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{children}</div>
+      {footer && <div className="shrink-0 pt-5 sm:pt-7">{footer}</div>}
     </div>
   </div>
 );
 
 export const DrawerFooter = ({ onCancel, submitLabel = 'حفظ', cancelLabel = 'إلغاء' }: { onCancel: () => void; submitLabel?: string; cancelLabel?: string }) => (
-  <div className="grid grid-cols-2 gap-4">
-    <button type="button" onClick={onCancel} className="h-14 rounded-2xl bg-slate-100 font-black text-slate-600">{cancelLabel}</button>
-    <button type="submit" className="h-14 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 font-black text-white shadow-lg shadow-violet-200">{submitLabel}</button>
+  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+    <button type="button" onClick={onCancel} className="h-12 rounded-2xl bg-slate-100 text-sm font-black text-slate-600 sm:h-14 sm:text-base">{cancelLabel}</button>
+    <button type="submit" className="h-12 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 text-sm font-black text-white shadow-lg shadow-violet-200 sm:h-14 sm:text-base">{submitLabel}</button>
   </div>
 );
 
@@ -244,14 +269,14 @@ export const ConfirmDeleteModal = ({
   onConfirm: () => void;
   preview?: ReactNode;
 }) => (
-  <div className="fixed inset-0 z-9999 grid place-items-center bg-black/70 p-6" dir="rtl">
-    <div className="w-full max-w-3xl rounded-[2rem] bg-white p-8 text-center shadow-2xl">
-      {preview && <div className="mx-auto mb-8 flex min-h-56 items-center justify-center rounded-[2rem] bg-red-50 p-6">{preview}</div>}
-      <h2 className="text-3xl font-black text-red-600">{title}</h2>
-      <p className="mx-auto mt-5 max-w-2xl text-lg font-semibold leading-8 text-slate-600">{description}</p>
-      <div className="mt-8 grid grid-cols-[1fr_2fr] gap-5">
-        <button type="button" onClick={onClose} className="h-14 rounded-2xl bg-slate-100 text-lg font-black text-slate-600">إلغاء</button>
-        <button type="button" onClick={onConfirm} className="h-14 rounded-2xl bg-red-600 text-lg font-black text-white">{confirmLabel}</button>
+  <div className="fixed inset-0 z-9999 grid place-items-end bg-black/70 p-3 sm:place-items-center sm:p-6" dir="rtl">
+    <div className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-[1.5rem] bg-white p-5 text-center shadow-2xl sm:rounded-[2rem] sm:p-8">
+      {preview && <div className="mx-auto mb-6 flex min-h-40 max-w-sm items-center justify-center rounded-[1.5rem] bg-red-50 p-4 sm:mb-8 sm:min-h-56 sm:rounded-[2rem] sm:p-6">{preview}</div>}
+      <h2 className="text-xl font-black text-red-600 sm:text-3xl">{title}</h2>
+      <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">{description}</p>
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-[1fr_2fr] sm:gap-5">
+        <button type="button" onClick={onClose} className="h-12 rounded-2xl bg-slate-100 text-base font-black text-slate-600 sm:h-14 sm:text-lg">إلغاء</button>
+        <button type="button" onClick={onConfirm} className="h-12 rounded-2xl bg-red-600 text-base font-black text-white sm:h-14 sm:text-lg">{confirmLabel}</button>
       </div>
     </div>
   </div>
@@ -320,9 +345,9 @@ export const LoadingState = () => (
 );
 
 export const EmptyState = ({ title, action }: { title: string; action?: ReactNode }) => (
-  <div className="p-10 text-center">
-    <p className="text-lg font-black text-slate-500">{title}</p>
-    {action && <div className="mt-4">{action}</div>}
+  <div className="p-6 text-center sm:p-10">
+    <p className="text-base font-black text-slate-500 sm:text-lg">{title}</p>
+    {action && <div className="mt-4 flex justify-center">{action}</div>}
   </div>
 );
 

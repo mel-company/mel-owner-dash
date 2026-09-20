@@ -163,7 +163,7 @@ const DeliveryCompanies = () => {
   if (loading && companies.length === 0) return <LoadingState />;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="شركات الشحن"
         description={<>هناك <span className="font-black text-violet-600">{companies.length} شركة</span> في قائمة الشحن</>}

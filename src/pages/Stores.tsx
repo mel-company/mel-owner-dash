@@ -4,9 +4,7 @@ import {
   CalendarDays,
   ChevronDown,
   CirclePlus,
-  Grid2X2,
   ImagePlus,
-  List,
   Pencil,
   Plus,
   Search,
@@ -31,7 +29,6 @@ import {
 import { cn } from '@/lib/utils';
 import { systemStoresService, type CreateStoreRequest, type Store } from '../services/systemStoresService';
 
-type ViewMode = 'table' | 'cards';
 type StoreRating = 'ضعيف' | 'متوسط' | 'ممتاز';
 
 type FiltersState = {
@@ -155,7 +152,6 @@ const Stores = () => {
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<FiltersState>(defaultFilters);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
@@ -319,11 +315,11 @@ const Stores = () => {
   if (loading && stores.length === 0) return <LoadingState />;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="إدارة المتاجر"
         description={<>هناك <span className="font-black text-violet-600">{total || visibleStores.length}</span> متجر في قائمة المتاجر</>}
-        icon={<StoreIcon className="h-6 w-6" />}
+        icon={<StoreIcon className="h-5 w-5 sm:h-6 sm:w-6" />}
         action={(
           <PrimaryActionButton onClick={openCreateModal}>
             اضافة متجر جديد
@@ -336,40 +332,21 @@ const Stores = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         {stats.map((stat) => (
           <StatCard key={stat.title} title={stat.title} value={stat.value} icon={stat.icon} tone={stat.tone} />
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-black text-slate-900">{listTitle}</h2>
+      <div className="toolbar-row">
+        <h2 className="text-lg font-black text-slate-900 sm:text-xl">{listTitle}</h2>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={cn('view-button', viewMode === 'table' && 'view-button-active')}
-            >
-              جدول
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('cards')}
-              className={cn('view-button', viewMode === 'cards' && 'view-button-active')}
-            >
-              بطاقات
-              <Grid2X2 className="h-4 w-4" />
-            </button>
-          </div>
-
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
           <button
             type="button"
             onClick={() => setShowFilters(true)}
             className={cn(
-              'view-button relative',
+              'view-button relative justify-center',
               filterCount > 0 && 'border-violet-300 bg-violet-600 text-white'
             )}
           >
@@ -381,130 +358,105 @@ const Stores = () => {
             )}
           </button>
 
-          <div className="flex items-center gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
-            <button type="button" className="h-10 rounded-xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500">
+          <div className="search-chip" dir="ltr">
+            <button type="button" className="h-9 shrink-0 rounded-xl bg-cyan-50 px-4 text-sm font-bold text-cyan-500 sm:h-10 sm:px-5">
               البحث
             </button>
-            <div className="relative min-w-[220px]">
+            <div className="relative min-w-0 flex-1 sm:min-w-[200px]">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="ابحث عن المتاجر"
-                className="h-10 w-full rounded-xl border-0 bg-transparent pr-9 pl-3 text-sm font-semibold outline-none placeholder:text-slate-400"
+                className="h-9 w-full rounded-xl border-0 bg-transparent pr-9 pl-3 text-right text-sm font-semibold outline-none placeholder:text-slate-400 sm:h-10"
+                dir="rtl"
               />
             </div>
           </div>
         </div>
       </div>
 
-      {viewMode === 'table' ? (
-        <TableShell
-          footer={(
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={(value) => {
-                setPageSize(value);
-                setPage(1);
-              }}
-            />
-          )}
-        >
-          {visibleStores.length === 0 ? (
-            <EmptyState
-              title="لا يوجد متاجر"
-              action={<PrimaryActionButton onClick={openCreateModal}>اضافة متجر جديد</PrimaryActionButton>}
-            />
-          ) : (
-            <table className="w-full min-w-[960px]">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
-                  <th className="px-5 py-5 text-right">الصورة</th>
-                  <th className="px-5 py-5 text-right">اسم المتجر</th>
-                  <th className="px-5 py-5 text-right">المالك</th>
-                  <th className="px-5 py-5 text-right">الحالة</th>
-                  <th className="px-5 py-5 text-right">نوع الاشتراك</th>
-                  <th className="px-5 py-5 text-right">تاريخ انتهاء الاشتراك</th>
-                  <th className="px-5 py-5 text-right">تقييم المتجر</th>
-                  <th className="px-5 py-5 text-right">العمليات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {visibleStores.map((store, index) => {
-                  const row = getStoreDisplay(store, index);
-                  return (
-                    <tr key={store.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-semibold text-slate-500">{String(index + 1).padStart(2, '0')}</span>
-                          <BrandMark logo={row.logo} accent={row.accent} />
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/dashboard/stores/${store.id}`)}
-                          className="font-black text-slate-950"
-                        >
-                          {row.name}
+      <TableShell
+        footer={(
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setPage(1);
+            }}
+          />
+        )}
+      >
+        {visibleStores.length === 0 ? (
+          <EmptyState
+            title="لا يوجد متاجر"
+            action={<PrimaryActionButton onClick={openCreateModal}>اضافة متجر جديد</PrimaryActionButton>}
+          />
+        ) : (
+          <table className="w-full min-w-[960px]">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
+                <th className="px-5 py-5 text-right">الصورة</th>
+                <th className="px-5 py-5 text-right">اسم المتجر</th>
+                <th className="px-5 py-5 text-right">المالك</th>
+                <th className="px-5 py-5 text-right">الحالة</th>
+                <th className="px-5 py-5 text-right">نوع الاشتراك</th>
+                <th className="px-5 py-5 text-right">تاريخ انتهاء الاشتراك</th>
+                <th className="px-5 py-5 text-right">تقييم المتجر</th>
+                <th className="px-5 py-5 text-right">العمليات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {visibleStores.map((store, index) => {
+                const row = getStoreDisplay(store, index);
+                return (
+                  <tr key={store.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-slate-500">{String(index + 1).padStart(2, '0')}</span>
+                        <BrandMark logo={row.logo} accent={row.accent} />
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/dashboard/stores/${store.id}`)}
+                        className="font-black text-slate-950"
+                      >
+                        {row.name}
+                      </button>
+                    </td>
+                    <td className="px-5 py-4 font-semibold text-slate-600">{row.owner}</td>
+                    <td className="px-5 py-4">
+                      <StatusPill tone={row.statusKey === 'active' ? 'green' : 'red'}>
+                        {row.statusKey === 'active' ? 'نشط' : 'غير نشط'}
+                      </StatusPill>
+                    </td>
+                    <td className="px-5 py-4">
+                      <StatusPill tone={row.planKey === 'premium' ? 'blue' : 'violet'}>{row.planText}</StatusPill>
+                    </td>
+                    <td className="px-5 py-4 text-slate-600">{row.endDate}</td>
+                    <td className="px-5 py-4"><RatingText rating={row.rating} /></td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setStoreToDelete(store)} className="text-red-400 transition hover:text-red-600" aria-label="حذف">
+                          <Trash2 className="h-4 w-4" />
                         </button>
-                      </td>
-                      <td className="px-5 py-4 font-semibold text-slate-600">{row.owner}</td>
-                      <td className="px-5 py-4">
-                        <StatusPill tone={row.statusKey === 'active' ? 'green' : 'red'}>
-                          {row.statusKey === 'active' ? 'نشط' : 'غير نشط'}
-                        </StatusPill>
-                      </td>
-                      <td className="px-5 py-4">
-                        <StatusPill tone={row.planKey === 'premium' ? 'blue' : 'violet'}>{row.planText}</StatusPill>
-                      </td>
-                      <td className="px-5 py-4 text-slate-600">{row.endDate}</td>
-                      <td className="px-5 py-4"><RatingText rating={row.rating} /></td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <button type="button" onClick={() => setStoreToDelete(store)} className="text-red-400 transition hover:text-red-600" aria-label="حذف">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                          <button type="button" onClick={() => openEditModal(store)} className="text-slate-400 transition hover:text-blue-500" aria-label="تعديل">
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </TableShell>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {visibleStores.length === 0 ? (
-            <div className="col-span-full">
-              <EmptyState
-                title="لا يوجد متاجر"
-                action={<PrimaryActionButton onClick={openCreateModal}>اضافة متجر جديد</PrimaryActionButton>}
-              />
-            </div>
-          ) : (
-            visibleStores.map((store, index) => {
-              const row = getStoreDisplay(store, index);
-              return (
-                <StoreCard
-                  key={store.id}
-                  row={row}
-                  onView={() => navigate(`/dashboard/stores/${store.id}`)}
-                  onEdit={() => openEditModal(store)}
-                  onDelete={() => setStoreToDelete(store)}
-                />
-              );
-            })
-          )}
-        </div>
-      )}
+                        <button type="button" onClick={() => openEditModal(store)} className="text-slate-400 transition hover:text-blue-500" aria-label="تعديل">
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </TableShell>
 
       {showModal && (
         <form onSubmit={editingStore ? handleUpdateStore : handleCreateStore}>

@@ -154,7 +154,7 @@ const AppSidebar = () => {
     <aside
       className={cn(
         'flex h-full flex-col items-center overflow-hidden bg-white p-4',
-        collapsed ? 'w-[92px]' : 'w-[277px]'
+        collapsed ? 'w-[92px]' : 'w-[min(100vw,277px)] sm:w-[277px]'
       )}
     >
       <div className={cn('flex min-h-0 w-full flex-1 flex-col gap-[18px]', !collapsed && 'w-[239px]')}>
@@ -262,8 +262,15 @@ const AppSidebar = () => {
 
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
-          <button type="button" className="absolute inset-0 bg-black/40" aria-label="إغلاق" onClick={() => setOpenMobile(false)} />
-          <div className="absolute inset-y-0 right-0 shadow-2xl">{panel}</div>
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45 transition-opacity"
+            aria-label="إغلاق القائمة"
+            onClick={() => setOpenMobile(false)}
+          />
+          <div className="absolute inset-y-0 right-0 h-full animate-in slide-in-from-right duration-200 shadow-2xl">
+            {panel}
+          </div>
         </div>
       )}
     </>

@@ -142,7 +142,7 @@ const Accounting = () => {
   if (loading && transactions.length === 0) return <LoadingState />;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="الحسابات المالية"
         description={(
@@ -150,7 +150,7 @@ const Accounting = () => {
             هناك <span className="font-black text-violet-600">{listCount}</span> دفعة في قائمة الحسابات المالية
           </>
         )}
-        icon={<Wallet className="h-6 w-6" />}
+        icon={<Wallet className="h-5 w-5 sm:h-6 sm:w-6" />}
         action={(
           <PrimaryActionButton>
             تصدير القائمة
@@ -161,7 +161,7 @@ const Accounting = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <RevenueCard value={stats.totalRevenue} />
         <StatCard
           title="المعاملات لهذا الشهر"
@@ -194,10 +194,10 @@ const Accounting = () => {
         />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-black text-slate-900">{listTitle}</h2>
+      <div className="toolbar-row">
+        <h2 className="text-lg font-black text-slate-900 sm:text-xl">{listTitle}</h2>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
           <button
             type="button"
             onClick={() => {
@@ -205,7 +205,7 @@ const Accounting = () => {
               setShowFilters(true);
             }}
             className={cn(
-              'view-button relative inline-flex items-center gap-2',
+              'view-button relative inline-flex items-center justify-center gap-2',
               filterCount > 0 && 'border-violet-300 bg-violet-600 text-white'
             )}
           >
@@ -222,11 +222,11 @@ const Accounting = () => {
             )}
           </button>
 
-          <div className="flex items-center gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
-            <button type="button" className="h-10 rounded-xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500">
+          <div className="search-chip" dir="ltr">
+            <button type="button" className="h-9 shrink-0 rounded-xl bg-cyan-50 px-4 text-sm font-bold text-cyan-500 sm:h-10 sm:px-5">
               البحث
             </button>
-            <div className="relative flex min-w-[220px] items-center gap-2 px-2">
+            <div className="relative flex min-w-0 flex-1 items-center gap-2 px-2 sm:min-w-[200px]">
               <input
                 value={search}
                 onChange={(event) => {
@@ -234,7 +234,8 @@ const Accounting = () => {
                   setPage(1);
                 }}
                 placeholder="ابحث عن المتاجر"
-                className="h-10 w-full rounded-xl border-0 bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400"
+                className="h-9 w-full rounded-xl border-0 bg-transparent text-right text-sm font-semibold outline-none placeholder:text-slate-400 sm:h-10"
+                dir="rtl"
               />
               <img src="/accounting/search.svg" alt="" className="h-[18px] w-[18px] shrink-0 opacity-50" />
             </div>

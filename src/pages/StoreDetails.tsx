@@ -43,7 +43,7 @@ const StoreDetails = () => {
 
   if (error || !store) {
     return (
-      <div className="min-h-screen space-y-5 bg-[#f8fafc]" dir="rtl">
+      <div className="page-shell bg-[#f8fafc]" dir="rtl">
         <AlertMessage>{error || 'المتجر غير موجود'}</AlertMessage>
         <PrimaryActionButton onClick={() => navigate('/dashboard/stores')}>العودة إلى المتاجر</PrimaryActionButton>
       </div>
@@ -54,7 +54,7 @@ const StoreDetails = () => {
   const subscriptionStatus = store.subscription?.status;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title={store.name}
         description="تفاصيل المتجر الكاملة ومعلومات الاشتراك والمالك"

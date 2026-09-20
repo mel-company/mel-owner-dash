@@ -173,7 +173,7 @@ const PaymentMethods = () => {
   if (loading && methods.length === 0 && providers.length === 0) return <LoadingState />;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="بوابات الدفع"
         description={<>هناك <span className="font-black text-violet-600">{methods.length} طريقة دفع</span> و <span className="font-black text-violet-600">{providers.length} مزود</span></>}

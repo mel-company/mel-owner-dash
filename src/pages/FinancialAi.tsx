@@ -284,7 +284,7 @@ const FinancialAi = () => {
   if (loading && !summary) return <LoadingState />;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="مالية الذكاء الاصطناعي"
         description={
