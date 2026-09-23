@@ -75,6 +75,8 @@ const Support = () => {
   const [ticketStores, setTicketStores] = useState<SupportTicketStoreOption[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [reply, setReply] = useState('');
+  const [replySending, setReplySending] = useState(false);
+  const [replyError, setReplyError] = useState('');
   const [ticketUnreadMap, setTicketUnreadMap] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<TicketFilters>({
     status: '',
@@ -232,6 +234,8 @@ const Support = () => {
     setModalMode('details');
     setMessages([]);
     setAttachments([]);
+    setReply('');
+    setReplyError('');
     lastMessageIdRef.current = null;
 
     try {
@@ -328,24 +332,47 @@ const Support = () => {
   };
 
   const handleSendReply = async () => {
-    if (!selectedTicket || !reply.trim()) return;
+    if (!selectedTicket || !reply.trim() || replySending) return;
 
+    const text = reply.trim();
+    setReplySending(true);
+    setReplyError('');
     try {
       const message = await supportMessagesService.replySystemTicket({
         ticketId: selectedTicket.id,
-        message: reply.trim(),
-        content: reply.trim(),
+        message: text,
+        content: text,
       });
-      setMessages((current) => [...current, message]);
-      lastMessageIdRef.current = message.id;
+      const normalized = {
+        ...message,
+        content: message.content || message.message || text,
+        message: message.message || message.content || text,
+      };
+      setMessages((current) => {
+        if (normalized.id && current.some((item) => item.id === normalized.id)) {
+          return current;
+        }
+        return [...current, normalized];
+      });
+      if (normalized.id) {
+        lastMessageIdRef.current = normalized.id;
+      }
       setReply('');
-      // Backend auto-marks ticket read for this agent on system reply
       clearTicketUnread(selectedTicket.id);
       markTicketReadLocally(selectedTicket.id);
       refreshUnreadTotal();
+      // Confirm from server so the bubble never depends on a thin reply payload.
+      try {
+        await loadTicketMessages(selectedTicket.id);
+      } catch {
+        /* keep optimistic message */
+      }
     } catch (err) {
+      setReplyError('فشل في إرسال الرد. حاول مرة أخرى.');
       setError('فشل في إرسال الرد.');
       console.error('Error sending reply:', err);
+    } finally {
+      setReplySending(false);
     }
   };
 
@@ -521,6 +548,8 @@ const Support = () => {
           stores={ticketStores}
           reply={reply}
           setReply={setReply}
+          replySending={replySending}
+          replyError={replyError}
           onSendReply={handleSendReply}
           onUploadAttachments={handleUploadAttachments}
           onDeleteAttachment={handleDeleteAttachment}
@@ -937,6 +966,8 @@ const TicketDetailsDrawer = ({
   stores,
   reply,
   setReply,
+  replySending,
+  replyError,
   onSendReply,
   onUploadAttachments,
   onDeleteAttachment,
@@ -949,6 +980,8 @@ const TicketDetailsDrawer = ({
   stores: SupportTicketStoreOption[];
   reply: string;
   setReply: (value: string) => void;
+  replySending: boolean;
+  replyError: string;
   onSendReply: () => void;
   onUploadAttachments: (files: FileList | File[]) => void;
   onDeleteAttachment: (attachmentId: string) => void;
@@ -1130,10 +1163,34 @@ const TicketDetailsDrawer = ({
                 <p className="py-10 text-center text-sm font-bold text-slate-400">لا توجد رسائل بعد</p>
               )}
             </div>
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2">
-              <button onClick={onSendReply} className="h-10 rounded-xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500">إرسال</button>
-              <input value={reply} onChange={(event) => setReply(event.target.value)} placeholder="كتابة الرسالة" className="h-10 flex-1 bg-transparent px-3 text-sm outline-none" />
-              <Send className="h-4 w-4 text-slate-300" />
+            <div className="mt-4 space-y-2">
+              {replyError && (
+                <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{replyError}</p>
+              )}
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2">
+                <button
+                  type="button"
+                  disabled={replySending || !reply.trim()}
+                  onClick={onSendReply}
+                  className="h-10 rounded-xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500 disabled:opacity-50"
+                >
+                  {replySending ? '...' : 'إرسال'}
+                </button>
+                <input
+                  value={reply}
+                  onChange={(event) => setReply(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      onSendReply();
+                    }
+                  }}
+                  placeholder="كتابة الرسالة"
+                  disabled={replySending}
+                  className="h-10 flex-1 bg-transparent px-3 text-sm outline-none disabled:opacity-60"
+                />
+                <Send className="h-4 w-4 text-slate-300" />
+              </div>
             </div>
           </div>
         </div>

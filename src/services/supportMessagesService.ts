@@ -105,11 +105,18 @@ export const supportMessagesService = {
   /**
    * الرد على تذكرة دعم (System)
    * POST /api/v1/message/system/reply
+   * Backend uses FilesInterceptor (multipart). Plain JSON can lose fields —
+   * always send FormData so ticketId/message are reliably parsed.
    */
   replySystemTicket: async (replyData: ReplyMessageRequest): Promise<SupportMessage> => {
+    const formData = new FormData();
+    formData.append('ticketId', replyData.ticketId);
+    const text = (replyData.message || replyData.content || '').trim();
+    if (text) formData.append('message', text);
+
     const response = await axiosInstance.post<SupportMessage>(
       '/message/system/reply',
-      normalizeMessagePayload(replyData)
+      formData
     );
     return normalizeSupportMessage(response as unknown as SupportMessage);
   },

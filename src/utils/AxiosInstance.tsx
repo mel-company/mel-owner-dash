@@ -17,28 +17,16 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('token');
-    
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('✅ Token added to request:', {
-        url: config.url,
-        hasToken: true,
-        tokenLength: token.length,
-      });
-    } else {
-      console.warn('⚠️ No token found in localStorage for request:', config.url);
     }
-    
-    // Log request for debugging
-    console.log('API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      baseURL: config.baseURL,
-      fullURL: `${config.baseURL}${config.url}`,
-      hasToken: !!token,
-      withCredentials: config.withCredentials,
-    });
-    
+
+    // Let the browser set multipart boundary — a bare Content-Type breaks FormData.
+    if (config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type'];
+    }
+
     return config;
   },
   (error: AxiosError) => {
