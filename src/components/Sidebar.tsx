@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSupportUnread } from '../contexts/SupportUnreadContext';
 import { SidebarProvider, useSidebar as useShadcnSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +11,7 @@ type AppMenuItem = {
   roles: Array<'owner' | 'employee' | 'support' | 'developer'>;
   section: 'system' | 'user';
   badge?: string;
+  dynamicBadge?: 'support-unread';
   flipIcon?: boolean;
 };
 
@@ -23,6 +25,7 @@ const menuItems: AppMenuItem[] = [
   { path: '/dashboard/stores', label: 'أدارة المتجر', icon: '/sidebar/icon-stores.svg', roles: ['owner', 'employee'], section: 'user' },
   { path: '/dashboard/delivery', label: 'شركات الشحن', icon: '/sidebar/icon-delivery.svg', roles: ['owner'], section: 'user' },
   { path: '/dashboard/plans', label: 'باقات الاشتراك', icon: '/sidebar/icon-plans.svg', roles: ['owner'], section: 'user' },
+  { path: '/dashboard/support', label: 'الدعم الفني', icon: '/sidebar/icon-support.svg', roles: ['support', 'owner'], section: 'user', dynamicBadge: 'support-unread' },
 ];
 
 const AppSidebar = () => {
@@ -30,6 +33,7 @@ const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { state, toggleSidebar, isMobile, setOpenMobile, openMobile } = useShadcnSidebar();
+  const { unreadTotal } = useSupportUnread();
 
   const collapsed = !isMobile && state === 'collapsed';
   const mobileOpen = isMobile && openMobile;
@@ -45,6 +49,12 @@ const AppSidebar = () => {
   const systemItems = items.filter((i) => i.section === 'system');
   const userItems = items.filter((i) => i.section === 'user');
 
+  const getBadge = (item: AppMenuItem) => {
+    if (item.dynamicBadge === 'support-unread' && unreadTotal > 0) {
+      return unreadTotal > 99 ? '99+' : `+${unreadTotal}`;
+    }
+    return item.badge;
+  };
   const roleLabel = ({
     owner: 'مدير النظام',
     employee: 'موظف',
@@ -63,7 +73,7 @@ const AppSidebar = () => {
 
   const renderNavItem = (item: AppMenuItem) => {
     const active = isActive(item.path);
-    const badge = item.badge;
+    const badge = getBadge(item);
 
     if (collapsed) {
       return (
