@@ -349,14 +349,18 @@ export const supportTicketsService = {
    * رابط محادثة الزائر + واتساب (System)
    * POST /api/v1/support-ticket/system/{id}/public-chat-link
    */
-  getPublicChatLink: async (id: string): Promise<{
+  getPublicChatLink: async (
+    id: string,
+    options?: { replyText?: string }
+  ): Promise<{
     token: string;
     chatUrl: string;
     whatsappUrl: string | null;
     phone: string | null;
   }> => {
     const response = await axiosInstance.post(
-      `/support-ticket/system/${id}/public-chat-link`
+      `/support-ticket/system/${id}/public-chat-link`,
+      { replyText: options?.replyText || undefined }
     );
     return response as unknown as {
       token: string;

@@ -77,6 +77,10 @@ const Support = () => {
   const [reply, setReply] = useState('');
   const [replySending, setReplySending] = useState(false);
   const [replyError, setReplyError] = useState('');
+  const [customerNotify, setCustomerNotify] = useState<{
+    chatUrl: string;
+    whatsappUrl: string | null;
+  } | null>(null);
   const [ticketUnreadMap, setTicketUnreadMap] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<TicketFilters>({
     status: '',
@@ -236,6 +240,7 @@ const Support = () => {
     setAttachments([]);
     setReply('');
     setReplyError('');
+    setCustomerNotify(null);
     lastMessageIdRef.current = null;
 
     try {
@@ -337,6 +342,7 @@ const Support = () => {
     const text = reply.trim();
     setReplySending(true);
     setReplyError('');
+    setCustomerNotify(null);
     try {
       const message = await supportMessagesService.replySystemTicket({
         ticketId: selectedTicket.id,
@@ -361,11 +367,29 @@ const Support = () => {
       clearTicketUnread(selectedTicket.id);
       markTicketReadLocally(selectedTicket.id);
       refreshUnreadTotal();
-      // Confirm from server so the bubble never depends on a thin reply payload.
       try {
         await loadTicketMessages(selectedTicket.id);
       } catch {
         /* keep optimistic message */
+      }
+
+      // Landing-page visitors have no dashboard — push them the reply via WhatsApp link.
+      const isLanding =
+        selectedTicket.source === TicketSourceEnum.LANDING_PAGE ||
+        Boolean(selectedTicket.contactPhone || selectedTicket.contactEmail);
+      if (isLanding) {
+        try {
+          const link = await supportTicketsService.getPublicChatLink(selectedTicket.id, {
+            replyText: text,
+          });
+          setCustomerNotify({
+            chatUrl: link.chatUrl,
+            whatsappUrl: link.whatsappUrl,
+          });
+          // OTPIQ delivers automatically; keep WhatsApp link as manual fallback only.
+        } catch (linkErr) {
+          console.error('Failed to build customer notify link:', linkErr);
+        }
       }
     } catch (err) {
       setReplyError('فشل في إرسال الرد. حاول مرة أخرى.');
@@ -550,6 +574,7 @@ const Support = () => {
           setReply={setReply}
           replySending={replySending}
           replyError={replyError}
+          customerNotify={customerNotify}
           onSendReply={handleSendReply}
           onUploadAttachments={handleUploadAttachments}
           onDeleteAttachment={handleDeleteAttachment}
@@ -968,6 +993,7 @@ const TicketDetailsDrawer = ({
   setReply,
   replySending,
   replyError,
+  customerNotify,
   onSendReply,
   onUploadAttachments,
   onDeleteAttachment,
@@ -982,6 +1008,7 @@ const TicketDetailsDrawer = ({
   setReply: (value: string) => void;
   replySending: boolean;
   replyError: string;
+  customerNotify: { chatUrl: string; whatsappUrl: string | null } | null;
   onSendReply: () => void;
   onUploadAttachments: (files: FileList | File[]) => void;
   onDeleteAttachment: (attachmentId: string) => void;
@@ -1166,6 +1193,33 @@ const TicketDetailsDrawer = ({
             <div className="mt-4 space-y-2">
               {replyError && (
                 <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{replyError}</p>
+              )}
+              {customerNotify && (
+                <div className="rounded-2xl bg-emerald-50 px-3 py-3 text-right ring-1 ring-emerald-100">
+                  <p className="text-xs font-black text-emerald-700">
+                    تم حفظ الرد وإرساله للزبون عبر OTP IQ (واتساب / SMS)
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                    {customerNotify.whatsappUrl && (
+                      <a
+                        href={customerNotify.whatsappUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white"
+                      >
+                        إعادة إرسال يدوياً واتساب
+                      </a>
+                    )}
+                    <a
+                      href={customerNotify.chatUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl bg-white px-3 py-1.5 text-xs font-black text-emerald-700 ring-1 ring-emerald-200"
+                    >
+                      رابط محادثة الزبون
+                    </a>
+                  </div>
+                </div>
               )}
               <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2">
                 <button
