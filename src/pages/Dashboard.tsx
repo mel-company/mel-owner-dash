@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 import { HugeiconsIcon } from '@hugeicons/react';
 import type { IconSvgElement } from '@hugeicons/react';
 import {
@@ -48,6 +49,19 @@ import { cn } from '@/lib/utils';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler);
 
 const Dashboard = () => {
+  const { user } = useAuth();
+
+  if (user?.role === 'developer') {
+    return <Navigate to="/dashboard/developer" replace />;
+  }
+  if (user?.role === 'support') {
+    return <Navigate to="/dashboard/support" replace />;
+  }
+
+  return <OwnerDashboard />;
+};
+
+const OwnerDashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

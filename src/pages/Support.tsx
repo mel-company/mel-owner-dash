@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Code2,
   Download,
   FileText,
   Headphones,
@@ -30,6 +32,7 @@ import {
 import { supportMessagesService, type SupportMessage } from '../services/supportMessagesService';
 import { useSupportUnread } from '../contexts/SupportUnreadContext';
 import { markTicketReadLocally } from '../utils/supportUnread';
+import { PageHeader, PrimaryActionButton } from '@/components/dashboard';
 import { cn } from '@/lib/utils';
 
 type TicketFilters = {
@@ -52,11 +55,19 @@ const defaultTicketForm: CreateTicketRequest = {
 const pageSizeOptions = [10, 20, 50];
 
 const Support = () => {
+  const location = useLocation();
+  const isDeveloperPage = location.pathname.includes('/developer');
+  const pageTitle = isDeveloperPage ? 'مطور النظام' : 'الدعم الفني';
+  const pageDescriptionLabel = isDeveloperPage ? 'قائمة مطور النظام' : 'قائمة الدعم الفني';
+  const listTitle = isDeveloperPage ? 'قائمة تذاكر مطور النظام' : 'قائمة تذاكر الدعم الفني';
+  const PageTitleIcon = isDeveloperPage ? Code2 : Headphones;
+
   const { setUnreadTotal, refreshUnreadTotal } = useSupportUnread();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [modalMode, setModalMode] = useState<ModalMode>(null);
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [ticketToDelete, setTicketToDelete] = useState<SupportTicket | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
@@ -66,6 +77,12 @@ const Support = () => {
   const [reply, setReply] = useState('');
   const [ticketUnreadMap, setTicketUnreadMap] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<TicketFilters>({
+    status: '',
+    priority: '',
+    department: '',
+    search: '',
+  });
+  const [draftFilters, setDraftFilters] = useState<TicketFilters>({
     status: '',
     priority: '',
     department: '',
@@ -376,29 +393,23 @@ const Support = () => {
 
   return (
     <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <PageIcon>
-            <Headphones className="h-6 w-6" />
-          </PageIcon>
-          <div className="text-right">
-            <h1 className="text-2xl font-black text-slate-950">الدعم الفني</h1>
-            <p className="text-sm font-medium text-slate-500">
-              هناك <span className="font-black text-violet-600">{filteredTickets.length} بطاقة</span> في قائمة الدعم الفني
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={openCreateModal}
-          className="inline-flex h-12 items-center gap-2 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 px-5 text-sm font-bold text-white shadow-lg shadow-violet-200"
-        >
-          إضافة تذكرة جديدة
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-white/20">
-            <Plus className="h-4 w-4" />
-          </span>
-        </button>
-      </div>
+      <PageHeader
+        title={pageTitle}
+        description={
+          <>
+            هناك <span className="font-black text-violet-600">{filteredTickets.length} بطاقة</span> في {pageDescriptionLabel}
+          </>
+        }
+        icon={<PageTitleIcon className="h-5 w-5 sm:h-6 sm:w-6" />}
+        action={(
+          <PrimaryActionButton onClick={openCreateModal}>
+            إضافة تذكرة جديدة
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-white/20">
+              <Plus className="h-4 w-4" />
+            </span>
+          </PrimaryActionButton>
+        )}
+      />
 
       {error && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
@@ -412,10 +423,14 @@ const Support = () => {
         <StatCard title="عدد التذاكر المغلقة" value={stats.closed} tone="rose" icon={<X className="h-6 w-6" />} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setFilters({ status: '', priority: '', department: '', search: '' })}
+            type="button"
+            onClick={() => {
+              setDraftFilters(filters);
+              setShowFilters(true);
+            }}
             className={cn(
               'inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-100 bg-white px-5 text-sm font-bold text-slate-600 shadow-sm',
               activeFilterCount > 0 && 'border-violet-300 bg-violet-600 text-white'
@@ -430,8 +445,8 @@ const Support = () => {
         </div>
 
         <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-          <button className="h-12 rounded-2xl bg-cyan-50 px-6 text-sm font-bold text-cyan-500">البحث</button>
-          <div className="relative min-w-[280px] max-w-md flex-1">
+          <button type="button" className="h-12 rounded-2xl bg-cyan-50 px-6 text-sm font-bold text-cyan-500">البحث</button>
+          <div className="relative min-w-[220px] max-w-md flex-1">
             <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={filters.search}
@@ -446,9 +461,9 @@ const Support = () => {
         </div>
       </div>
 
-      {activeFilterCount > 0 && (
-        <h2 className="text-2xl font-black text-slate-900">نتائج البحث والفلاتر</h2>
-      )}
+      <h2 className="text-xl font-black text-slate-900 sm:text-2xl">
+        {activeFilterCount > 0 ? 'نتائج البحث والفلاتر' : listTitle}
+      </h2>
 
       <TicketTable
         tickets={paginatedTickets}
@@ -464,6 +479,27 @@ const Support = () => {
         onView={openTicketDetails}
         onDelete={setTicketToDelete}
       />
+
+      {showFilters && (
+        <FiltersDrawer
+          filters={draftFilters}
+          setFilters={setDraftFilters}
+          onClose={() => setShowFilters(false)}
+          onApply={() => {
+            setFilters(draftFilters);
+            setPage(1);
+            setShowFilters(false);
+            fetchTickets();
+          }}
+          onReset={() => {
+            const empty = { status: '', priority: '', department: '', search: '' };
+            setDraftFilters(empty);
+            setFilters(empty);
+            setPage(1);
+            setShowFilters(false);
+          }}
+        />
+      )}
 
       {modalMode === 'create' && (
         <CreateTicketDrawer
@@ -508,6 +544,137 @@ const PageIcon = ({ children }: { children: React.ReactNode }) => (
   <div className="relative grid h-12 w-12 place-items-center rounded-2xl bg-violet-50 text-violet-600">
     {children}
     <span className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-violet-200" />
+  </div>
+);
+
+const LandingContactActions = ({ ticketId, hasPhone }: { ticketId: string; hasPhone: boolean }) => {
+  const [busy, setBusy] = useState(false);
+  const [chatUrl, setChatUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const loadLink = async () => {
+    setBusy(true);
+    try {
+      const result = await supportTicketsService.getPublicChatLink(ticketId);
+      setChatUrl(result.chatUrl);
+      return result;
+    } catch (error) {
+      console.error('Failed to load public chat link:', error);
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openWhatsApp = async () => {
+    const result = await loadLink();
+    if (result?.whatsappUrl) {
+      window.open(result.whatsappUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const copyChatLink = async () => {
+    const result = chatUrl
+      ? { chatUrl }
+      : await loadLink();
+    if (!result?.chatUrl) return;
+    try {
+      await navigator.clipboard.writeText(result.chatUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy chat link:', error);
+    }
+  };
+
+  return (
+    <div className="mt-4 space-y-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {hasPhone && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={openWhatsApp}
+            className="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-600 disabled:opacity-60"
+          >
+            {busy ? '...' : 'واتساب + رابط التذكرة'}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={copyChatLink}
+          className="rounded-xl bg-violet-100 px-3 py-1.5 text-xs font-black text-violet-700 disabled:opacity-60"
+        >
+          {copied ? 'تم النسخ' : 'نسخ رابط المحادثة'}
+        </button>
+      </div>
+      {chatUrl && (
+        <a
+          href={chatUrl}
+          target="_blank"
+          rel="noreferrer"
+          dir="ltr"
+          className="block truncate text-left text-[11px] font-bold text-violet-500 underline"
+        >
+          {chatUrl}
+        </a>
+      )}
+    </div>
+  );
+};
+
+const FiltersDrawer = ({
+  filters,
+  setFilters,
+  onClose,
+  onApply,
+  onReset,
+}: {
+  filters: TicketFilters;
+  setFilters: React.Dispatch<React.SetStateAction<TicketFilters>>;
+  onClose: () => void;
+  onApply: () => void;
+  onReset: () => void;
+}) => (
+  <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
+    <div
+      onMouseDown={(event) => event.stopPropagation()}
+      className="fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8"
+    >
+      <DrawerHeader title="الفلاتر" onClose={onClose} />
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <SelectField
+          label="الحالة"
+          value={filters.status}
+          placeholder="كل الحالات"
+          options={[{ value: '', label: 'كل الحالات' }, ...statusOptions]}
+          onChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+        />
+        <SelectField
+          label="الأولوية"
+          value={filters.priority}
+          placeholder="كل الأولويات"
+          options={[{ value: '', label: 'كل الأولويات' }, ...priorityOptions]}
+          onChange={(value) => setFilters((current) => ({ ...current, priority: value }))}
+        />
+        <SelectField
+          label="القسم"
+          value={filters.department}
+          placeholder="كل الأقسام"
+          options={[{ value: '', label: 'كل الأقسام' }, ...departmentOptions]}
+          onChange={(value) => setFilters((current) => ({ ...current, department: value }))}
+        />
+      </div>
+      <div className="grid shrink-0 grid-cols-2 gap-4 pt-7">
+        <button type="button" onClick={onReset} className="h-14 rounded-2xl bg-slate-100 font-black text-slate-600">
+          إعادة تعيين
+        </button>
+        <button type="button" onClick={onApply} className="h-14 rounded-2xl bg-violet-600 font-black text-white">
+          تطبيق الفلاتر
+        </button>
+      </div>
+    </div>
   </div>
 );
 
@@ -563,10 +730,9 @@ const TicketTable = ({
             <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
               <th className="px-5 py-5 text-right">رقم التذكرة</th>
               <th className="px-5 py-5 text-right">المتجر</th>
-              <th className="px-5 py-5 text-right">آخر رسالة</th>
+              <th className="px-5 py-5 text-right">العنوان</th>
               <th className="px-5 py-5 text-right">القسم</th>
-              <th className="px-5 py-5 text-right">آخر نشاط</th>
-              <th className="px-5 py-5 text-right">غير مقروء</th>
+              <th className="px-5 py-5 text-right">التاريخ</th>
               <th className="px-5 py-5 text-right">الأولوية</th>
               <th className="px-5 py-5 text-right">الحالة</th>
               <th className="px-5 py-5 text-right">العمليات</th>
@@ -614,15 +780,6 @@ const TicketTable = ({
                   <p className="font-bold">{formatDate(ticket.lastMessageAt || ticket.updatedAt || ticket.createdAt)}</p>
                   <p className="text-xs text-slate-400">{formatTime(ticket.lastMessageAt || ticket.updatedAt || ticket.createdAt)}</p>
                 </td>
-                <td className="px-5 py-4">
-                  {unread > 0 ? (
-                    <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-red-500 px-2 py-1 text-xs font-black text-white">
-                      {unread > 99 ? '99+' : unread}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-bold text-slate-300">0</span>
-                  )}
-                </td>
                 <td className="px-5 py-4"><PriorityMeter priority={ticket.priority} /></td>
                 <td className="px-5 py-4"><StatusBadge status={ticket.status} /></td>
                 <td className="px-5 py-4">
@@ -646,7 +803,7 @@ const TicketTable = ({
             )})}
             {tickets.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-5 py-12 text-center text-sm font-bold text-slate-400">لا توجد تذاكر</td>
+                <td colSpan={8} className="px-5 py-12 text-center text-sm font-bold text-slate-400">لا توجد تذاكر</td>
               </tr>
             )}
           </tbody>
@@ -826,20 +983,12 @@ const TicketDetailsDrawer = ({
                 </a>
                 {ticket.contactPhone && (
                   <div className="mt-3 flex items-center justify-end gap-3">
-                    {/* wa.me takes bare digits — no "+", no spaces. */}
-                    <a
-                      href={`https://wa.me/${ticket.contactPhone.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-xl bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-600"
-                    >
-                      واتساب
-                    </a>
                     <a href={`tel:${ticket.contactPhone}`} dir="ltr" className="text-sm font-bold text-slate-600">
                       {ticket.contactPhone}
                     </a>
                   </div>
                 )}
+                <LandingContactActions ticketId={ticket.id} hasPhone={Boolean(ticket.contactPhone)} />
               </div>
             )}
 

@@ -85,8 +85,16 @@ function App() {
             <Route
               path="support"
               element={
-                <ProtectedRoute requiredRoles={['support', 'owner']}>
+                <ProtectedRoute requiredRoles={['support', 'owner', 'developer']}>
                   <Support />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="developer"
+              element={
+                <ProtectedRoute requiredRoles={['developer']}>
+                  <Developer />
                 </ProtectedRoute>
               }
             />
@@ -116,16 +124,9 @@ function App() {
             />
           </Route>
 
-
-          <Route
-            path="/developer"
-            element={
-              <ProtectedRoute requiredRoles={['developer']}>
-                <Developer />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/developer" element={<Navigate to="/dashboard/developer" replace />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

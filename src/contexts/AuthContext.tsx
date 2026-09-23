@@ -14,8 +14,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-      
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
   hasAccess: (requiredRole: UserRole[]) => boolean;
 }
@@ -40,57 +39,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return null;
   });
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<User | null> => {
     try {
-      const response = await systemAuthService.login({ email, password });
-      
-      if (response.token && response.message) {
-        // Decode JWT token to get user info
-        const tokenParts = response.token.split('.');
-        if (tokenParts.length === 3) {
-          try {
-            const payload = JSON.parse(atob(tokenParts[1])) as {
-              id: string;
-              email: string;
-              name: string;
-              role: string;
-              phone?: string;
-            };
-            
-            // Map backend role to frontend role
-            const roleMap: { [key: string]: UserRole } = {
-              'DEVELOPER': 'developer',
-              'OWNER': 'owner',
-              'EMPLOYEE': 'employee',
-              'SUPPORT': 'support',
-            };
-            
-            const userData: User = {
-              id: payload.id,
-              username: payload.email.split('@')[0] || payload.name.toLowerCase(),
-              role: roleMap[payload.role] ,
-              name: payload.name,
-              email: payload.email,
-            };
-            
-            setUser(userData);
-            localStorage.setItem('user', JSON.stringify(userData));
-            localStorage.setItem('token', response.token);
-            if (response.refreshToken) {
-              localStorage.setItem('refreshToken', response.refreshToken);
-            }
-            return true;
-          } catch (decodeError) {
-            console.error('Error decoding token:', decodeError);
-            return false;
-          }
+      const response = await systemAuthService.login({
+        email: email.trim(),
+        password,
+      });
+
+      if (!response.token) return null;
+
+      const tokenParts = response.token.split('.');
+      if (tokenParts.length !== 3) return null;
+
+      try {
+        const payload = JSON.parse(atob(tokenParts[1])) as {
+          id: string;
+          email: string;
+          name: string;
+          role: string;
+          phone?: string;
+        };
+
+        const roleMap: Record<string, UserRole> = {
+          DEVELOPER: 'developer',
+          OWNER: 'owner',
+          EMPLOYEE: 'employee',
+          SUPPORT: 'support',
+        };
+
+        const mappedRole = roleMap[String(payload.role || '').toUpperCase()];
+        if (!mappedRole) {
+          console.error('Unknown user role:', payload.role);
+          return null;
         }
-        return false;
+
+        const userData: User = {
+          id: payload.id,
+          username: payload.email?.split('@')[0] || payload.name.toLowerCase(),
+          role: mappedRole,
+          name: payload.name,
+          email: payload.email,
+        };
+
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('token', response.token);
+        if (response.refreshToken) {
+          localStorage.setItem('refreshToken', response.refreshToken);
+        }
+        return userData;
+      } catch (decodeError) {
+        console.error('Error decoding token:', decodeError);
+        return null;
       }
-      return false;
     } catch (error) {
       console.error('Login error:', error);
-      return false;
+      return null;
     }
   };
 

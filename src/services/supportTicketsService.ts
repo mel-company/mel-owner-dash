@@ -85,6 +85,8 @@ export interface SupportTicket {
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  /** Guest chat token for LANDING_PAGE tickets (opaque, not the ticket id). */
+  publicAccessToken?: string | null;
   source?: TicketSourceEnum | null;
 }
 
@@ -341,6 +343,27 @@ export const supportTicketsService = {
       `/support-ticket/system/${id}/resolve`
     );
     return response as unknown as SupportTicket;
+  },
+
+  /**
+   * رابط محادثة الزائر + واتساب (System)
+   * POST /api/v1/support-ticket/system/{id}/public-chat-link
+   */
+  getPublicChatLink: async (id: string): Promise<{
+    token: string;
+    chatUrl: string;
+    whatsappUrl: string | null;
+    phone: string | null;
+  }> => {
+    const response = await axiosInstance.post(
+      `/support-ticket/system/${id}/public-chat-link`
+    );
+    return response as unknown as {
+      token: string;
+      chatUrl: string;
+      whatsappUrl: string | null;
+      phone: string | null;
+    };
   },
 
   // ========== Store User Tickets ==========

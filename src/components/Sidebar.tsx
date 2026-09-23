@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSupportUnread } from '../contexts/SupportUnreadContext';
 import { SidebarProvider, useSidebar as useShadcnSidebar } from '@/components/ui/sidebar';
@@ -17,7 +19,7 @@ type AppMenuItem = {
 
 /** Tabs: ادارة النظام + ادوات المستخدم (Figma) */
 const menuItems: AppMenuItem[] = [
-  { path: '/dashboard', label: 'لوحة التحكم', icon: '/sidebar/icon-dashboard.svg', roles: ['owner', 'employee', 'support'], section: 'system', badge: '+1' },
+  { path: '/dashboard', label: 'لوحة التحكم', icon: '/sidebar/icon-dashboard.svg', roles: ['owner', 'employee', 'support', 'developer'], section: 'system', badge: '+1' },
   { path: '/dashboard/employees', label: 'ادارة الموظفين', icon: '/sidebar/icon-employees.svg', roles: ['owner'], section: 'system' },
   { path: '/dashboard/accounting', label: 'الحسابات المالية', icon: '/sidebar/icon-accounting.svg', roles: ['owner', 'employee'], section: 'system', flipIcon: true },
   { path: '/dashboard/financial-ai', label: 'مالية الذكاء الاصطناعي', icon: '/sidebar/icon-financial-ai.svg', roles: ['owner'], section: 'system' },
@@ -25,7 +27,8 @@ const menuItems: AppMenuItem[] = [
   { path: '/dashboard/stores', label: 'أدارة المتجر', icon: '/sidebar/icon-stores.svg', roles: ['owner', 'employee'], section: 'user' },
   { path: '/dashboard/delivery', label: 'شركات الشحن', icon: '/sidebar/icon-delivery.svg', roles: ['owner'], section: 'user' },
   { path: '/dashboard/plans', label: 'باقات الاشتراك', icon: '/sidebar/icon-plans.svg', roles: ['owner'], section: 'user' },
-  { path: '/dashboard/support', label: 'الدعم الفني', icon: '/sidebar/icon-support.svg', roles: ['support', 'owner'], section: 'user', dynamicBadge: 'support-unread' },
+  { path: '/dashboard/support', label: 'الدعم الفني', icon: '/sidebar/icon-support.svg', roles: ['support', 'owner', 'developer'], section: 'user', dynamicBadge: 'support-unread' },
+  { path: '/dashboard/developer', label: 'مطور النظام', icon: '/sidebar/icon-developer.svg', roles: ['developer'], section: 'user' },
 ];
 
 const AppSidebar = () => {
@@ -34,13 +37,34 @@ const AppSidebar = () => {
   const navigate = useNavigate();
   const { state, toggleSidebar, isMobile, setOpenMobile, openMobile } = useShadcnSidebar();
   const { unreadTotal } = useSupportUnread();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const collapsed = !isMobile && state === 'collapsed';
   const mobileOpen = isMobile && openMobile;
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [menuOpen]);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setMenuOpen(false);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const items = menuItems.filter((item) =>
@@ -231,32 +255,61 @@ const AppSidebar = () => {
           </div>
         </div>
 
-        {/* User card */}
-        <button
-          type="button"
-          onDoubleClick={handleLogout}
-          title="انقر مرتين لتسجيل الخروج"
-          className={cn(
-            'flex shrink-0 items-center justify-center px-3 py-2',
-            collapsed ? 'w-[60px] rounded-[22px]' : 'w-full rounded-[22px]'
-          )}
-          style={{ backgroundImage: 'linear-gradient(199deg, rgb(182, 87, 255) 24%, rgb(0, 191, 255) 76%)' }}
-        >
-          {collapsed ? (
-            <UserThumb initials={initials} />
-          ) : (
-            <div className="flex w-full flex-1 items-center justify-between gap-[7px]">
-              <UserThumb initials={initials} />
-              <div className="flex min-w-0 flex-1 items-center justify-between">
-                <div className="flex flex-col items-end gap-0.5 text-right text-xs text-white">
-                  <p className="font-bold">{user?.name || 'محمد علي يوسف'}</p>
-                  <p className="font-normal">{roleLabel}</p>
-                </div>
-                <img src="/sidebar/chevron.svg" alt="" width={19} height={19} className="-scale-y-100" />
-              </div>
+        {/* User card + logout */}
+        <div ref={menuRef} className="relative w-full shrink-0">
+          {menuOpen && (
+            <div
+              className={cn(
+                'absolute bottom-[calc(100%+10px)] z-20 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-100',
+                collapsed ? 'left-1/2 w-44 -translate-x-1/2' : 'inset-x-0'
+              )}
+            >
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-red-500 transition hover:bg-red-50 disabled:opacity-60"
+              >
+                <span>{loggingOut ? 'جاري الخروج...' : 'تسجيل الخروج'}</span>
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
           )}
-        </button>
+
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-label="قائمة الحساب"
+            className={cn(
+              'flex items-center justify-center px-3 py-2 transition',
+              collapsed ? 'w-[60px] rounded-[22px]' : 'w-full rounded-[22px]',
+              menuOpen && 'ring-2 ring-white/40'
+            )}
+            style={{ backgroundImage: 'linear-gradient(199deg, rgb(182, 87, 255) 24%, rgb(0, 191, 255) 76%)' }}
+          >
+            {collapsed ? (
+              <UserThumb initials={initials} />
+            ) : (
+              <div className="flex w-full flex-1 items-center justify-between gap-[7px]">
+                <UserThumb initials={initials} />
+                <div className="flex min-w-0 flex-1 items-center justify-between">
+                  <div className="flex flex-col items-end gap-0.5 text-right text-xs text-white">
+                    <p className="font-bold">{user?.name || 'مستخدم'}</p>
+                    <p className="font-normal">{roleLabel}</p>
+                  </div>
+                  <img
+                    src="/sidebar/chevron.svg"
+                    alt=""
+                    width={19}
+                    height={19}
+                    className={cn('transition', menuOpen ? 'scale-y-100' : '-scale-y-100')}
+                  />
+                </div>
+              </div>
+            )}
+          </button>
+        </div>
       </div>
     </aside>
   );
