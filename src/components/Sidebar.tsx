@@ -28,6 +28,7 @@ const menuItems: AppMenuItem[] = [
   { path: '/dashboard/delivery', label: 'شركات الشحن', icon: '/sidebar/icon-delivery.svg', roles: ['owner'], section: 'user' },
   { path: '/dashboard/plans', label: 'باقات الاشتراك', icon: '/sidebar/icon-plans.svg', roles: ['owner'], section: 'user' },
   { path: '/dashboard/support', label: 'الدعم الفني', icon: '/sidebar/icon-support.svg', roles: ['support', 'owner', 'developer'], section: 'user', dynamicBadge: 'support-unread' },
+  { path: '/dashboard/domains', label: 'صحة النطاقات', icon: '/sidebar/icon-developer.svg', roles: ['owner', 'developer'], section: 'system' },
   { path: '/dashboard/developer', label: 'مطور النظام', icon: '/sidebar/icon-developer.svg', roles: ['developer'], section: 'user' },
 ];
 

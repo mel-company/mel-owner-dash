@@ -16,6 +16,7 @@ import DeliveryCompanies from './pages/DeliveryCompanies';
 import DeliveryZones from './pages/DeliveryZones';
 import PaymentMethods from './pages/PaymentMethods';
 import Developer from './pages/Developer';
+import DomainHealth from './pages/DomainHealth';
 
 function App() {
   return (
@@ -95,6 +96,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['developer']}>
                   <Developer />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="domains"
+              element={
+                <ProtectedRoute requiredRoles={['owner', 'developer']}>
+                  <DomainHealth />
                 </ProtectedRoute>
               }
             />
