@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { ChevronLeft, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSupportUnread } from '../contexts/SupportUnreadContext';
+import BrandLogo from './BrandLogo';
 import { SidebarProvider, useSidebar as useShadcnSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
@@ -201,7 +202,9 @@ const AppSidebar = () => {
             )}
           >
             <Link to="/dashboard" onClick={onNav} className="flex items-center gap-2.5" aria-label="mel.iq">
-              <BrandLogo />
+              <span className="flex size-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_0_25px_rgba(125,38,247,0.25)] ring-1 ring-[#ebf6ff]">
+                <BrandLogo variant="mark" imageClassName="h-7 w-7" />
+              </span>
               {!collapsed && (
                 <div className="flex flex-col items-end gap-0.5 text-right">
                   <p className="text-sm font-bold leading-none text-[#04111c]" dir="ltr">mel.iq</p>
@@ -213,16 +216,17 @@ const AppSidebar = () => {
             <button
               type="button"
               onClick={() => (isMobile ? setOpenMobile(false) : toggleSidebar())}
-              className="relative size-8 shrink-0 overflow-hidden rounded-lg"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#6c809d] transition-colors hover:bg-white/70"
               aria-label={collapsed ? 'فتح القائمة' : 'إغلاق القائمة'}
             >
-              <span className="absolute inset-[22%_-50%_20%_16%] flex items-center justify-center">
-                <img
-                  src={collapsed ? '/sidebar/toggle-closed.svg' : '/sidebar/toggle.svg'}
-                  alt=""
-                  className="-rotate-90 size-full max-w-none"
-                />
-              </span>
+              <ChevronLeft
+                className={cn(
+                  'size-5 transition-transform duration-200',
+                  // Sidebar is on the right: expanded → point right to collapse; collapsed → point left to open
+                  !collapsed && 'rotate-180',
+                )}
+                strokeWidth={1.75}
+              />
             </button>
           </div>
 
@@ -339,20 +343,6 @@ const AppSidebar = () => {
     </>
   );
 };
-
-const BrandLogo = () => (
-  <span
-    className="relative size-[42px] shrink-0 overflow-hidden rounded-full shadow-[0_0_25px_rgba(125,38,247,0.25)]"
-    style={{ backgroundImage: 'linear-gradient(234deg, rgb(182, 87, 255) 24%, rgb(0, 191, 255) 76%)' }}
-  >
-    <span className="absolute inset-[23.8%_23.7%]">
-      <img src="/sidebar/logo-a.svg" alt="" className="absolute inset-0 size-full" />
-    </span>
-    <span className="absolute inset-[45.7%_36.9%_36.9%_40.5%]">
-      <img src="/sidebar/logo-c.svg" alt="" className="absolute inset-0 size-full" />
-    </span>
-  </span>
-);
 
 const UserThumb = ({ initials }: { initials: string }) => (
   <span className="relative size-11 shrink-0 overflow-hidden">

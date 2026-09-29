@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import ReactECharts from 'echarts-for-react';
+import type { EChartsOption } from 'echarts';
 import { HugeiconsIcon } from '@hugeicons/react';
 import type { IconSvgElement } from '@hugeicons/react';
 import {
@@ -20,19 +22,6 @@ import {
   Wallet02Icon,
 } from '@hugeicons-pro/core-stroke-rounded';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import {
   ownerStatsService,
   type AdminProductivity,
   type FeaturesAdoption,
@@ -43,10 +32,18 @@ import {
   type StoreMetrics,
 } from '../services/ownerStatsService';
 import { useAuth } from '../contexts/AuthContext';
-import { LoadingState, PageHeader, PrimaryActionButton, StatCard, StatusPill, TableShell } from '@/components/dashboard';
+import { PageHeader, PrimaryActionButton, StatusPill, TableShell } from '@/components/dashboard';
+import { Badge } from '@/components/ui/badge';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler);
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -107,52 +104,118 @@ const OwnerDashboard = () => {
     }
   };
 
-  const revenueSeries = useMemo(() => ({
-    labels: ['اليوم', 'هذا الشهر', 'الإجمالي'],
-    datasets: [{
-      label: 'الإيرادات',
-      data: [kpis.revenue_today || 0, kpis.revenue_this_month || 0, kpis.total_revenue || 0],
-      borderColor: '#7D26F7',
-      backgroundColor: 'rgba(125,38,247,0.12)',
-      fill: true,
-      tension: 0.4,
-      pointBackgroundColor: '#7D26F7',
-      pointBorderColor: '#fff',
-      pointBorderWidth: 2,
-      pointRadius: 5,
+  const revenueOption = useMemo<EChartsOption>(() => ({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      textStyle: { fontFamily: 'Setar XS, sans-serif' },
+    },
+    grid: { left: 16, right: 16, top: 24, bottom: 32, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: ['اليوم', 'هذا الشهر', 'الإجمالي'],
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#64748b', fontWeight: 700, fontFamily: 'Setar XS, sans-serif' },
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: 'rgba(148,163,184,0.2)' } },
+      axisLabel: { color: '#64748b', fontWeight: 600, fontFamily: 'Setar XS, sans-serif' },
+    },
+    series: [{
+      name: 'الإيرادات',
+      type: 'bar',
+      barMaxWidth: 48,
+      data: [
+        { value: kpis.revenue_today || 0, itemStyle: { color: '#a78bfa', borderRadius: [12, 12, 0, 0] } },
+        { value: kpis.revenue_this_month || 0, itemStyle: { color: '#7c3aed', borderRadius: [12, 12, 0, 0] } },
+        { value: kpis.total_revenue || 0, itemStyle: { color: '#5b21b6', borderRadius: [12, 12, 0, 0] } },
+      ],
     }],
   }), [kpis]);
 
-  const ordersSeries = useMemo(() => ({
-    labels: ['اليوم', 'آخر 7 أيام', 'ناجحة', 'فاشلة', 'ملغاة'],
-    datasets: [{
-      label: 'الطلبات',
+  const ordersOption = useMemo<EChartsOption>(() => ({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      textStyle: { fontFamily: 'Setar XS, sans-serif' },
+    },
+    grid: { left: 16, right: 16, top: 24, bottom: 32, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: ['اليوم', 'آخر 7 أيام', 'ناجحة', 'فاشلة', 'ملغاة'],
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#64748b', fontWeight: 700, fontFamily: 'Setar XS, sans-serif' },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { color: 'rgba(148,163,184,0.2)' } },
+      axisLabel: { color: '#64748b', fontWeight: 600, fontFamily: 'Setar XS, sans-serif' },
+    },
+    series: [{
+      name: 'الطلبات',
+      type: 'bar',
+      barMaxWidth: 40,
       data: [
-        ordersData.ordersToday || 0,
-        ordersData.ordersLast7Days || 0,
-        ordersData.paymentSuccessCount || 0,
-        ordersData.paymentFailureCount || 0,
-        ordersData.cancelledOrders || 0,
+        { value: ordersData.ordersToday || 0, itemStyle: { color: '#38bdf8', borderRadius: [12, 12, 0, 0] } },
+        { value: ordersData.ordersLast7Days || 0, itemStyle: { color: '#7c3aed', borderRadius: [12, 12, 0, 0] } },
+        { value: ordersData.paymentSuccessCount || 0, itemStyle: { color: '#10b981', borderRadius: [12, 12, 0, 0] } },
+        { value: ordersData.paymentFailureCount || 0, itemStyle: { color: '#ef4444', borderRadius: [12, 12, 0, 0] } },
+        { value: ordersData.cancelledOrders || 0, itemStyle: { color: '#f97316', borderRadius: [12, 12, 0, 0] } },
       ],
-      backgroundColor: ['#38bdf8', '#7c3aed', '#10b981', '#ef4444', '#f97316'],
-      borderRadius: 12,
-      borderSkipped: false,
     }],
   }), [ordersData]);
 
-  const storeSeries = useMemo(() => ({
-    labels: ['نشطة', 'بدون منتجات', 'بدون طلبات'],
-    datasets: [{
-      data: [
-        storeMetrics.activeStores || 0,
-        storeMetrics.storesWithoutProducts || 0,
-        storeMetrics.storesWithoutOrders || 0,
-      ],
-      backgroundColor: ['#10b981', '#f97316', '#ef4444'],
-      borderWidth: 0,
-      hoverOffset: 8,
-    }],
-  }), [storeMetrics]);
+  const storeOption = useMemo<EChartsOption>(() => {
+    const rows = [
+      { name: 'نشطة', value: storeMetrics.activeStores || 0, color: '#10b981' },
+      { name: 'بدون منتجات', value: storeMetrics.storesWithoutProducts || 0, color: '#f97316' },
+      { name: 'بدون طلبات', value: storeMetrics.storesWithoutOrders || 0, color: '#ef4444' },
+    ];
+    const hasData = rows.some((row) => row.value > 0);
+
+    return {
+      tooltip: {
+        trigger: 'item',
+        textStyle: { fontFamily: 'Setar XS, sans-serif' },
+        formatter: '{b}: {c} ({d}%)',
+      },
+      legend: {
+        bottom: 0,
+        icon: 'circle',
+        textStyle: { color: '#64748b', fontWeight: 700, fontFamily: 'Setar XS, sans-serif' },
+      },
+      series: [{
+        name: 'حالة المتاجر',
+        type: 'pie',
+        radius: ['58%', '78%'],
+        center: ['50%', '46%'],
+        avoidLabelOverlap: true,
+        itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        data: hasData
+          ? rows.map((row) => ({ name: row.name, value: row.value, itemStyle: { color: row.color } }))
+          : [{ name: 'لا بيانات', value: 1, itemStyle: { color: '#e2e8f0' } }],
+      }],
+    };
+  }, [storeMetrics]);
+
+  const revenueTotal =
+    (kpis.revenue_today || 0) + (kpis.revenue_this_month || 0) + (kpis.total_revenue || 0);
+  const ordersTotal =
+    (ordersData.ordersToday || 0)
+    + (ordersData.ordersLast7Days || 0)
+    + (ordersData.paymentSuccessCount || 0)
+    + (ordersData.paymentFailureCount || 0)
+    + (ordersData.cancelledOrders || 0);
+  const storesEmpty = !(
+    (storeMetrics.activeStores || 0)
+    + (storeMetrics.storesWithoutProducts || 0)
+    + (storeMetrics.storesWithoutOrders || 0)
+  );
 
   const featureAdoption = (featuresData.storesUsingCoupons || 0)
     + (featuresData.storesUsingDeliveryIntegration || 0)
@@ -161,7 +224,11 @@ const OwnerDashboard = () => {
   const riskCount = (riskData.storesWithExpiredSubscriptions?.length || 0)
     + (riskData.storesWithHighRefunds?.length || 0);
 
-  if (loading) return <LoadingState />;
+  const activeShare = storeMetrics.totalStores
+    ? Math.round(((storeMetrics.activeStores || 0) / storeMetrics.totalStores) * 100)
+    : null;
+
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
@@ -183,105 +250,86 @@ const OwnerDashboard = () => {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
-        <StatCard
+        <KpiCard
           title="إجمالي المتاجر"
+          description="كل المتاجر على المنصة"
           value={(storeMetrics.totalStores || 0).toLocaleString('en-US')}
-          icon={<HugeiconsIcon icon={StoreManagement01Icon} size={24} strokeWidth={2.2} />}
-          tone="blue"
+          icon={StoreManagement01Icon}
         />
-        <StatCard
+        <KpiCard
           title="المتاجر النشطة"
+          description="متاجر لديها نشاط حديث"
           value={(storeMetrics.activeStores || 0).toLocaleString('en-US')}
-          icon={<HugeiconsIcon icon={UserGroupIcon} size={24} strokeWidth={2.2} />}
-          tone="teal"
+          icon={UserGroupIcon}
+          badge={activeShare != null ? `${activeShare}% نشط` : undefined}
+          badgeVariant="secondary"
         />
-        <StatCard
+        <KpiCard
           title="إجمالي الإيرادات"
+          description={`اليوم ${formatMoney(kpis.revenue_today)} · الشهر ${formatMoney(kpis.revenue_this_month)}`}
           value={formatMoney(kpis.total_revenue)}
-          icon={<HugeiconsIcon icon={Wallet02Icon} size={24} strokeWidth={2.2} />}
-          tone="violet"
+          icon={Wallet02Icon}
+          accent
         />
-        <StatCard
+        <KpiCard
           title="إجمالي الطلبات"
+          description="كل الطلبات المسجّلة"
           value={(ordersData.totalOrders || 0).toLocaleString('en-US')}
-          icon={<HugeiconsIcon icon={Invoice03Icon} size={24} strokeWidth={2.2} />}
-          tone="amber"
+          icon={Invoice03Icon}
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.55fr_1fr]">
-        <ChartCard
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.55fr_1fr]">
+        <ChartPanel
           title="الإيرادات"
-          subtitle="اليوم، الشهر، والإجمالي"
-          icon={ChartLineData01Icon}
-        >
-          <Line data={revenueSeries} options={chartOptions} />
-        </ChartCard>
-        <ChartCard
+          description="مقارنة إيراد اليوم والشهر والإجمالي"
+          icon={ChartHistogramIcon}
+          empty={revenueTotal === 0}
+          emptyText="لا توجد إيرادات مسجّلة بعد"
+          option={revenueOption}
+        />
+        <ChartPanel
           title="حالة المتاجر"
-          subtitle="مؤشرات تحتاج متابعة"
+          description={`${storeMetrics.activeStores || 0} نشطة من أصل ${storeMetrics.totalStores || 0}`}
           icon={PieChartIcon}
-        >
-          <Doughnut data={storeSeries} options={doughnutOptions} />
-        </ChartCard>
+          empty={storesEmpty}
+          emptyText="لا توجد بيانات متاجر للعرض"
+          option={storeOption}
+        />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <ChartCard
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <ChartPanel
           title="استخدام الطلبات"
-          subtitle="أداء الدفع والطلبات"
-          icon={ChartHistogramIcon}
-        >
-          <Bar data={ordersSeries} options={chartOptions} />
-        </ChartCard>
+          description="حجم الطلبات وأداء الدفع"
+          icon={ChartLineData01Icon}
+          empty={ordersTotal === 0}
+          emptyText="لا توجد طلبات للعرض"
+          option={ordersOption}
+        />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <StatCard
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <AttentionCard
             title="تذاكر مفتوحة"
             value={(adminData.ticketsOpened || 0).toLocaleString('en-US')}
-            icon={<HugeiconsIcon icon={CustomerSupportIcon} size={24} strokeWidth={2.2} />}
-            tone="cyan"
+            icon={CustomerSupportIcon}
           />
-          <StatCard
+          <AttentionCard
             title="تذاكر محلولة"
             value={(adminData.ticketsResolved || 0).toLocaleString('en-US')}
-            icon={<HugeiconsIcon icon={CheckmarkCircle02Icon} size={24} strokeWidth={2.2} />}
-            tone="emerald"
+            icon={CheckmarkCircle02Icon}
           />
-          <StatCard
+          <AttentionCard
             title="متاجر بهبوط طلبات"
             value={(riskData.storesWithDropInOrders?.length || 0).toLocaleString('en-US')}
-            icon={<HugeiconsIcon icon={Package01Icon} size={24} strokeWidth={2.2} />}
-            tone="amber"
+            icon={Package01Icon}
           />
-          <StatCard
+          <AttentionCard
             title="مخاطر تحتاج متابعة"
             value={riskCount.toLocaleString('en-US')}
-            icon={<HugeiconsIcon icon={Alert02Icon} size={24} strokeWidth={2.2} />}
-            tone="rose"
+            icon={Alert02Icon}
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <InsightCard
-          title="إيرادات اليوم"
-          value={formatMoney(kpis.revenue_today)}
-          icon={AnalyticsUpIcon}
-          tone="violet"
-        />
-        <InsightCard
-          title="إيرادات الشهر"
-          value={formatMoney(kpis.revenue_this_month)}
-          icon={Wallet02Icon}
-          tone="blue"
-        />
-        <InsightCard
-          title="متوسط إيراد المتجر"
-          value={formatMoney(kpis.average_revenue_per_store)}
-          icon={StoreManagement01Icon}
-          tone="teal"
-        />
       </div>
 
       <TableShell>
@@ -348,92 +396,215 @@ const OwnerDashboard = () => {
   );
 };
 
-const ChartCard = ({
-  title,
-  subtitle,
-  icon,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  icon: IconSvgElement;
-  children: ReactNode;
-}) => (
-  <div className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-100">
-    <div className="mb-5 flex items-center justify-between gap-3">
-      <div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-violet-600">
-        <HugeiconsIcon icon={icon} size={22} strokeWidth={2.2} />
+const DashboardSkeleton = () => (
+  <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-12 rounded-2xl" />
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-64 max-w-full" />
+        </div>
       </div>
-      <div className="min-w-0 flex-1 text-right">
-        <h2 className="text-xl font-black text-slate-950">{title}</h2>
-        <p className="text-sm font-semibold text-slate-400">{subtitle}</p>
+      <Skeleton className="h-11 w-full rounded-2xl sm:w-40" />
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <Card key={index} className="gap-4 py-5">
+          <CardHeader className="gap-3 px-5">
+            <CardAction>
+              <Skeleton className="size-10 rounded-xl" />
+            </CardAction>
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-3 w-40" />
+          </CardHeader>
+          <CardContent className="px-5 pt-0">
+            <Skeleton className="h-8 w-24" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.55fr_1fr]">
+      <Card className="gap-4 py-5">
+        <CardHeader className="gap-2 px-5">
+          <CardAction>
+            <Skeleton className="size-10 rounded-xl" />
+          </CardAction>
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-48" />
+        </CardHeader>
+        <CardContent className="px-5 pt-0">
+          <Skeleton className="h-80 w-full rounded-xl" />
+        </CardContent>
+      </Card>
+      <Card className="gap-4 py-5">
+        <CardHeader className="gap-2 px-5">
+          <CardAction>
+            <Skeleton className="size-10 rounded-xl" />
+          </CardAction>
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-4 w-40" />
+        </CardHeader>
+        <CardContent className="px-5 pt-0">
+          <Skeleton className="h-80 w-full rounded-xl" />
+        </CardContent>
+      </Card>
+    </div>
+
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <Card className="gap-4 py-5">
+        <CardHeader className="gap-2 px-5">
+          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-4 w-44" />
+        </CardHeader>
+        <CardContent className="px-5 pt-0">
+          <Skeleton className="h-80 w-full rounded-xl" />
+        </CardContent>
+      </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Card key={index} className="gap-3 py-4">
+            <CardHeader className="gap-2 px-4">
+              <CardAction>
+                <Skeleton className="size-9 rounded-lg" />
+              </CardAction>
+              <Skeleton className="h-3 w-24" />
+            </CardHeader>
+            <CardContent className="px-4 pt-0">
+              <Skeleton className="h-7 w-16" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
-    <div className="h-80">{children}</div>
+
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardContent className="space-y-3 p-5">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-12 w-full rounded-xl" />
+        ))}
+      </CardContent>
+    </Card>
   </div>
 );
 
-const InsightCard = ({
+const KpiCard = ({
+  title,
+  description,
+  value,
+  icon,
+  badge,
+  badgeVariant = 'secondary',
+  accent = false,
+}: {
+  title: string;
+  description: string;
+  value: string;
+  icon: IconSvgElement;
+  badge?: string;
+  badgeVariant?: 'secondary' | 'outline' | 'default';
+  accent?: boolean;
+}) => (
+  <Card
+    className={cn(
+      'gap-4 py-5',
+      accent && 'border-violet-200 bg-gradient-to-br from-violet-50/80 to-card shadow-[0_12px_32px_rgba(125,38,247,0.12)]',
+    )}
+  >
+    <CardHeader className="gap-3 px-5 [.border-b]:pb-0">
+      <CardAction>
+        <span
+          className={cn(
+            'grid size-10 place-items-center rounded-xl',
+            accent ? 'bg-violet-600 text-white' : 'bg-muted text-muted-foreground',
+          )}
+        >
+          <HugeiconsIcon icon={icon} size={20} strokeWidth={2.2} />
+        </span>
+      </CardAction>
+      <CardTitle className="text-sm font-bold text-muted-foreground">{title}</CardTitle>
+      <CardDescription className="text-xs">{description}</CardDescription>
+    </CardHeader>
+    <CardContent className="flex items-end justify-between gap-2 px-5 pt-0">
+      <p className={cn('text-2xl font-black tracking-tight text-foreground sm:text-3xl', accent && 'text-violet-700')}>
+        {value}
+      </p>
+      {badge && <Badge variant={badgeVariant}>{badge}</Badge>}
+    </CardContent>
+  </Card>
+);
+
+const ChartPanel = ({
+  title,
+  description,
+  icon,
+  option,
+  empty = false,
+  emptyText = 'لا توجد بيانات',
+}: {
+  title: string;
+  description: string;
+  icon: IconSvgElement;
+  option: EChartsOption;
+  empty?: boolean;
+  emptyText?: string;
+}) => (
+  <Card className="gap-4 overflow-hidden py-5">
+    <CardHeader className="gap-1 px-5">
+      <CardAction>
+        <span className="grid size-10 place-items-center rounded-xl bg-violet-50 text-violet-600">
+          <HugeiconsIcon icon={icon} size={20} strokeWidth={2.2} />
+        </span>
+      </CardAction>
+      <CardTitle className="text-lg font-black text-foreground">{title}</CardTitle>
+      <CardDescription>{description}</CardDescription>
+    </CardHeader>
+    <CardContent className="px-5 pt-0">
+      <div className="relative h-80 w-full">
+        {empty ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 text-center">
+            <p className="text-sm font-bold text-slate-500">{emptyText}</p>
+            <p className="text-xs text-slate-400">ستظهر الرسوم هنا عند توفر البيانات</p>
+          </div>
+        ) : (
+          <ReactECharts
+            option={option}
+            style={{ height: '100%', width: '100%' }}
+            opts={{ renderer: 'canvas' }}
+            notMerge
+            lazyUpdate
+          />
+        )}
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const AttentionCard = ({
   title,
   value,
   icon,
-  tone,
 }: {
   title: string;
   value: string;
   icon: IconSvgElement;
-  tone: 'violet' | 'blue' | 'teal';
-}) => {
-  const tones = {
-    violet: 'bg-violet-50 text-violet-600',
-    blue: 'bg-blue-50 text-blue-600',
-    teal: 'bg-teal-50 text-teal-600',
-  };
-
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-[1.7rem] bg-white px-5 py-5 shadow-sm ring-1 ring-slate-100">
-      <div className={cn('grid h-12 w-12 place-items-center rounded-2xl', tones[tone])}>
-        <HugeiconsIcon icon={icon} size={24} strokeWidth={2.2} />
-      </div>
-      <div className="min-w-0 flex-1 text-right">
-        <p className="text-sm font-bold text-slate-400">{title}</p>
-        <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
-      </div>
-    </div>
-  );
-};
-
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false,
-    },
-  },
-  scales: {
-    x: { grid: { display: false }, ticks: { font: { weight: 700 as const } } },
-    y: { grid: { color: 'rgba(148,163,184,0.16)' }, ticks: { font: { weight: 600 as const } } },
-  },
-};
-
-const doughnutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  cutout: '68%',
-  plugins: {
-    legend: {
-      position: 'bottom' as const,
-      labels: {
-        boxWidth: 12,
-        boxHeight: 12,
-        usePointStyle: true,
-        padding: 18,
-        font: { weight: 700 as const },
-      },
-    },
-  },
-};
+}) => (
+  <Card className="gap-3 py-4">
+    <CardHeader className="gap-1 px-4">
+      <CardAction>
+        <span className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground">
+          <HugeiconsIcon icon={icon} size={18} strokeWidth={2.2} />
+        </span>
+      </CardAction>
+      <CardTitle className="text-xs font-bold text-muted-foreground">{title}</CardTitle>
+    </CardHeader>
+    <CardContent className="px-4 pt-0">
+      <p className="text-2xl font-black text-foreground">{value}</p>
+    </CardContent>
+  </Card>
+);
 
 const formatMoney = (value?: number) => (value ? `${value.toLocaleString('en-US')} د.ع` : '0 د.ع');
 

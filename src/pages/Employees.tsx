@@ -54,17 +54,19 @@ const defaultFilters: FiltersState = {
 
 const roleOptions = [
   { value: EmployeeRoleEnum.EMPLOYEE, label: 'موظف', tone: 'blue' as const },
-  { value: 'OWNER', label: 'المالك', tone: 'amber' as const },
+  { value: EmployeeRoleEnum.OWNER, label: 'المالك', tone: 'amber' as const },
   { value: EmployeeRoleEnum.DEVELOPER, label: 'مطور', tone: 'green' as const },
   { value: EmployeeRoleEnum.SUPPORT, label: 'دعم فني', tone: 'red' as const },
 ];
 
 const formRoleOptions = [
-  { value: EmployeeRoleEnum.EMPLOYEE, label: 'موظف' },
-  { value: EmployeeRoleEnum.DEVELOPER, label: 'مطور' },
-  { value: EmployeeRoleEnum.SUPPORT, label: 'دعم فني' },
-  { value: 'ADMIN', label: 'أدمن' },
-];
+  { value: 'OWNER', label: 'المالك' },
+  { value: 'EMPLOYEE', label: 'موظف' },
+  { value: 'DEVELOPER', label: 'مطور' },
+  { value: 'SUPPORT', label: 'دعم فني' },
+] as const;
+
+const VALID_ROLES = new Set<string>(['OWNER', 'EMPLOYEE', 'DEVELOPER', 'SUPPORT']);
 
 const Employees = () => {
   const [employees, setEmployees] = useState<SystemEmployee[]>([]);
@@ -106,7 +108,7 @@ const Employees = () => {
     const searchable = [employee.name, employee.email, employee.phone].join(' ').toLowerCase();
     const matchesSearch = searchable.includes(search.trim().toLowerCase());
     const matchesRole = !filters.role || employee.role === filters.role;
-    const active = isActive(employee.status);
+    const active = isActive(employee);
     const matchesStatus =
       filters.status === 'all'
       || (filters.status === 'active' && active)
@@ -118,7 +120,7 @@ const Employees = () => {
   const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const visibleEmployees = filteredEmployees.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const activeCount = employees.filter((employee) => isActive(employee.status)).length;
+  const activeCount = employees.filter((employee) => isActive(employee)).length;
   const filterCount = [
     filters.role,
     filters.status !== 'all' ? filters.status : '',
@@ -143,11 +145,11 @@ const Employees = () => {
     setFormData({
       name: employee.name,
       email: employee.email,
-      phone: employee.phone || '',
-      role: (employee.role as EmployeeRoleEnum) || EmployeeRoleEnum.EMPLOYEE,
+      phone: toLocalIqPhone(employee.phone),
+      role: normalizeRole(employee.role),
       password: '',
       confirmPassword: '',
-      status: isActive(employee.status) ? 'active' : 'inactive',
+      status: isActive(employee) ? 'active' : 'inactive',
       mustChangePassword: false,
     });
     setShowDrawer(true);
@@ -168,33 +170,42 @@ const Employees = () => {
 
     try {
       setError('');
+      const phone = toE164IqPhone(formData.phone);
+      if (!phone) {
+        setError('رقم الهاتف غير صالح. استخدم رقم عراقي مثل 771 345 1330');
+        return;
+      }
+
+      const role = normalizeRole(formData.role);
+
       if (editingEmployee) {
         await systemEmployeesService.updateEmployee(editingEmployee.id, {
           name: formData.name,
           email: formData.email,
-          phone: formData.phone,
-          role: formData.role,
+          phone,
+          role,
           status: formData.status,
         });
       } else {
         await systemEmployeesService.createEmployee({
           name: formData.name,
           email: formData.email,
-          phone: formData.phone,
-          role: formData.role,
+          phone,
+          role,
           password: formData.password,
         });
       }
       closeDrawer();
       fetchEmployees();
-    } catch (err) {
-      setError(editingEmployee ? 'فشل في تحديث الموظف.' : 'فشل في إنشاء الموظف.');
+    } catch (err: unknown) {
+      const apiMessage = extractApiMessage(err);
+      setError(apiMessage || (editingEmployee ? 'فشل في تحديث الموظف.' : 'فشل في إنشاء الموظف.'));
       console.error('Error saving employee:', err);
     }
   };
 
   const handleDelete = async () => {
-    if (!employeeToDelete || deleteConfirmation !== employeeToDelete.name) return;
+    if (!employeeToDelete || !namesMatch(deleteConfirmation, employeeToDelete.name)) return;
     try {
       setError('');
       await systemEmployeesService.deleteEmployee(employeeToDelete.id);
@@ -208,13 +219,19 @@ const Employees = () => {
   };
 
   const handleDisable = async () => {
-    if (!employeeToDisable || disableConfirmation !== employeeToDisable.name) return;
+    if (!employeeToDisable || !namesMatch(disableConfirmation, employeeToDisable.name)) return;
     try {
       setError('');
       await systemEmployeesService.updateEmployee(employeeToDisable.id, { status: 'inactive' });
+      setEmployees((current) =>
+        current.map((employee) =>
+          employee.id === employeeToDisable.id
+            ? { ...employee, status: 'inactive', isActive: false }
+            : employee,
+        ),
+      );
       setEmployeeToDisable(null);
       setDisableConfirmation('');
-      fetchEmployees();
     } catch (err) {
       setError('فشل في إيقاف حساب الموظف.');
       console.error('Error disabling employee:', err);
@@ -222,7 +239,7 @@ const Employees = () => {
   };
 
   const handleStatusToggle = async (employee: SystemEmployee) => {
-    if (isActive(employee.status)) {
+    if (isActive(employee)) {
       setEmployeeToDisable(employee);
       setDisableConfirmation('');
       return;
@@ -231,7 +248,13 @@ const Employees = () => {
     try {
       setError('');
       await systemEmployeesService.updateEmployee(employee.id, { status: 'active' });
-      fetchEmployees();
+      setEmployees((current) =>
+        current.map((item) =>
+          item.id === employee.id
+            ? { ...item, status: 'active', isActive: true }
+            : item,
+        ),
+      );
     } catch (err) {
       setError('فشل في تفعيل حساب الموظف.');
       console.error('Error enabling employee:', err);
@@ -370,7 +393,7 @@ const Employees = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visibleEmployees.map((employee, index) => {
-                const active = isActive(employee.status);
+                const active = isActive(employee);
                 const roleMeta = getRoleMeta(employee.role);
                 return (
                   <tr key={employee.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
@@ -447,9 +470,9 @@ const Employees = () => {
               />
               <SelectField
                 label="دور الحساب"
-                value={formData.role}
-                options={formRoleOptions}
-                onChange={(value) => setFormData((current) => ({ ...current, role: value as EmployeeRoleEnum }))}
+                value={normalizeRole(formData.role)}
+                options={[...formRoleOptions]}
+                onChange={(value) => setFormData((current) => ({ ...current, role: normalizeRole(value) }))}
               />
               <div>
                 <div className="mb-2 flex items-center justify-between">
@@ -641,7 +664,7 @@ const StatusToggle = ({ active, onClick }: { active: boolean; onClick: () => voi
     onClick={onClick}
     className={cn(
       'inline-flex h-9 min-w-[92px] items-center rounded-full px-1 text-xs font-black transition',
-      active ? 'justify-start bg-emerald-100 text-emerald-600' : 'justify-end bg-orange-100 text-orange-500'
+      active ? 'justify-start bg-emerald-100 text-emerald-600' : 'justify-end bg-orange-100 text-orange-500',
     )}
   >
     <span className="grid h-7 place-items-center rounded-full bg-white px-3 shadow">
@@ -671,10 +694,11 @@ const ConfirmNameModal = ({
   onClose: () => void;
   onConfirm: () => void;
 }) => {
-  const canConfirm = value === employee.name;
+  const canConfirm = namesMatch(value, employee.name);
   const titleColor = accent === 'red' ? 'text-red-600' : 'text-orange-500';
   const buttonColor = accent === 'red' ? 'bg-red-600' : 'bg-orange-500';
   const previewBg = accent === 'red' ? 'bg-red-50' : 'bg-orange-50';
+  const showMismatch = value.trim().length > 0 && !canConfirm;
 
   return (
     <div className="fixed inset-0 z-9999 grid place-items-end bg-black/70 p-3 sm:place-items-center sm:p-6" dir="rtl">
@@ -698,12 +722,31 @@ const ConfirmNameModal = ({
 
         <h2 className={cn('text-xl font-black sm:text-3xl', titleColor)}>{title}</h2>
         <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">{description}</p>
+        <p className="mt-3 text-xs font-bold text-slate-400">
+          اكتب الاسم بالضبط:{' '}
+          <button
+            type="button"
+            className="font-black text-violet-600 underline-offset-2 hover:underline"
+            onClick={() => onChange(employee.name || '')}
+          >
+            {employee.name}
+          </button>
+        </p>
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={employee.name}
-          className="mt-5 h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100 sm:mt-6 sm:h-14 sm:px-5"
+          autoFocus
+          className={cn(
+            'mt-3 h-12 w-full rounded-2xl border px-4 text-sm font-bold outline-none focus:ring-4 sm:mt-4 sm:h-14 sm:px-5',
+            showMismatch
+              ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+              : 'border-slate-200 focus:border-violet-300 focus:ring-violet-100',
+          )}
         />
+        {showMismatch && (
+          <p className="mt-2 text-xs font-bold text-red-500">الاسم غير مطابق — اضغط الاسم أعلاه لنسخه</p>
+        )}
         <div className="mt-6 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-[1fr_2fr] sm:gap-5">
           <button type="button" onClick={onClose} className="h-12 rounded-2xl bg-slate-100 text-base font-black text-slate-600 sm:h-14 sm:text-lg">
             إلغاء
@@ -722,19 +765,68 @@ const ConfirmNameModal = ({
   );
 };
 
-const isActive = (status?: string) => status === 'active' || status === 'ACTIVE';
+const namesMatch = (typed: string, expected?: string | null) =>
+  typed.trim().localeCompare(expected?.trim() || '', undefined, { sensitivity: 'accent' }) === 0;
+
+const isActive = (employee: { status?: string; isActive?: boolean } | string | undefined) => {
+  if (employee == null) return true;
+  if (typeof employee === 'string') {
+    return employee === 'active' || employee === 'ACTIVE';
+  }
+  if (typeof employee.isActive === 'boolean') return employee.isActive;
+  if (employee.status == null) return true;
+  return employee.status === 'active' || employee.status === 'ACTIVE';
+};
+
+const normalizeRole = (role?: string): EmployeeRoleEnum => {
+  const raw = (role || '').trim().toUpperCase();
+  if (raw === 'ADMIN') return EmployeeRoleEnum.OWNER;
+  if (VALID_ROLES.has(raw)) return raw as EmployeeRoleEnum;
+  return EmployeeRoleEnum.EMPLOYEE;
+};
 
 const getRoleMeta = (role?: string) => {
   const found = roleOptions.find((item) => item.value === role);
   if (found) return found;
-  if (role === 'ADMIN') return { value: 'ADMIN', label: 'أدمن', tone: 'violet' as const };
+  if (role === 'ADMIN') return roleOptions.find((item) => item.value === EmployeeRoleEnum.OWNER)!;
   return { value: role || '', label: role || 'غير محدد', tone: 'slate' as const };
+};
+
+/** Strip +964 / leading 0 so the input matches the +964 badge. */
+const toLocalIqPhone = (phone?: string) => {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('964')) return digits.slice(3);
+  if (digits.startsWith('0')) return digits.slice(1);
+  return digits;
+};
+
+/** API expects E.164, e.g. +9647713451330 */
+const toE164IqPhone = (phone?: string) => {
+  if (!phone?.trim()) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+  const national = digits.startsWith('964')
+    ? digits.slice(3)
+    : digits.startsWith('0')
+      ? digits.slice(1)
+      : digits;
+  if (national.length < 10) return '';
+  return `+964${national}`;
+};
+
+const extractApiMessage = (err: unknown): string => {
+  const data = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data;
+  const message = data?.message;
+  if (Array.isArray(message)) return message.join(' — ');
+  if (typeof message === 'string') return message;
+  return '';
 };
 
 const formatPhone = (phone?: string) => {
   if (!phone) return '-';
-  if (phone.startsWith('+')) return phone;
-  return `+964 ${phone}`;
+  const local = toLocalIqPhone(phone);
+  return local ? `+964 ${local}` : phone;
 };
 
 const formatDisplayDate = (value?: string) => {
