@@ -1,14 +1,34 @@
 import axiosInstance from '../utils/AxiosInstance';
 
-export type AccountingTransactionType = 'SUBSCRIPTION' | 'PAYMENT' | string;
-export type AccountingTransactionStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'FAILED' | string;
+export type AccountingTransactionType =
+  | 'SUBSCRIPTION'
+  | 'PAYMENT'
+  | 'CREDITS'
+  | 'INITIAL_SUBSCRIPTION'
+  | 'RENEWAL'
+  | 'CHANGE_PLAN'
+  | 'DOMAIN_REGISTRATION'
+  | string;
+
+export type AccountingTransactionStatus =
+  | 'PENDING'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'FAILED'
+  | 'ACTIVE'
+  | 'INACTIVE'
+  | 'EXPIRED'
+  | 'PAID'
+  | 'REFUNDED'
+  | 'PARTIALLY_REFUNDED'
+  | string;
 
 export interface AccountingTransaction {
   id: string;
   type: AccountingTransactionType;
   store?: {
     id: string;
-    name: string;
+    name: string | null;
   } | null;
   amount: number;
   date: string;
@@ -18,6 +38,9 @@ export interface AccountingTransaction {
     id: string;
     name: string;
   } | null;
+  provider?: string | null;
+  refundedAmount?: number;
+  canRefund?: boolean;
 }
 
 export interface AccountingTransactionsResponse {
