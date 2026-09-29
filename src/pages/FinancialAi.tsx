@@ -40,6 +40,7 @@ import {
   type FinancialAiSummary,
   type Money,
 } from '../services/financialAiService';
+import { platformPaymentService } from '../services/platformPaymentService';
 
 const CURRENCY_STORAGE_KEY = 'financial-ai:currency';
 const RATE_STORAGE_KEY = 'financial-ai:rate';
@@ -57,6 +58,8 @@ const statusLabels: Record<string, string> = {
   PENDING: 'قيد الدفع',
   FAILED: 'فشل',
   EXPIRED: 'منتهي',
+  REFUNDED: 'مسترجع',
+  PARTIALLY_REFUNDED: 'مسترجع جزئياً',
 };
 
 const statusTones: Record<string, 'green' | 'amber' | 'red' | 'slate'> = {
@@ -64,7 +67,13 @@ const statusTones: Record<string, 'green' | 'amber' | 'red' | 'slate'> = {
   PENDING: 'amber',
   FAILED: 'red',
   EXPIRED: 'slate',
+  REFUNDED: 'slate',
+  PARTIALLY_REFUNDED: 'amber',
 };
+
+const canRefundPurchase = (purchase: CreditPurchase) =>
+  purchase.provider === 'QI_CARD' &&
+  (purchase.status === 'PAID' || purchase.status === 'PARTIALLY_REFUNDED');
 
 /** Recalculate IQD from USD whenever the user edits the exchange rate. */
 const atRate = (money: Money | undefined, rate: number): Money => {
@@ -143,6 +152,11 @@ const FinancialAi = () => {
   const [purchaseStatus, setPurchaseStatus] = useState('');
   const [purchasePage, setPurchasePage] = useState(1);
   const [purchasePageSize, setPurchasePageSize] = useState(10);
+  const [refundTarget, setRefundTarget] = useState<CreditPurchase | null>(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundMessage, setRefundMessage] = useState('');
+  const [refunding, setRefunding] = useState(false);
+  const [purchaseReloadKey, setPurchaseReloadKey] = useState(0);
 
   const activeRate = rate > 0 ? rate : summary?.rate || 1;
 
@@ -237,7 +251,62 @@ const FinancialAi = () => {
     return () => {
       cancelled = true;
     };
-  }, [purchasePage, purchasePageSize, purchaseStatus]);
+  }, [purchasePage, purchasePageSize, purchaseStatus, purchaseReloadKey]);
+
+  const openRefund = (purchase: CreditPurchase) => {
+    const remaining = Math.max(
+      0,
+      (purchase.amountIqd ?? 0) - (purchase.refundedAmountIqd ?? 0),
+    );
+    setRefundTarget(purchase);
+    setRefundAmount(remaining > 0 ? String(remaining) : '');
+    setRefundMessage('');
+  };
+
+  const closeRefund = () => {
+    if (refunding) return;
+    setRefundTarget(null);
+    setRefundAmount('');
+    setRefundMessage('');
+  };
+
+  const submitRefund = async () => {
+    if (!refundTarget) return;
+    const remaining = Math.max(
+      0,
+      (refundTarget.amountIqd ?? 0) - (refundTarget.refundedAmountIqd ?? 0),
+    );
+    const amount = Number(refundAmount.replace(/,/g, ''));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('أدخل مبلغ استرجاع صحيح.');
+      return;
+    }
+    if (amount > remaining) {
+      setError(`المبلغ أكبر من المتبقي (${remaining.toLocaleString()} د.ع).`);
+      return;
+    }
+
+    try {
+      setRefunding(true);
+      setError('');
+      await platformPaymentService.refund(refundTarget.id, {
+        amount,
+        message: refundMessage.trim() || undefined,
+      });
+      setRefundTarget(null);
+      setRefundAmount('');
+      setRefundMessage('');
+      setPurchaseReloadKey((key) => key + 1);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err instanceof Error ? err.message : 'فشل الاسترجاع.');
+      setError(message);
+      console.error('Error refunding platform payment:', err);
+    } finally {
+      setRefunding(false);
+    }
+  };
 
   const openStore = useCallback(async (storeId: string) => {
     setOpenStoreId(storeId);
@@ -644,6 +713,7 @@ const FinancialAi = () => {
               <th className="px-5 py-5 text-right">تاريخ الدفع</th>
               <th className="px-5 py-5 text-right">التسليم</th>
               <th className="px-5 py-5 text-right">الحالة</th>
+              <th className="px-5 py-5 text-right">إجراء</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -677,11 +747,26 @@ const FinancialAi = () => {
                     {statusLabels[purchase.status] ?? purchase.status}
                   </StatusPill>
                 </td>
+                <td className="px-5 py-4">
+                  {canRefundPurchase(purchase) ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl border-rose-200 font-bold text-rose-600 hover:bg-rose-50"
+                      onClick={() => openRefund(purchase)}
+                    >
+                      استرجاع
+                    </Button>
+                  ) : (
+                    <span className="text-xs font-semibold text-slate-300">—</span>
+                  )}
+                </td>
               </tr>
             ))}
             {!purchases.length && (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <EmptyState title="لا توجد عمليات شراء رصيد" />
                 </td>
               </tr>
@@ -689,6 +774,82 @@ const FinancialAi = () => {
           </tbody>
         </table>
       </TableShell>
+
+      {refundTarget && (
+        <SideDrawer
+          title="استرجاع دفعة QiCard"
+          subtitle={refundTarget.user?.name || refundTarget.orderId}
+          icon={<CreditCard className="h-6 w-6" />}
+          maxWidth="max-w-md"
+          onClose={closeRefund}
+          footer={(
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                disabled={refunding}
+                onClick={closeRefund}
+                className="h-14 rounded-2xl bg-slate-100 font-black text-slate-600 disabled:opacity-60"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={refunding}
+                onClick={submitRefund}
+                className="h-14 rounded-2xl bg-linear-to-l from-rose-600 to-orange-500 font-black text-white shadow-lg shadow-rose-200 disabled:opacity-60"
+              >
+                {refunding ? 'جارٍ الاسترجاع…' : 'تأكيد الاسترجاع'}
+              </button>
+            </div>
+          )}
+        >
+          <div className="space-y-5">
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+              <p>
+                المبلغ الأصلي:{' '}
+                <span className="font-black text-slate-950">
+                  {(refundTarget.amountIqd ?? 0).toLocaleString()} د.ع
+                </span>
+              </p>
+              <p className="mt-1">
+                المسترجع سابقاً:{' '}
+                <span className="font-black text-slate-950">
+                  {(refundTarget.refundedAmountIqd ?? 0).toLocaleString()} د.ع
+                </span>
+              </p>
+              <p className="mt-1">
+                المتبقي:{' '}
+                <span className="font-black text-rose-600">
+                  {Math.max(
+                    0,
+                    (refundTarget.amountIqd ?? 0) - (refundTarget.refundedAmountIqd ?? 0),
+                  ).toLocaleString()}{' '}
+                  د.ع
+                </span>
+              </p>
+            </div>
+            <label className="block space-y-2">
+              <span className="text-sm font-black text-slate-800">مبلغ الاسترجاع (د.ع)</span>
+              <Input
+                value={refundAmount}
+                onChange={(event) => setRefundAmount(event.target.value)}
+                inputMode="decimal"
+                dir="ltr"
+                className="h-12 rounded-2xl text-right font-bold"
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-black text-slate-800">سبب الاسترجاع (اختياري)</span>
+              <Input
+                value={refundMessage}
+                onChange={(event) => setRefundMessage(event.target.value)}
+                placeholder="مثال: طلب الزبون"
+                className="h-12 rounded-2xl"
+              />
+            </label>
+          </div>
+        </SideDrawer>
+      )}
 
       {openStoreId && (
         <SideDrawer

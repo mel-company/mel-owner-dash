@@ -114,8 +114,11 @@ export interface CreditPurchase {
   user: FinancialAiStoreOwner;
   pack: { id: string | null; name: string | null; generations: number; editor: number } | null;
   amount: Money;
+  /** Raw IQD charged on the platform payment (for refunds). */
+  amountIqd?: number;
+  refundedAmountIqd?: number;
   currency: string;
-  status: 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED';
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'REFUNDED' | 'PARTIALLY_REFUNDED' | string;
   provider: string;
   orderId: string;
   transactionId: string | null;

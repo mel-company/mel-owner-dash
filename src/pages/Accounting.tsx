@@ -78,6 +78,8 @@ const Accounting = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const fetchAccounting = useCallback(async () => {
     try {
@@ -139,6 +141,26 @@ const Accounting = () => {
   const listCount = total || visibleTransactions.length;
   const listTitle = search || filterCount > 0 ? 'نتائج البحث والفلاتر' : 'قائمة الحسابات المالية';
 
+  const handleExport = async (format: 'xlsx' | 'pdf') => {
+    try {
+      setExporting(true);
+      setShowExportMenu(false);
+      setError('');
+      await accountingService.exportTransactions(format, {
+        search: search || undefined,
+        type: filters.type || undefined,
+        status: filters.status || undefined,
+        from: filters.dateFrom || undefined,
+        to: filters.dateTo || undefined,
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'فشل في تصدير القائمة.');
+      console.error('Error exporting accounting list:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading && transactions.length === 0) return <LoadingState />;
 
   return (
@@ -152,10 +174,33 @@ const Accounting = () => {
         )}
         icon={<Wallet className="h-5 w-5 sm:h-6 sm:w-6" />}
         action={(
-          <PrimaryActionButton>
-            تصدير القائمة
-            <img src="/accounting/export.svg" alt="" className="h-5 w-5 brightness-0 invert" />
-          </PrimaryActionButton>
+          <div className="relative">
+            <PrimaryActionButton
+              onClick={() => setShowExportMenu((open) => !open)}
+              className={exporting ? 'pointer-events-none opacity-70' : undefined}
+            >
+              {exporting ? 'جاري التصدير...' : 'تصدير القائمة'}
+              <img src="/accounting/export.svg" alt="" className="h-5 w-5 brightness-0 invert" />
+            </PrimaryActionButton>
+            {showExportMenu && !exporting && (
+              <div className="absolute left-0 top-full z-20 mt-2 min-w-44 overflow-hidden rounded-2xl border border-slate-100 bg-white py-1 shadow-xl shadow-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => handleExport('xlsx')}
+                  className="block w-full px-4 py-2.5 text-right text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                >
+                  Excel (.xlsx)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('pdf')}
+                  className="block w-full px-4 py-2.5 text-right text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                >
+                  PDF (.pdf)
+                </button>
+              </div>
+            )}
+          </div>
         )}
       />
 
