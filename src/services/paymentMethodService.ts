@@ -10,6 +10,8 @@ export interface PaymentMethod {
     name: string;
     code: string;
     type?: 'ONLINE' | 'OFFLINE';
+    /** Withdrawing a provider withdraws every method under it. */
+    isActive?: boolean;
   };
   isActive?: boolean;
   sortOrder?: number;

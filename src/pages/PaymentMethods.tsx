@@ -55,6 +55,7 @@ const PaymentMethods = () => {
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
   const [editingProvider, setEditingProvider] = useState<PaymentProvider | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; type: 'method' | 'provider' } | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<PaymentProvider | null>(null);
   const [methodFormData, setMethodFormData] = useState<CreatePaymentMethodRequest>(defaultMethodForm);
   const [providerFormData, setProviderFormData] = useState<CreatePaymentProviderRequest>(defaultProviderForm);
   const [page, setPage] = useState(1);
@@ -156,6 +157,43 @@ const PaymentMethods = () => {
     }
   };
 
+  /**
+   * The platform's switch, and it reaches further than this page.
+   *
+   * Deactivating a provider withdraws every method under it: the storefront
+   * stops listing them, checkout refuses an order that names one, the pay
+   * button refuses to open a gateway, and the merchant dashboard will not let
+   * a shop switch one back on. That is a lot to happen behind one tap, so a
+   * provider going *off* asks first; turning one back on does not, because
+   * restoring something is not the dangerous direction.
+   */
+  const toggleProvider = async (provider: PaymentProvider) => {
+    try {
+      setError('');
+      await paymentProviderService.updatePaymentProvider(provider.id, {
+        isActive: !provider.isActive,
+      });
+      setDeactivateTarget(null);
+      fetchData();
+    } catch (err) {
+      setError('تعذر تغيير حالة المزود.');
+      console.error('Error toggling payment provider:', err);
+    }
+  };
+
+  const toggleMethod = async (method: PaymentMethod) => {
+    try {
+      setError('');
+      await paymentMethodService.updatePaymentMethod(method.id, {
+        isActive: !method.isActive,
+      });
+      fetchData();
+    } catch (err) {
+      setError('تعذر تغيير حالة طريقة الدفع.');
+      console.error('Error toggling payment method:', err);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -214,9 +252,9 @@ const PaymentMethods = () => {
         {visibleRows.length === 0 ? (
           <EmptyState title={activeTab === 'methods' ? 'لا توجد طرق دفع' : 'لا يوجد مزودو دفع'} action={<PrimaryActionButton onClick={openCreateDrawer}>إضافة جديد</PrimaryActionButton>} />
         ) : activeTab === 'methods' ? (
-          <MethodsTable rows={visibleRows as PaymentMethod[]} providers={providers} onEdit={openEditMethod} onDelete={(method) => setDeleteTarget({ id: method.id, name: method.name, type: 'method' })} />
+          <MethodsTable rows={visibleRows as PaymentMethod[]} providers={providers} onEdit={openEditMethod} onDelete={(method) => setDeleteTarget({ id: method.id, name: method.name, type: 'method' })} onToggle={toggleMethod} />
         ) : (
-          <ProvidersTable rows={visibleRows as PaymentProvider[]} onEdit={openEditProvider} onDelete={(provider) => setDeleteTarget({ id: provider.id, name: provider.name, type: 'provider' })} />
+          <ProvidersTable rows={visibleRows as PaymentProvider[]} onEdit={openEditProvider} onDelete={(provider) => setDeleteTarget({ id: provider.id, name: provider.name, type: 'provider' })} onToggle={(provider) => (provider.isActive ? setDeactivateTarget(provider) : toggleProvider(provider))} />
         )}
       </TableShell>
 
@@ -262,6 +300,25 @@ const PaymentMethods = () => {
         </form>
       )}
 
+      {deactivateTarget && (
+        <ConfirmDeleteModal
+          title="إيقاف مزود الدفع؟"
+          description={`سيتم إيقاف جميع طرق الدفع التابعة لـ "${deactivateTarget.name}" في كل المتاجر: لن تظهر للمشتري عند الدفع، ولن يتمكن أصحاب المتاجر من تفعيلها حتى تُعيد تفعيل المزود. الطلبات المدفوعة مسبقاً لا تتأثر.`}
+          confirmLabel="إيقاف المزود"
+          onClose={() => setDeactivateTarget(null)}
+          onConfirm={() => toggleProvider(deactivateTarget)}
+          preview={
+            <div className="rounded-3xl bg-white p-6 shadow-sm">
+              <Landmark className="mx-auto mb-4 h-12 w-12 text-orange-500" />
+              <p className="text-xl font-black text-slate-950">{deactivateTarget.name}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                {deactivateTarget._count?.methods ?? 0} طريقة دفع ستتوقف
+              </p>
+            </div>
+          }
+        />
+      )}
+
       {deleteTarget && (
         <ConfirmDeleteModal
           title="هل أنت متأكد من الحذف؟"
@@ -276,7 +333,40 @@ const PaymentMethods = () => {
   );
 };
 
-const MethodsTable = ({ rows, providers, onEdit, onDelete }: { rows: PaymentMethod[]; providers: PaymentProvider[]; onEdit: (method: PaymentMethod) => void; onDelete: (method: PaymentMethod) => void }) => (
+/**
+ * The same control `Employees.tsx` uses, so an operator meets one idiom for
+ * "this row is on" across the dashboard.
+ */
+const StatusToggle = ({
+  active,
+  onClick,
+  title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title?: string;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title}
+    className={[
+      'inline-flex h-9 min-w-[92px] items-center rounded-full px-1 text-xs font-black transition',
+      active
+        ? 'justify-start bg-emerald-100 text-emerald-600'
+        : 'justify-end bg-orange-100 text-orange-500',
+    ].join(' ')}
+  >
+    <span className="grid h-7 place-items-center rounded-full bg-white px-3 shadow">
+      {active ? 'مفعل' : 'معطل'}
+    </span>
+  </button>
+);
+
+const providerOf = (method: PaymentMethod, providers: PaymentProvider[]) =>
+  method.provider ?? providers.find((p) => p.id === method.providerId);
+
+const MethodsTable = ({ rows, providers, onEdit, onDelete, onToggle }: { rows: PaymentMethod[]; providers: PaymentProvider[]; onEdit: (method: PaymentMethod) => void; onDelete: (method: PaymentMethod) => void; onToggle: (method: PaymentMethod) => void }) => (
   <table className="w-full min-w-[920px]">
     <thead>
       <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
@@ -295,7 +385,16 @@ const MethodsTable = ({ rows, providers, onEdit, onDelete }: { rows: PaymentMeth
           <td className="px-5 py-4 font-semibold text-slate-600">{method.code}</td>
           <td className="px-5 py-4 text-slate-600">{method.provider?.name || providers.find((provider) => provider.id === method.providerId)?.name || '-'}</td>
           <td className="px-5 py-4 text-slate-600">{method.sortOrder ?? index + 1}</td>
-          <td className="px-5 py-4"><StatusPill tone={method.isActive ? 'green' : 'slate'}>{method.isActive ? 'نشط' : 'غير نشط'}</StatusPill></td>
+          <td className="px-5 py-4">
+            {providerOf(method, providers)?.isActive === false ? (
+              // A method under a withdrawn provider cannot be offered whatever
+              // its own flag says, so showing an "on" toggle here would be a
+              // lie the merchant and the shopper both see through.
+              <StatusPill tone="slate">موقوف مع المزود</StatusPill>
+            ) : (
+              <StatusToggle active={!!method.isActive} onClick={() => onToggle(method)} />
+            )}
+          </td>
           <td className="px-5 py-4"><ActionButtons onEdit={() => onEdit(method)} onDelete={() => onDelete(method)} /></td>
         </tr>
       ))}
@@ -303,7 +402,7 @@ const MethodsTable = ({ rows, providers, onEdit, onDelete }: { rows: PaymentMeth
   </table>
 );
 
-const ProvidersTable = ({ rows, onEdit, onDelete }: { rows: PaymentProvider[]; onEdit: (provider: PaymentProvider) => void; onDelete: (provider: PaymentProvider) => void }) => (
+const ProvidersTable = ({ rows, onEdit, onDelete, onToggle }: { rows: PaymentProvider[]; onEdit: (provider: PaymentProvider) => void; onDelete: (provider: PaymentProvider) => void; onToggle: (provider: PaymentProvider) => void }) => (
   <table className="w-full min-w-[920px]">
     <thead>
       <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
@@ -332,7 +431,17 @@ const ProvidersTable = ({ rows, onEdit, onDelete }: { rows: PaymentProvider[]; o
           <td className="px-5 py-4 font-semibold text-slate-600">{provider.code}</td>
           <td className="px-5 py-4"><StatusPill tone="blue">{provider.type === 'ONLINE' ? 'أونلاين' : 'أوفلاين'}</StatusPill></td>
           <td className="px-5 py-4 text-slate-600">{provider._count?.methods || 0}</td>
-          <td className="px-5 py-4"><StatusPill tone={provider.isActive ? 'green' : 'slate'}>{provider.isActive ? 'نشط' : 'غير نشط'}</StatusPill></td>
+          <td className="px-5 py-4">
+            <StatusToggle
+              active={!!provider.isActive}
+              onClick={() => onToggle(provider)}
+              title={
+                provider.isActive
+                  ? 'إيقاف المزود يوقف جميع طرق الدفع التابعة له في كل المتاجر'
+                  : 'إعادة تفعيل المزود تُعيد طرق الدفع التي كانت مفعّلة'
+              }
+            />
+          </td>
           <td className="px-5 py-4"><ActionButtons onEdit={() => onEdit(provider)} onDelete={() => onDelete(provider)} /></td>
         </tr>
       ))}
