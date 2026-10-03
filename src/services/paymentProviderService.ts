@@ -1,6 +1,26 @@
 import axiosInstance from '../utils/AxiosInstance';
 
+/**
+ * The integration behind a provider row, when there is one.
+ *
+ * `null` for cash on delivery and for any brand the platform has no adapter
+ * for — which is not the same as unhealthy, and must not be drawn as a fault.
+ */
+export interface ProviderGateway {
+  gateway: 'ZAIN_CASH' | 'QI_CARD';
+  name: string;
+  logoUrl: string;
+  configured: boolean;
+  production: boolean;
+  mode: 'TEST' | 'PRODUCTION';
+  missingCredentials: string[];
+  credentialsValid: boolean;
+  reason: string;
+}
+
 export interface PaymentProvider {
+  /** Joined server-side so no client keeps its own code → logo mapping. */
+  gateway?: ProviderGateway | null;
   id: string;
   name: string;
   code: string;

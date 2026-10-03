@@ -30,3 +30,4 @@ export * from './accountingService';
 export * from './financialAiService';
 export * from './domainHealthService';
 export * from './platformPaymentService';
+export * from './paymentGatewaysService';

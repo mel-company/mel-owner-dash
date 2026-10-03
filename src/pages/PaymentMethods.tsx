@@ -18,6 +18,7 @@ import {
   TableShell,
   TextAreaField,
 } from '@/components/dashboard';
+import { GatewayHealthStrip } from '@/components/dashboard/GatewayHealthStrip';
 import {
   paymentMethodService,
   paymentProviderService,
@@ -175,8 +176,20 @@ const PaymentMethods = () => {
       });
       setDeactivateTarget(null);
       fetchData();
-    } catch (err) {
-      setError('تعذر تغيير حالة المزود.');
+    } catch (err: any) {
+      /**
+       * The server refuses an activation it cannot honour and says exactly
+       * which environment variables are missing. Swallowing that for a
+       * generic "something went wrong" would send the operator to the logs
+       * for an answer the response already carried.
+       */
+      const message =
+        err?.response?.data?.message ?? err?.data?.message ?? err?.message;
+      setError(
+        typeof message === 'string' && message
+          ? message
+          : 'تعذر تغيير حالة المزود.',
+      );
       console.error('Error toggling payment provider:', err);
     }
   };
@@ -227,6 +240,8 @@ const PaymentMethods = () => {
         <StatCard title="إجمالي المزودين" value={providers.length} icon={<Landmark />} tone="violet" />
         <StatCard title="المزودين النشطين" value={providers.filter((provider) => provider.isActive).length} icon={<Landmark />} tone="emerald" />
       </div>
+
+      <GatewayHealthStrip />
 
       <SearchFiltersBar search={search} onSearchChange={setSearch} placeholder="ابحث في بوابات الدفع" onFilterClick={() => setSearch('')}>
         <div className="flex gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
@@ -420,7 +435,18 @@ const ProvidersTable = ({ rows, onEdit, onDelete, onToggle }: { rows: PaymentPro
           <td className="px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-violet-600">
-                {provider.logoUrl ? <img src={provider.logoUrl} alt="" className="h-8 w-8 object-contain" /> : <Landmark className="h-5 w-5" />}
+                {/* The gateway's own logo wins: it is the brand's, and it
+                    survives a rebrand without anyone editing a seed row. */}
+                {provider.gateway?.logoUrl || provider.logoUrl ? (
+                  <img
+                    src={provider.gateway?.logoUrl || provider.logoUrl}
+                    alt=""
+                    className="h-8 w-8 object-contain"
+                    onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  <Landmark className="h-5 w-5" />
+                )}
               </div>
               <div>
                 <p className="font-black text-slate-950">{provider.name}</p>
@@ -432,15 +458,29 @@ const ProvidersTable = ({ rows, onEdit, onDelete, onToggle }: { rows: PaymentPro
           <td className="px-5 py-4"><StatusPill tone="blue">{provider.type === 'ONLINE' ? 'أونلاين' : 'أوفلاين'}</StatusPill></td>
           <td className="px-5 py-4 text-slate-600">{provider._count?.methods || 0}</td>
           <td className="px-5 py-4">
-            <StatusToggle
-              active={!!provider.isActive}
-              onClick={() => onToggle(provider)}
-              title={
-                provider.isActive
-                  ? 'إيقاف المزود يوقف جميع طرق الدفع التابعة له في كل المتاجر'
-                  : 'إعادة تفعيل المزود تُعيد طرق الدفع التي كانت مفعّلة'
-              }
-            />
+            {/**
+              * Enabling is gated on the gateway being able to charge at all;
+              * disabling never is. The server enforces both — this is the
+              * explanation, not the control.
+              */}
+            {!provider.isActive && provider.gateway && !provider.gateway.configured ? (
+              <div className="space-y-1">
+                <StatusPill tone="red">إعدادات ناقصة</StatusPill>
+                <p className="text-[11px] font-semibold text-slate-400" dir="ltr">
+                  {provider.gateway.missingCredentials.join(' · ')}
+                </p>
+              </div>
+            ) : (
+              <StatusToggle
+                active={!!provider.isActive}
+                onClick={() => onToggle(provider)}
+                title={
+                  provider.isActive
+                    ? 'إيقاف المزود يوقف جميع طرق الدفع التابعة له في كل المتاجر'
+                    : 'إعادة تفعيل المزود تُعيد طرق الدفع التي كانت مفعّلة'
+                }
+              />
+            )}
           </td>
           <td className="px-5 py-4"><ActionButtons onEdit={() => onEdit(provider)} onDelete={() => onDelete(provider)} /></td>
         </tr>
