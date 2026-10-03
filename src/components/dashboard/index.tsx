@@ -1,5 +1,10 @@
 import type { FormEvent, ReactNode } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 export type StatTone = 'blue' | 'cyan' | 'teal' | 'amber' | 'rose' | 'violet' | 'emerald';
@@ -55,34 +60,41 @@ export const PrimaryActionButton = ({
   type?: 'button' | 'submit';
   className?: string;
 }) => (
-  <button
+  <Button
     type={type}
     onClick={onClick}
+    size="lg"
     className={cn(
-      'inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 px-4 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:scale-[1.01] sm:h-12 sm:px-5',
-      className
+      'h-11 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 px-4 text-sm font-bold text-white shadow-lg shadow-violet-200 hover:bg-linear-to-l hover:from-violet-700 hover:to-fuchsia-500 hover:opacity-95 sm:h-12 sm:px-5',
+      className,
     )}
   >
     {children}
-  </button>
+  </Button>
 );
 
-export const StatCard = ({ title, value, icon, tone = 'blue', hint = '12.6% ↗' }: { title: string; value: ReactNode; icon: ReactNode; tone?: StatTone; hint?: ReactNode }) => {
+export const StatCard = ({ title, value, icon, tone = 'blue', hint }: { title: string; value: ReactNode; icon: ReactNode; tone?: StatTone; hint?: ReactNode }) => {
   const color = statTones[tone];
 
   return (
-    <div className="flex min-h-[72px] items-center justify-between gap-3 rounded-[1.25rem] bg-white px-4 py-3 shadow-[0_12px_35px_rgba(15,23,42,0.04)] ring-1 ring-slate-100 sm:min-h-[78px] sm:gap-4 sm:rounded-[1.45rem] sm:px-5 sm:py-4">
-      <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl shadow-lg sm:h-12 sm:w-12', color.wrap)}>
-        <div className={cn('[&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.4] sm:[&_svg]:h-6 sm:[&_svg]:w-6', color.icon)}>{icon}</div>
-      </div>
-      <div className="min-w-0 flex-1 text-right">
-        <p className="truncate text-xs font-black text-slate-700 sm:text-sm">{title}</p>
-        <div className="mt-1.5 flex items-center justify-start gap-2" dir="ltr">
-          {hint && <span className="text-[10px] font-bold text-emerald-500 sm:text-xs">{hint}</span>}
-          <span className="text-xl font-black leading-none text-slate-950 sm:text-2xl">{value}</span>
+    <Card className="flex min-h-[72px] flex-row items-center justify-between gap-3 rounded-[1.25rem] py-3 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:min-h-[78px] sm:gap-4 sm:rounded-[1.45rem] sm:py-4">
+      <CardContent className="flex w-full items-center justify-between gap-3 px-4 sm:gap-4 sm:px-5">
+        <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl shadow-lg sm:h-12 sm:w-12', color.wrap)}>
+          <div className={cn('[&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.4] sm:[&_svg]:h-6 sm:[&_svg]:w-6', color.icon)}>{icon}</div>
         </div>
-      </div>
-    </div>
+        <div className="min-w-0 flex-1 text-right">
+          <CardTitle className="truncate text-xs font-black text-slate-700 sm:text-sm">{title}</CardTitle>
+          <div className="mt-1.5 flex items-center justify-start gap-2" dir="ltr">
+            {hint != null && hint !== false && (
+              <Badge variant="secondary" className="bg-emerald-50 text-[10px] font-bold text-emerald-600 sm:text-xs">
+                {hint}
+              </Badge>
+            )}
+            <span className="text-xl font-black leading-none text-slate-950 sm:text-2xl">{value}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -108,28 +120,35 @@ export const SearchFiltersBar = ({
   <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
     <div className="flex flex-wrap items-center gap-2">
       {children}
-      <button
+      <Button
         type="button"
+        variant={filterCount > 0 ? 'default' : 'outline'}
         onClick={onFilterClick}
         className={cn(
-          'inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-100 bg-white px-4 text-sm font-bold text-slate-600 shadow-sm sm:h-12 sm:px-5',
-          filterCount > 0 && 'border-violet-300 bg-violet-600 text-white'
+          'h-11 rounded-2xl px-4 text-sm font-bold sm:h-12 sm:px-5',
+          filterCount > 0 && 'border-violet-300 bg-violet-600 text-white hover:bg-violet-600',
         )}
       >
         الفلاتر
-        {filterCount > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">+{filterCount}</span>}
+        {filterCount > 0 && (
+          <Badge variant="destructive" className="rounded-full px-2 py-0.5 text-[10px]">
+            +{filterCount}
+          </Badge>
+        )}
         <SlidersHorizontal className="h-4 w-4" />
-      </button>
+      </Button>
     </div>
     <div className="flex w-full flex-1 flex-wrap items-center gap-2 sm:min-w-[260px] sm:max-w-md sm:justify-end">
-      <button type="button" className="h-11 shrink-0 rounded-2xl bg-cyan-50 px-5 text-sm font-bold text-cyan-500 sm:h-12 sm:px-6">البحث</button>
+      <Button type="button" variant="secondary" className="h-11 shrink-0 rounded-2xl bg-cyan-50 px-5 text-sm font-bold text-cyan-600 hover:bg-cyan-50 sm:h-12 sm:px-6">
+        البحث
+      </Button>
       <div className="relative min-w-0 flex-1">
         <Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
+        <Input
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={placeholder}
-          className="h-11 w-full rounded-2xl border border-slate-100 bg-white pr-11 pl-4 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100 sm:h-12"
+          className="h-11 rounded-2xl border-slate-100 bg-white pr-11 pl-4 text-sm font-semibold sm:h-12"
         />
       </div>
     </div>
@@ -137,10 +156,10 @@ export const SearchFiltersBar = ({
 );
 
 export const TableShell = ({ children, footer }: { children: ReactNode; footer?: ReactNode }) => (
-  <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-sm ring-1 ring-slate-100 sm:rounded-[2rem]">
-    <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">{children}</div>
+  <Card className="gap-0 overflow-hidden rounded-[1.5rem] py-0 shadow-sm sm:rounded-[2rem]">
+    <CardContent className="overflow-x-auto overscroll-x-contain p-0 [-webkit-overflow-scrolling:touch]">{children}</CardContent>
     {footer}
-  </div>
+  </Card>
 );
 
 export const Pagination = ({
@@ -176,28 +195,44 @@ export const Pagination = ({
       </label>
       <div className="flex flex-wrap items-center justify-center gap-1.5 sm:flex-row-reverse sm:gap-2">
         {totalPages > 1 && (
-          <button type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page === 1} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-50 text-slate-500 disabled:opacity-40">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            onClick={() => onPageChange(Math.max(1, page - 1))}
+            disabled={page === 1}
+            className="rounded-xl"
+          >
             <ChevronLeft className="h-4 w-4" />
-          </button>
+          </Button>
         )}
         {pages.map((item, index) => (
           typeof item === 'number' ? (
-            <button
+            <Button
               key={`${item}-${index}`}
               type="button"
+              variant={item === page ? 'default' : 'secondary'}
+              size="icon-sm"
               onClick={() => onPageChange(item)}
-              className={cn('grid h-8 w-8 place-items-center rounded-xl font-bold', item === page ? 'bg-violet-600 text-white' : 'bg-slate-50 text-slate-500')}
+              className={cn('rounded-xl font-bold', item === page && 'bg-violet-600 hover:bg-violet-600')}
             >
               {item}
-            </button>
+            </Button>
           ) : (
             <span key={`dots-${index}`} className="px-1 font-bold text-slate-400">…</span>
           )
         ))}
         {totalPages > 1 && (
-          <button type="button" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-50 text-slate-500 disabled:opacity-40">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+            disabled={page === totalPages}
+            className="rounded-xl"
+          >
             <ChevronRight className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -237,9 +272,15 @@ export const SideDrawer = ({
           </div>
           <PageIcon>{icon}</PageIcon>
         </div>
-        <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-50 text-slate-400">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="size-10 shrink-0 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100"
+        >
           <X className="h-5 w-5" />
-        </button>
+        </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{children}</div>
       {footer && <div className="shrink-0 pt-5 sm:pt-7">{footer}</div>}
@@ -249,8 +290,15 @@ export const SideDrawer = ({
 
 export const DrawerFooter = ({ onCancel, submitLabel = 'حفظ', cancelLabel = 'إلغاء' }: { onCancel: () => void; submitLabel?: string; cancelLabel?: string }) => (
   <div className="grid grid-cols-2 gap-3 sm:gap-4">
-    <button type="button" onClick={onCancel} className="h-12 rounded-2xl bg-slate-100 text-sm font-black text-slate-600 sm:h-14 sm:text-base">{cancelLabel}</button>
-    <button type="submit" className="h-12 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 text-sm font-black text-white shadow-lg shadow-violet-200 sm:h-14 sm:text-base">{submitLabel}</button>
+    <Button type="button" variant="secondary" onClick={onCancel} className="h-12 rounded-2xl text-sm font-black sm:h-14 sm:text-base">
+      {cancelLabel}
+    </Button>
+    <Button
+      type="submit"
+      className="h-12 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 text-sm font-black text-white shadow-lg shadow-violet-200 hover:opacity-95 sm:h-14 sm:text-base"
+    >
+      {submitLabel}
+    </Button>
   </div>
 );
 
@@ -275,8 +323,12 @@ export const ConfirmDeleteModal = ({
       <h2 className="text-xl font-black text-red-600 sm:text-3xl">{title}</h2>
       <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">{description}</p>
       <div className="mt-6 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-[1fr_2fr] sm:gap-5">
-        <button type="button" onClick={onClose} className="h-12 rounded-2xl bg-slate-100 text-base font-black text-slate-600 sm:h-14 sm:text-lg">إلغاء</button>
-        <button type="button" onClick={onConfirm} className="h-12 rounded-2xl bg-red-600 text-base font-black text-white sm:h-14 sm:text-lg">{confirmLabel}</button>
+        <Button type="button" variant="secondary" onClick={onClose} className="h-12 rounded-2xl text-base font-black sm:h-14 sm:text-lg">
+          إلغاء
+        </Button>
+        <Button type="button" variant="destructive" onClick={onConfirm} className="h-12 rounded-2xl text-base font-black sm:h-14 sm:text-lg">
+          {confirmLabel}
+        </Button>
       </div>
     </div>
   </div>
@@ -285,13 +337,13 @@ export const ConfirmDeleteModal = ({
 export const FormField = ({ label, value, onChange, type = 'text', placeholder, required }: { label: string; value: string | number | undefined; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean }) => (
   <div>
     <label className="mb-2 block text-sm font-bold text-slate-700">{label}</label>
-    <input
+    <Input
       type={type}
       value={value ?? ''}
       placeholder={placeholder}
       required={required}
       onChange={(event) => onChange(event.target.value)}
-      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+      className="h-12 rounded-2xl border-slate-200 px-4 text-sm font-semibold"
     />
   </div>
 );
@@ -328,19 +380,53 @@ export const SelectField = ({ label, value, options, onChange, required }: { lab
 
 export const StatusPill = ({ children, tone = 'slate' }: { children: ReactNode; tone?: 'slate' | 'green' | 'red' | 'blue' | 'violet' | 'amber' }) => {
   const tones = {
-    slate: 'bg-slate-100 text-slate-600',
-    green: 'bg-emerald-50 text-emerald-500',
-    red: 'bg-red-50 text-red-500',
-    blue: 'bg-blue-50 text-blue-600',
-    violet: 'bg-violet-50 text-violet-600',
-    amber: 'bg-orange-50 text-orange-500',
+    slate: 'border-transparent bg-slate-100 text-slate-600',
+    green: 'border-transparent bg-emerald-50 text-emerald-600',
+    red: 'border-transparent bg-red-50 text-red-500',
+    blue: 'border-transparent bg-blue-50 text-blue-600',
+    violet: 'border-transparent bg-violet-50 text-violet-600',
+    amber: 'border-transparent bg-orange-50 text-orange-500',
   };
-  return <span className={cn('inline-flex rounded-full px-3 py-1 text-xs font-black', tones[tone])}>{children}</span>;
+  return (
+    <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs font-black', tones[tone])}>
+      {children}
+    </Badge>
+  );
 };
 
 export const LoadingState = () => (
-  <div className="flex h-64 items-center justify-center">
-    <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-violet-600" />
+  <div className="page-shell space-y-4 bg-[#f8fafc] text-right" dir="rtl">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-12 rounded-2xl" />
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-56 max-w-full" />
+        </div>
+      </div>
+      <Skeleton className="h-11 w-full rounded-2xl sm:w-36" />
+    </div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+            <Skeleton className="size-10 rounded-xl" />
+          </div>
+          <Skeleton className="h-8 w-20" />
+        </div>
+      ))}
+    </div>
+    <div className="rounded-xl border bg-card p-5 shadow-sm">
+      <div className="mb-4 space-y-2">
+        <Skeleton className="h-5 w-36" />
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <Skeleton className="h-64 w-full rounded-xl" />
+    </div>
   </div>
 );
 

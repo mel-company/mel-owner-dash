@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import BrandLogo from './BrandLogo';
 import { useSidebar } from '@/components/ui/sidebar';
 import { SupportUnreadProvider } from '@/contexts/SupportUnreadContext';
 import { cn } from '@/lib/utils';
@@ -24,11 +25,8 @@ const DashboardLayout = () => {
               aria-label="mel.iq"
             >
               <span className="text-sm font-bold text-[#04111c]" dir="ltr">mel.iq</span>
-              <span
-                className="relative size-8 overflow-hidden rounded-full shadow-[0_0_16px_rgba(125,38,247,0.25)]"
-                style={{ backgroundImage: 'linear-gradient(234deg, rgb(182, 87, 255) 24%, rgb(0, 191, 255) 76%)' }}
-              >
-                <img src="/sidebar/logo-a.svg" alt="" className="absolute inset-[24%] size-[52%]" />
+              <span className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_0_16px_rgba(125,38,247,0.25)] ring-1 ring-[#ebf6ff]">
+                <BrandLogo variant="mark" imageClassName="h-5 w-5" />
               </span>
             </button>
           </header>

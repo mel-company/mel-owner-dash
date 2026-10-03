@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileSearch, FileText, ReceiptText, Wallet } from 'lucide-react';
+import { CreditCard, FileSearch, FileText, ReceiptText, Wallet } from 'lucide-react';
 import {
   AlertMessage,
   EmptyState,
@@ -14,12 +14,15 @@ import {
   StatusPill,
   TableShell,
 } from '@/components/dashboard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
   accountingService,
   type AccountingStats,
   type AccountingTransaction,
 } from '../services/accountingService';
+import { platformPaymentService } from '../services/platformPaymentService';
 
 type FiltersState = {
   type: string;
@@ -78,6 +81,12 @@ const Accounting = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [refundTarget, setRefundTarget] = useState<AccountingTransaction | null>(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundMessage, setRefundMessage] = useState('');
+  const [refunding, setRefunding] = useState(false);
 
   const fetchAccounting = useCallback(async () => {
     try {
@@ -139,6 +148,85 @@ const Accounting = () => {
   const listCount = total || visibleTransactions.length;
   const listTitle = search || filterCount > 0 ? 'نتائج البحث والفلاتر' : 'قائمة الحسابات المالية';
 
+  const handleExport = async (format: 'xlsx' | 'pdf') => {
+    try {
+      setExporting(true);
+      setShowExportMenu(false);
+      setError('');
+      await accountingService.exportTransactions(format, {
+        search: search || undefined,
+        type: filters.type || undefined,
+        status: filters.status || undefined,
+        from: filters.dateFrom || undefined,
+        to: filters.dateTo || undefined,
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'فشل في تصدير القائمة.');
+      console.error('Error exporting accounting list:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const remainingRefund = (transaction: AccountingTransaction) =>
+    Math.max(0, (transaction.amount ?? 0) - (transaction.refundedAmount ?? 0));
+
+  const openRefund = (transaction: AccountingTransaction) => {
+    const remaining = remainingRefund(transaction);
+    setRefundTarget(transaction);
+    setRefundAmount(remaining > 0 ? String(remaining) : '');
+    setRefundMessage('');
+  };
+
+  const closeRefund = () => {
+    if (refunding) return;
+    setRefundTarget(null);
+    setRefundAmount('');
+    setRefundMessage('');
+  };
+
+  const submitRefund = async () => {
+    if (!refundTarget) return;
+    const remaining = remainingRefund(refundTarget);
+    const amount = Number(refundAmount.replace(/,/g, ''));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('أدخل مبلغ استرجاع صحيح.');
+      return;
+    }
+    if (amount > remaining) {
+      setError(`المبلغ أكبر من المتبقي (${remaining.toLocaleString()} د.ع).`);
+      return;
+    }
+
+    try {
+      setRefunding(true);
+      setError('');
+      await platformPaymentService.refund(refundTarget.id, {
+        amount,
+        message: refundMessage.trim() || undefined,
+      });
+      setRefundTarget(null);
+      setRefundAmount('');
+      setRefundMessage('');
+      await fetchAccounting();
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+      setError(
+        Array.isArray(message)
+          ? message.join(' — ')
+          : typeof message === 'string'
+            ? message
+            : err instanceof Error
+              ? err.message
+              : 'فشل الاسترجاع.',
+      );
+      console.error('Error refunding platform payment:', err);
+    } finally {
+      setRefunding(false);
+    }
+  };
+
   if (loading && transactions.length === 0) return <LoadingState />;
 
   return (
@@ -152,10 +240,33 @@ const Accounting = () => {
         )}
         icon={<Wallet className="h-5 w-5 sm:h-6 sm:w-6" />}
         action={(
-          <PrimaryActionButton>
-            تصدير القائمة
-            <img src="/accounting/export.svg" alt="" className="h-5 w-5 brightness-0 invert" />
-          </PrimaryActionButton>
+          <div className="relative">
+            <PrimaryActionButton
+              onClick={() => setShowExportMenu((open) => !open)}
+              className={exporting ? 'pointer-events-none opacity-70' : undefined}
+            >
+              {exporting ? 'جاري التصدير...' : 'تصدير القائمة'}
+              <img src="/accounting/export.svg" alt="" className="h-5 w-5 brightness-0 invert" />
+            </PrimaryActionButton>
+            {showExportMenu && !exporting && (
+              <div className="absolute left-0 top-full z-20 mt-2 min-w-44 overflow-hidden rounded-2xl border border-slate-100 bg-white py-1 shadow-xl shadow-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => handleExport('xlsx')}
+                  className="block w-full px-4 py-2.5 text-right text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                >
+                  Excel (.xlsx)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('pdf')}
+                  className="block w-full px-4 py-2.5 text-right text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                >
+                  PDF (.pdf)
+                </button>
+              </div>
+            )}
+          </div>
         )}
       />
 
@@ -260,7 +371,7 @@ const Accounting = () => {
         {visibleTransactions.length === 0 ? (
           <EmptyState title="لا توجد معاملات مالية" />
         ) : (
-          <table className="w-full min-w-[980px]">
+          <table className="w-full min-w-[1080px]">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
                 <th className="px-5 py-5 text-right">#</th>
@@ -270,6 +381,7 @@ const Accounting = () => {
                 <th className="px-5 py-5 text-right">تاريخ الدفع</th>
                 <th className="px-5 py-5 text-right">طريقة الدفع</th>
                 <th className="px-5 py-5 text-right">الحالة</th>
+                <th className="px-5 py-5 text-right">إجراء</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -301,6 +413,21 @@ const Accounting = () => {
                     </td>
                     <td className="px-5 py-4">
                       <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                    </td>
+                    <td className="px-5 py-4">
+                      {transaction.canRefund ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl border-rose-200 font-bold text-rose-600 hover:bg-rose-50"
+                          onClick={() => openRefund(transaction)}
+                        >
+                          استرجاع
+                        </Button>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-300">—</span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -386,6 +513,77 @@ const Accounting = () => {
           </div>
         </SideDrawer>
       )}
+
+      {refundTarget && (
+        <SideDrawer
+          title="استرجاع دفعة QiCard"
+          subtitle={refundTarget.store?.name || getTransactionLabel(refundTarget)}
+          icon={<CreditCard className="h-6 w-6" />}
+          maxWidth="max-w-md"
+          onClose={closeRefund}
+          footer={(
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                disabled={refunding}
+                onClick={closeRefund}
+                className="h-14 rounded-2xl bg-slate-100 font-black text-slate-600 disabled:opacity-60"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={refunding}
+                onClick={submitRefund}
+                className="h-14 rounded-2xl bg-linear-to-l from-rose-600 to-orange-500 font-black text-white shadow-lg shadow-rose-200 disabled:opacity-60"
+              >
+                {refunding ? 'جارٍ الاسترجاع…' : 'تأكيد الاسترجاع'}
+              </button>
+            </div>
+          )}
+        >
+          <div className="space-y-5">
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+              <p>
+                المبلغ الأصلي:{' '}
+                <span className="font-black text-slate-950">
+                  {(refundTarget.amount ?? 0).toLocaleString()} د.ع
+                </span>
+              </p>
+              <p className="mt-1">
+                المسترجع سابقاً:{' '}
+                <span className="font-black text-slate-950">
+                  {(refundTarget.refundedAmount ?? 0).toLocaleString()} د.ع
+                </span>
+              </p>
+              <p className="mt-1">
+                المتبقي:{' '}
+                <span className="font-black text-rose-600">
+                  {remainingRefund(refundTarget).toLocaleString()} د.ع
+                </span>
+              </p>
+            </div>
+            <label className="block space-y-2">
+              <span className="text-sm font-black text-slate-800">مبلغ الاسترجاع (د.ع)</span>
+              <Input
+                value={refundAmount}
+                onChange={(event) => setRefundAmount(event.target.value)}
+                inputMode="decimal"
+                className="h-12 rounded-2xl"
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-black text-slate-800">سبب الاسترجاع (اختياري)</span>
+              <Input
+                value={refundMessage}
+                onChange={(event) => setRefundMessage(event.target.value)}
+                placeholder="مثل: استرجاع جزئي / كامل"
+                className="h-12 rounded-2xl"
+              />
+            </label>
+          </div>
+        </SideDrawer>
+      )}
     </div>
   );
 };
@@ -450,48 +648,83 @@ const PaymentMethodIcon = ({ brand }: { brand: CardBrand }) => {
 };
 
 const getMethodKey = (transaction: AccountingTransaction): 'bank' | 'card' | 'electronic' => {
-  const raw = `${transaction.method || ''} ${transaction.plan?.name || ''}`.toLowerCase();
-  if (raw.includes('bank') || raw.includes('تحويل') || raw.includes('wire')) return 'bank';
-  if (raw.includes('google') || raw.includes('electronic') || raw.includes('الكتروني') || raw.includes('gpay')) {
-    return 'electronic';
-  }
-  if (raw.includes('card') || raw.includes('visa') || raw.includes('master') || raw.includes('بطاقة')) return 'card';
-  return transaction.type === 'SUBSCRIPTION' ? 'bank' : 'card';
+  const raw = `${transaction.method || ''} ${transaction.provider || ''}`.toUpperCase();
+  if (raw.includes('MANUAL') || raw.includes('BANK')) return 'bank';
+  if (raw.includes('ZAIN')) return 'electronic';
+  if (raw.includes('QI_CARD') || raw.includes('CARD')) return 'card';
+  if (transaction.type === 'SUBSCRIPTION' && !transaction.provider) return 'bank';
+  return 'card';
 };
 
 const getCardBrand = (transaction: AccountingTransaction, methodKey: 'bank' | 'card' | 'electronic'): CardBrand => {
   if (methodKey === 'bank') return 'bank';
   if (methodKey === 'electronic') return 'gpay';
 
-  const raw = `${transaction.method || ''}`.toLowerCase();
+  const raw = `${transaction.method || ''} ${transaction.provider || ''}`.toLowerCase();
   if (raw.includes('master')) return 'mastercard';
   if (raw.includes('visa')) return 'visa';
-  if (raw.includes('google') || raw.includes('gpay')) return 'gpay';
+  if (raw.includes('google') || raw.includes('gpay') || raw.includes('zain')) return 'gpay';
 
   const hash = [...String(transaction.id)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
   return hash % 2 === 0 ? 'mastercard' : 'visa';
 };
 
 const getMethodMeta = (transaction: AccountingTransaction) => {
+  const provider = (transaction.provider || transaction.method || '').toUpperCase();
+  if (provider === 'QI_CARD') {
+    return { key: 'card' as const, label: 'كي كارد', brand: getCardBrand(transaction, 'card') };
+  }
+  if (provider === 'ZAIN_CASH') {
+    return { key: 'electronic' as const, label: 'زين كاش', brand: getCardBrand(transaction, 'electronic') };
+  }
+  if (provider === 'MANUAL' || (!transaction.provider && transaction.type === 'SUBSCRIPTION')) {
+    return { key: 'bank' as const, label: 'تحويل بنكي', brand: 'bank' as const };
+  }
   const key = getMethodKey(transaction);
   const labels = {
     bank: 'تحويل بنكي',
     card: 'بطاقة ائتمانية',
-    electronic: 'بطاقة ائتمانية',
+    electronic: 'دفع إلكتروني',
   } as const;
   return { key, label: labels[key], brand: getCardBrand(transaction, key) };
 };
 
 const getTransactionLabel = (transaction: AccountingTransaction) => {
   const digits = String(transaction.id).replace(/\D/g, '').slice(-2) || '01';
-  const kind = transaction.type === 'SUBSCRIPTION' ? 'أشتراك' : 'دفعة';
-  return `${kind} #${digits}`;
+  const kind =
+    transaction.type === 'SUBSCRIPTION'
+      ? 'أشتراك'
+      : transaction.type === 'CREDITS'
+        ? 'رصيد AI'
+        : transaction.type === 'RENEWAL'
+          ? 'تجديد'
+          : transaction.type === 'CHANGE_PLAN'
+            ? 'تغيير باقة'
+            : transaction.type === 'DOMAIN_REGISTRATION'
+              ? 'نطاق'
+              : transaction.type === 'INITIAL_SUBSCRIPTION'
+                ? 'اشتراك'
+                : 'دفعة';
+  const planName = transaction.plan?.name ? ` — ${transaction.plan.name}` : '';
+  return `${kind} #${digits}${planName}`;
 };
 
 const getStatusMeta = (status: string) => {
-  if (status === 'COMPLETED') return { label: 'مكتمل', tone: 'green' as const };
-  if (status === 'PENDING') return { label: 'قيد المراجعة', tone: 'amber' as const };
-  if (status === 'CANCELLED' || status === 'FAILED') return { label: 'غير مدفوع', tone: 'red' as const };
+  if (status === 'COMPLETED' || status === 'PAID' || status === 'ACTIVE') {
+    return { label: 'مدفوع', tone: 'green' as const };
+  }
+  if (status === 'PARTIALLY_REFUNDED') {
+    return { label: 'استرجاع جزئي', tone: 'amber' as const };
+  }
+  if (status === 'REFUNDED') {
+    return { label: 'مسترجع', tone: 'slate' as const };
+  }
+  if (status === 'PENDING' || status === 'INACTIVE') {
+    return { label: 'قيد المراجعة', tone: 'amber' as const };
+  }
+  if (status === 'CANCELLED' || status === 'FAILED' || status === 'EXPIRED') {
+    return { label: 'غير مدفوع', tone: 'red' as const };
+  }
   return { label: status || 'غير محدد', tone: 'slate' as const };
 };
 

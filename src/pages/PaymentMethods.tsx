@@ -268,8 +268,8 @@ const PaymentMethods = () => {
           >
             {activeTab === 'methods' ? (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <FormField label="الاسم" value={methodFormData.name} required onChange={(value) => setMethodFormData((current) => ({ ...current, name: value }))} />
-                <FormField label="الكود" value={methodFormData.code} required onChange={(value) => setMethodFormData((current) => ({ ...current, code: value }))} />
+                <FormField label="الاسم" value={methodFormData.name} placeholder="مثل: Qi أو زين كاش" required onChange={(value) => setMethodFormData((current) => ({ ...current, name: value }))} />
+                <FormField label="الكود" value={methodFormData.code} placeholder="مثل: qi أو zaincash" required onChange={(value) => setMethodFormData((current) => ({ ...current, code: value }))} />
                 <SelectField
                   label="المزود"
                   value={methodFormData.providerId}
@@ -286,8 +286,8 @@ const PaymentMethods = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <FormField label="اسم المزود" value={providerFormData.name} required onChange={(value) => setProviderFormData((current) => ({ ...current, name: value }))} />
-                <FormField label="الكود" value={providerFormData.code} required onChange={(value) => setProviderFormData((current) => ({ ...current, code: value }))} />
+                <FormField label="اسم المزود" value={providerFormData.name} placeholder="مثل: Qi أو ZainCash" required onChange={(value) => setProviderFormData((current) => ({ ...current, name: value }))} />
+                <FormField label="الكود" value={providerFormData.code} placeholder="مثل: qiservice أو zaincash" required onChange={(value) => setProviderFormData((current) => ({ ...current, code: value }))} />
                 <FormField label="رابط الشعار" value={providerFormData.logoUrl} onChange={(value) => setProviderFormData((current) => ({ ...current, logoUrl: value }))} />
                 <SelectField label="النوع" value={providerFormData.type} options={[{ value: 'ONLINE', label: 'أونلاين' }, { value: 'OFFLINE', label: 'أوفلاين' }]} onChange={(value) => setProviderFormData((current) => ({ ...current, type: value as 'ONLINE' | 'OFFLINE' }))} />
                 <SelectField label="الحالة" value={providerFormData.isActive ? 'active' : 'inactive'} options={[{ value: 'active', label: 'نشط' }, { value: 'inactive', label: 'غير نشط' }]} onChange={(value) => setProviderFormData((current) => ({ ...current, isActive: value === 'active' }))} />

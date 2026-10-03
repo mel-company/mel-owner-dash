@@ -1,7 +1,8 @@
 import axiosInstance from '../utils/AxiosInstance';
 
-// Employee Role Enum
+// Employee Role Enum — must match SystemUserRoleEnum on the API
 export const EmployeeRoleEnum = {
+  OWNER: 'OWNER',
   EMPLOYEE: 'EMPLOYEE',
   DEVELOPER: 'DEVELOPER',
   SUPPORT: 'SUPPORT',
@@ -16,6 +17,7 @@ export interface SystemEmployee {
   phone?: string;
   role?: string;
   status?: string;
+  isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -39,7 +41,7 @@ export interface UpdateEmployeeRequest {
   name?: string;
   email?: string;
   phone?: string;
-  role?: EmployeeRoleEnum;
+  role?: EmployeeRoleEnum | string;
   status?: string;
 }
 
@@ -51,6 +53,16 @@ export interface SearchEmployeesParams {
   status?: string;
 }
 
+const VALID_ROLES = new Set(['OWNER', 'EMPLOYEE', 'DEVELOPER', 'SUPPORT']);
+
+const sanitizeRole = (role?: string): EmployeeRoleEnum | undefined => {
+  if (role == null || role === '') return undefined;
+  const raw = role.trim().toUpperCase();
+  if (raw === 'ADMIN') return EmployeeRoleEnum.OWNER;
+  if (VALID_ROLES.has(raw)) return raw as EmployeeRoleEnum;
+  return undefined;
+};
+
 /**
  * System Employees Service
  * Handles system employee management endpoints
@@ -61,9 +73,10 @@ export const systemEmployeesService = {
    * POST /api/v1/system-employee
    */
   createEmployee: async (employeeData: CreateEmployeeRequest): Promise<SystemEmployee> => {
+    const role = sanitizeRole(employeeData.role) ?? EmployeeRoleEnum.EMPLOYEE;
     const response = await axiosInstance.post<SystemEmployee>(
       '/system-employee',
-      employeeData
+      { ...employeeData, role }
     );
     return response as unknown as SystemEmployee;
   },
@@ -119,12 +132,18 @@ export const systemEmployeesService = {
 
   /**
    * تحديث موظف
-   * PATCH /api/v1/system-employee/{id}
+   * PUT /api/v1/system-employee/{id}
    */
   updateEmployee: async (id: string, employeeData: UpdateEmployeeRequest): Promise<SystemEmployee> => {
+    const payload: UpdateEmployeeRequest = { ...employeeData };
+    if ('role' in payload) {
+      const role = sanitizeRole(payload.role);
+      if (role) payload.role = role;
+      else delete payload.role;
+    }
     const response = await axiosInstance.put<SystemEmployee>(
       `/system-employee/${id}`,
-      employeeData
+      payload
     );
     return response as unknown as SystemEmployee;
   },
