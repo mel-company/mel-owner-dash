@@ -598,10 +598,31 @@ export const GatewayDetailPanel = ({
               </div>
             )}
 
-            {health.reason && (
-              <p className="pt-1 text-[11px] leading-relaxed text-slate-400">
-                {health.reason}
-              </p>
+            {/*
+              The gateway's own words, shown only when they add something.
+
+              `reason` is the server's diagnostic string and it is English —
+              `configured; credentials not verified yet` — which read as a bug
+              sitting raw in an Arabic panel. For the two states this drawer
+              already draws (configured, or missing variables it lists by
+              name) it was also pure repetition. So the local states are said
+              in Arabic above, and the raw text appears only after a probe,
+              where it carries the gateway's actual answer and is worth having
+              verbatim: labelled as technical detail and `dir="ltr"`, so mixed
+              script reads as a quotation rather than a mistake.
+            */}
+            {probed?.reason && (
+              <div className="space-y-1 pt-1">
+                <div className="text-[11px] font-bold text-slate-500">
+                  رد البوابة
+                </div>
+                <p
+                  dir="ltr"
+                  className="text-left font-mono text-[11px] leading-relaxed text-slate-400"
+                >
+                  {probed.reason}
+                </p>
+              </div>
             )}
           </div>
         ) : (

@@ -409,7 +409,32 @@ const PaymentMethods = () => {
     <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="بوابات الدفع"
-        description={<>هناك <span className="font-black text-violet-600">{methods.length} طريقة دفع</span> و <span className="font-black text-violet-600">{providers.length} مزود</span></>}
+        /*
+          The page is «بوابات الدفع» and opens on the gateways, so the line
+          under the title counts gateways. It read «هناك 0 طريقة دفع و 4 مزود»
+          — leftover from when this was a methods-first page, and it led with
+          a zero that was true and irrelevant.
+        */
+        description={
+          <>
+            <span className="font-black text-violet-600">{providers.length} بوابة</span>
+            {gatewayCounts.needsSetup > 0 ? (
+              <>
+                {' — '}
+                <span className="font-black text-amber-600">
+                  {gatewayCounts.needsSetup} تحتاج إعداد
+                </span>
+              </>
+            ) : (
+              <>
+                {' — '}
+                <span className="font-black text-emerald-600">
+                  {gatewayCounts.active} مفعلة
+                </span>
+              </>
+            )}
+          </>
+        }
         icon={<CreditCard className="h-6 w-6" />}
         action={<PrimaryActionButton onClick={openCreateDrawer}>إضافة {activeTab === 'methods' ? 'طريقة دفع' : 'مزود دفع'}<Plus className="h-4 w-4" /></PrimaryActionButton>}
       />
