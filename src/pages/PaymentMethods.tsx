@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CreditCard, Landmark, Pencil, Plus, Trash2, WalletCards } from 'lucide-react';
+import { CheckCircle2, CreditCard, Database, Landmark, Pencil, Plus, Settings2, Trash2, XCircle } from 'lucide-react';
 import {
   AlertMessage,
   ConfirmDeleteModal,
@@ -19,6 +19,18 @@ import {
   TextAreaField,
 } from '@/components/dashboard';
 import { GatewayHealthStrip } from '@/components/dashboard/GatewayHealthStrip';
+import {
+  GatewayDetailPanel,
+  GatewaysTable,
+} from '@/components/payments/GatewaysTable';
+import { gatewayStatus } from '@/lib/gateway-presentation';
+import {
+  paymentGatewaysService,
+  type GatewayActivity,
+  type GatewaySurfaceSetting,
+  type PaymentGatewayHealth,
+  type PaymentSurface,
+} from '@/services/paymentGatewaysService';
 import {
   paymentMethodService,
   paymentProviderService,
@@ -84,7 +96,8 @@ const PaymentMethods = () => {
   const [providers, setProviders] = useState<PaymentProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'methods' | 'providers'>('methods');
+  // The page is «بوابات الدفع», so it opens on the gateways.
+  const [activeTab, setActiveTab] = useState<'methods' | 'providers'>('providers');
   const [search, setSearch] = useState('');
   const [showDrawer, setShowDrawer] = useState(false);
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
@@ -95,6 +108,13 @@ const PaymentMethods = () => {
   const [providerFormData, setProviderFormData] = useState<CreatePaymentProviderRequest>(defaultProviderForm);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [activity, setActivity] = useState<Record<string, GatewayActivity>>({});
+  const [detailProvider, setDetailProvider] = useState<PaymentProvider | null>(null);
+  const [probed, setProbed] = useState<PaymentGatewayHealth | null>(null);
+  const [probing, setProbing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [gatewaySettings, setGatewaySettings] = useState<GatewaySurfaceSetting[]>([]);
+  const [savingSurface, setSavingSurface] = useState<PaymentSurface | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -104,12 +124,29 @@ const PaymentMethods = () => {
     try {
       setLoading(true);
       setError('');
-      const [providersResponse, methodsResponse] = await Promise.all([
+      /**
+       * Activity reads the ledgers and contacts no gateway, so it is safe on
+       * page load — unlike the probe behind «اختبار الاتصال», which is a real
+       * round trip to someone else's payment system and stays a button.
+       *
+       * `catch` rather than `Promise.all`: a deployment whose server predates
+       * this route should still get its gateways list, with the activity
+       * columns reading «—» rather than the whole page failing.
+       */
+      const [providersResponse, methodsResponse, activityResponse, settingsResponse] = await Promise.all([
         paymentProviderService.getAllPaymentProviders({ page: 1, limit: 100 }),
         paymentMethodService.getAllPaymentMethods({ page: 1, limit: 100 }),
+        paymentGatewaysService.getActivity().catch(() => ({ data: [] })),
+        paymentGatewaysService.getSettings().catch(() => ({ data: [] })),
       ]);
       setProviders(providersResponse.data || []);
       setMethods(methodsResponse.data || []);
+      setActivity(
+        Object.fromEntries(
+          (activityResponse.data || []).map((entry) => [entry.gateway, entry]),
+        ),
+      );
+      setGatewaySettings(settingsResponse.data || []);
     } catch (err) {
       setError('فشل في جلب بيانات الدفع. يرجى المحاولة مرة أخرى.');
       console.error('Error fetching payment data:', err);
@@ -118,7 +155,25 @@ const PaymentMethods = () => {
     }
   };
 
-  const rows = activeTab === 'methods' ? methods.filter((method) => !method.is_deleted) : providers;
+  /** One pass over one population, so the four cards add up to the total. */
+  const gatewayCounts = useMemo(() => {
+    const counts = { active: 0, disabled: 0, needsSetup: 0 };
+    for (const provider of providers) {
+      const { status } = gatewayStatus(provider);
+      if (status === 'active') counts.active += 1;
+      else if (status === 'disabled') counts.disabled += 1;
+      else counts.needsSetup += 1;
+    }
+    return counts;
+  }, [providers]);
+
+  const rows =
+    activeTab === 'methods'
+      ? methods.filter((method) => !method.is_deleted)
+      : providers.filter(
+          (provider) =>
+            !statusFilter || gatewayStatus(provider).status === statusFilter,
+        );
   const filteredRows = useMemo(() => rows.filter((item) => {
     const text = activeTab === 'methods'
       ? [item.name, (item as PaymentMethod).code, (item as PaymentMethod).provider?.name].join(' ')
@@ -245,6 +300,95 @@ const PaymentMethods = () => {
     }
   };
 
+  const openDetail = (provider: PaymentProvider) => {
+    setDetailProvider(provider);
+    // A previous gateway's probe must not be read as this one's.
+    setProbed(null);
+  };
+
+  /**
+   * A real round trip, and the only thing on this page that makes one.
+   *
+   * The list is drawn from configuration alone, so opening the page cannot
+   * fire a request at someone else's production payment system once per
+   * gateway. That is why this is a button.
+   */
+  const probeGateway = async () => {
+    const gateway = detailProvider?.gateway?.gateway;
+    if (!gateway) return;
+    try {
+      setProbing(true);
+      setError('');
+      setProbed(await paymentGatewaysService.checkGateway(gateway));
+    } catch (err) {
+      setError(serverMessage(err, 'تعذر فحص الاتصال بالبوابة.'));
+      console.error('Error probing gateway:', err);
+    } finally {
+      setProbing(false);
+    }
+  };
+
+  /**
+   * Switch one gateway on or off for one surface.
+   *
+   * Optimistic, then reconciled from the server's answer: the control is a
+   * toggle and a toggle that waits a round trip before moving feels broken.
+   * A refusal puts it back and shows the server's reason rather than a
+   * generic failure.
+   */
+  const setSurfaceEnabled = async (
+    surface: PaymentSurface,
+    enabled: boolean,
+  ) => {
+    const gateway = detailProvider?.gateway?.gateway;
+    if (!gateway) return;
+
+    const previous = gatewaySettings;
+    const optimistic: GatewaySurfaceSetting = {
+      gateway,
+      surface,
+      enabled,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setSavingSurface(surface);
+    setGatewaySettings((current) => [
+      ...current.filter(
+        (entry) => !(entry.gateway === gateway && entry.surface === surface),
+      ),
+      optimistic,
+    ]);
+
+    try {
+      setError('');
+      const saved = await paymentGatewaysService.setSurfaceEnabled(
+        gateway,
+        surface,
+        enabled,
+      );
+      setGatewaySettings((current) => [
+        ...current.filter(
+          (entry) => !(entry.gateway === gateway && entry.surface === surface),
+        ),
+        saved,
+      ]);
+    } catch (err) {
+      setGatewaySettings(previous);
+      setError(serverMessage(err, 'تعذر تغيير إعداد البوابة.'));
+      console.error('Error updating gateway setting:', err);
+    } finally {
+      setSavingSurface(null);
+    }
+  };
+
+  /** The two surfaces for one gateway, keyed so the drawer can read either. */
+  const settingsFor = (gateway?: string) =>
+    Object.fromEntries(
+      gatewaySettings
+        .filter((entry) => entry.gateway === gateway)
+        .map((entry) => [entry.surface, entry]),
+    ) as Partial<Record<PaymentSurface, GatewaySurfaceSetting>>;
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -272,19 +416,47 @@ const PaymentMethods = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <StatCard title="إجمالي طرق الدفع" value={methods.length} icon={<WalletCards />} tone="blue" />
-        <StatCard title="طرق الدفع النشطة" value={methods.filter((method) => method.isActive).length} icon={<CreditCard />} tone="teal" />
-        <StatCard title="إجمالي المزودين" value={providers.length} icon={<Landmark />} tone="violet" />
-        <StatCard title="المزودين النشطين" value={providers.filter((provider) => provider.isActive).length} icon={<Landmark />} tone="emerald" />
+      {/*
+        The four states a gateway can be in, and they sum to the total.
+
+        The set this replaces counted methods and providers side by side —
+        four numbers from two different populations, so they did not add up to
+        anything and «المزودين النشطين» could not be checked against
+        «إجمالي المزودين» by eye. «تحتاج إعداد» is the one worth drawing: a
+        provider the platform is offering while the integration behind it has
+        no credentials, which otherwise looks identical to a working one until
+        a shopper reaches the gateway.
+      */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatCard title="إجمالي البوابات" value={providers.length} icon={<Database />} tone="blue" />
+        <StatCard title="مفعلة" value={gatewayCounts.active} icon={<CheckCircle2 />} tone="emerald" />
+        <StatCard title="معطلة" value={gatewayCounts.disabled} icon={<XCircle />} tone="slate" />
+        <StatCard title="تحتاج إعداد" value={gatewayCounts.needsSetup} icon={<Settings2 />} tone="amber" />
       </div>
 
       <GatewayHealthStrip />
 
-      <SearchFiltersBar search={search} onSearchChange={setSearch} placeholder="ابحث في بوابات الدفع" onFilterClick={() => setSearch('')}>
-        <div className="flex gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
-          <button onClick={() => { setActiveTab('methods'); setPage(1); }} className={tabClass(activeTab === 'methods')}>طرق الدفع</button>
-          <button onClick={() => { setActiveTab('providers'); setPage(1); }} className={tabClass(activeTab === 'providers')}>مزودو الدفع</button>
+      <SearchFiltersBar search={search} onSearchChange={setSearch} placeholder="ابحث عن بوابة دفع..." onFilterClick={() => setSearch('')}>
+        <div className="flex flex-wrap items-center gap-2">
+          {activeTab === 'providers' && (
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
+              className="h-11 rounded-2xl bg-white px-4 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-100 outline-none"
+            >
+              <option value="">جميع الحالات</option>
+              <option value="active">مفعلة</option>
+              <option value="disabled">معطلة</option>
+              <option value="needs-setup">تحتاج إعداد</option>
+            </select>
+          )}
+          <div className="flex gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
+            <button onClick={() => { setActiveTab('providers'); setPage(1); }} className={tabClass(activeTab === 'providers')}>البوابات</button>
+            <button onClick={() => { setActiveTab('methods'); setPage(1); }} className={tabClass(activeTab === 'methods')}>طرق الدفع</button>
+          </div>
         </div>
       </SearchFiltersBar>
 
@@ -307,9 +479,49 @@ const PaymentMethods = () => {
         ) : activeTab === 'methods' ? (
           <MethodsTable rows={visibleRows as PaymentMethod[]} providers={providers} onEdit={openEditMethod} onDelete={(method) => setDeleteTarget({ id: method.id, name: method.name, type: 'method' })} onToggle={toggleMethod} />
         ) : (
-          <ProvidersTable rows={visibleRows as PaymentProvider[]} onEdit={openEditProvider} onDelete={(provider) => setDeleteTarget({ id: provider.id, name: provider.name, type: 'provider' })} onToggle={(provider) => (provider.isActive ? setDeactivateTarget(provider) : toggleProvider(provider))} />
+          <GatewaysTable
+            rows={visibleRows as PaymentProvider[]}
+            activityByGateway={activity}
+            actions={{
+              onOpen: openDetail,
+              onEdit: openEditProvider,
+              onDelete: (provider) =>
+                setDeleteTarget({ id: provider.id, name: provider.name, type: 'provider' }),
+              onToggle: (provider) =>
+                provider.isActive ? setDeactivateTarget(provider) : toggleProvider(provider),
+            }}
+          />
         )}
       </TableShell>
+
+      {detailProvider && (
+        <SideDrawer
+          title="تفاصيل بوابة الدفع"
+          subtitle={detailProvider.name}
+          icon={<CreditCard className="h-5 w-5" />}
+          onClose={() => setDetailProvider(null)}
+        >
+          <GatewayDetailPanel
+            provider={detailProvider}
+            activity={
+              detailProvider.gateway
+                ? activity[detailProvider.gateway.gateway]
+                : null
+            }
+            settings={settingsFor(detailProvider.gateway?.gateway)}
+            savingSurface={savingSurface}
+            onSurfaceToggle={setSurfaceEnabled}
+            probing={probing}
+            probed={probed}
+            onProbe={probeGateway}
+            onToggle={() => {
+              if (detailProvider.isActive) setDeactivateTarget(detailProvider);
+              else toggleProvider(detailProvider);
+              setDetailProvider(null);
+            }}
+          />
+        </SideDrawer>
+      )}
 
       {showDrawer && (
         <form onSubmit={handleSubmit}>
@@ -455,77 +667,6 @@ const MethodsTable = ({ rows, providers, onEdit, onDelete, onToggle }: { rows: P
   </table>
 );
 
-const ProvidersTable = ({ rows, onEdit, onDelete, onToggle }: { rows: PaymentProvider[]; onEdit: (provider: PaymentProvider) => void; onDelete: (provider: PaymentProvider) => void; onToggle: (provider: PaymentProvider) => void }) => (
-  <table className="w-full min-w-[920px]">
-    <thead>
-      <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
-        <th className="px-5 py-5 text-right">المزود</th>
-        <th className="px-5 py-5 text-right">الكود</th>
-        <th className="px-5 py-5 text-right">النوع</th>
-        <th className="px-5 py-5 text-right">عدد الطرق</th>
-        <th className="px-5 py-5 text-right">الحالة</th>
-        <th className="px-5 py-5 text-right">العمليات</th>
-      </tr>
-    </thead>
-    <tbody className="divide-y divide-slate-100">
-      {rows.map((provider) => (
-        <tr key={provider.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
-          <td className="px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-violet-600">
-                {/* The gateway's own logo wins: it is the brand's, and it
-                    survives a rebrand without anyone editing a seed row. */}
-                {provider.gateway?.logoUrl || provider.logoUrl ? (
-                  <img
-                    src={provider.gateway?.logoUrl || provider.logoUrl}
-                    alt=""
-                    className="h-8 w-8 object-contain"
-                    onError={(event) => { event.currentTarget.style.display = 'none'; }}
-                  />
-                ) : (
-                  <Landmark className="h-5 w-5" />
-                )}
-              </div>
-              <div>
-                <p className="font-black text-slate-950">{provider.name}</p>
-                <p className="text-xs font-semibold text-slate-400">{provider.description || 'مزود دفع'}</p>
-              </div>
-            </div>
-          </td>
-          <td className="px-5 py-4 font-semibold text-slate-600">{provider.code}</td>
-          <td className="px-5 py-4"><StatusPill tone="blue">{provider.type === 'ONLINE' ? 'أونلاين' : 'أوفلاين'}</StatusPill></td>
-          <td className="px-5 py-4 text-slate-600">{provider._count?.methods || 0}</td>
-          <td className="px-5 py-4">
-            {/**
-              * Enabling is gated on the gateway being able to charge at all;
-              * disabling never is. The server enforces both — this is the
-              * explanation, not the control.
-              */}
-            {!provider.isActive && provider.gateway && !provider.gateway.configured ? (
-              <div className="space-y-1">
-                <StatusPill tone="red">إعدادات ناقصة</StatusPill>
-                <p className="text-[11px] font-semibold text-slate-400" dir="ltr">
-                  {provider.gateway.missingCredentials.join(' · ')}
-                </p>
-              </div>
-            ) : (
-              <StatusToggle
-                active={!!provider.isActive}
-                onClick={() => onToggle(provider)}
-                title={
-                  provider.isActive
-                    ? 'إيقاف المزود يوقف جميع طرق الدفع التابعة له في كل المتاجر'
-                    : 'إعادة تفعيل المزود تُعيد طرق الدفع التي كانت مفعّلة'
-                }
-              />
-            )}
-          </td>
-          <td className="px-5 py-4"><ActionButtons onEdit={() => onEdit(provider)} onDelete={() => onDelete(provider)} /></td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-);
 
 const ActionButtons = ({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) => (
   <div className="flex items-center gap-3">

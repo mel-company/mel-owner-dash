@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-export type StatTone = 'blue' | 'cyan' | 'teal' | 'amber' | 'rose' | 'violet' | 'emerald';
+export type StatTone = 'blue' | 'cyan' | 'teal' | 'amber' | 'rose' | 'violet' | 'emerald' | 'slate';
 
 const statTones: Record<StatTone, { wrap: string; icon: string }> = {
   blue: { wrap: 'bg-blue-50 shadow-blue-100', icon: 'text-blue-500' },
@@ -25,6 +25,9 @@ const statTones: Record<StatTone, { wrap: string; icon: string }> = {
   rose: { wrap: 'bg-red-50 shadow-red-100', icon: 'text-red-500' },
   violet: { wrap: 'bg-violet-50 shadow-violet-100', icon: 'text-violet-500' },
   emerald: { wrap: 'bg-emerald-50 shadow-emerald-100', icon: 'text-emerald-500' },
+  // For a count of things that are switched *off* — the one state that should
+  // not draw the eye with colour.
+  slate: { wrap: 'bg-slate-100 shadow-slate-200', icon: 'text-slate-500' },
 };
 
 export const PageIcon = ({ children, className }: { children: ReactNode; className?: string }) => (
