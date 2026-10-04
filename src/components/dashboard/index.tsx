@@ -1,4 +1,12 @@
-import type { FormEvent, ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -121,6 +129,7 @@ export const SearchFiltersBar = ({
   placeholder = 'ابحث',
   filterCount = 0,
   onFilterClick,
+  filterPanel,
   children,
 }: {
   search: string;
@@ -128,17 +137,88 @@ export const SearchFiltersBar = ({
   placeholder?: string;
   filterCount?: number;
   onFilterClick?: () => void;
+  /**
+   * The filters themselves, shown in a popover under the الفلاتر button.
+   *
+   * Optional and additive: a page that passes nothing keeps the old behaviour
+   * where the button is a bare action and any controls sit beside it. Passing
+   * a panel is what makes the button mean "filters" rather than "clear
+   * filters", which is what a filter button normally means.
+   */
+  filterPanel?: ReactNode;
   children?: ReactNode;
-}) => (
+}) => {
+  /**
+   * The panel is portalled for the same reason the row menus are.
+   *
+   * This bar sits inside `TableShell`, whose card is `overflow-hidden` and
+   * whose body is `overflow-x-auto`. A panel positioned inside it is *clipped*
+   * by those boundaries, not merely covered, so no `z-index` rescues it — and
+   * the case that breaks is the easy one to miss, because it only shows when
+   * the table is short: filter down to a single row and the card is shorter
+   * than the panel, which then loses its last option.
+   */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  /** Measured during commit, so it is never painted in the wrong place. */
+  const placePanel = useCallback(
+    (node: HTMLDivElement | null) => {
+      panelRef.current = node;
+      if (!node || !anchor) return;
+      const flipUp = anchor.bottom + 8 + node.offsetHeight > window.innerHeight;
+      node.style.top = flipUp ? '' : `${anchor.bottom + 8}px`;
+      node.style.bottom = flipUp ? `${window.innerHeight - anchor.top + 8}px` : '';
+    },
+    [anchor],
+  );
+
+  useEffect(() => {
+    if (!filtersOpen) return;
+
+    const close = () => setFiltersOpen(false);
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (panelRef.current?.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [filtersOpen]);
+
+  return (
   <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
     <div className="flex flex-wrap items-center gap-2">
       {children}
       <Button
         type="button"
+        ref={triggerRef}
         variant={filterCount > 0 ? 'default' : 'outline'}
-        onClick={onFilterClick}
+        onClick={() => {
+          if (filterPanel) {
+            setAnchor(triggerRef.current?.getBoundingClientRect() ?? null);
+            setFiltersOpen((value: boolean) => !value);
+          }
+          onFilterClick?.();
+        }}
         className={cn(
-          'h-11 rounded-2xl px-4 text-sm font-bold sm:h-12 sm:px-5',
+          'h-11 rounded-2xl px-4 text-sm font-bold transition-all active:scale-95 sm:h-12 sm:px-5',
           filterCount > 0 && 'border-violet-300 bg-violet-600 text-white hover:bg-violet-600',
         )}
       >
@@ -148,8 +228,28 @@ export const SearchFiltersBar = ({
             +{filterCount}
           </Badge>
         )}
-        <SlidersHorizontal className="h-4 w-4" />
+        <SlidersHorizontal
+          className={cn('h-4 w-4 transition-transform duration-200', filtersOpen && 'rotate-180')}
+        />
       </Button>
+      {filterPanel &&
+        filtersOpen &&
+        anchor &&
+        createPortal(
+          <div
+            ref={placePanel}
+            dir="rtl"
+            className="fixed z-[9998] w-64 rounded-2xl bg-white p-4 shadow-lg ring-1 ring-slate-100 animate-in fade-in zoom-in-95 duration-150"
+            style={{
+              top: anchor.bottom + 8,
+              // Hung from the trigger's right edge in RTL, clamped to the window.
+              left: Math.max(8, Math.min(anchor.right - 256, window.innerWidth - 264)),
+            }}
+          >
+            {filterPanel}
+          </div>,
+          document.body,
+        )}
     </div>
     <div className="flex w-full flex-1 flex-wrap items-center gap-2 sm:min-w-[260px] sm:max-w-md sm:justify-end">
       <Button type="button" variant="secondary" className="h-11 shrink-0 rounded-2xl bg-cyan-50 px-5 text-sm font-bold text-cyan-600 hover:bg-cyan-50 sm:h-12 sm:px-6">
@@ -166,7 +266,8 @@ export const SearchFiltersBar = ({
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export const TableShell = ({ children, footer }: { children: ReactNode; footer?: ReactNode }) => (
   <Card className="gap-0 overflow-hidden rounded-[1.5rem] py-0 shadow-sm sm:rounded-[2rem]">

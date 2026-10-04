@@ -10,6 +10,7 @@ import {
   StatusPill,
   TableShell,
 } from '@/components/dashboard';
+import { StoreCourierAccounts } from '@/components/dashboard/StoreCourierAccounts';
 import { systemStoresService, type Store } from '../services/systemStoresService';
 
 const publicAssetBaseUrl = import.meta.env.VITE_PUBLIC_URL || 'https://pub-fe6c304a027a4a3b9e3efb4fd3520dcf.r2.dev/';
@@ -135,6 +136,10 @@ const StoreDetails = () => {
           </tbody>
         </table>
       </TableShell>
+
+      {/* Prime and Boxy refuse to dispatch until this store's branch is
+          recorded, and this is the only screen that can record it. */}
+      <StoreCourierAccounts storeId={store.id} />
     </div>
   );
 };
