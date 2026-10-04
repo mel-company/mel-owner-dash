@@ -73,7 +73,17 @@ export const PrimaryActionButton = ({
   </Button>
 );
 
-export const StatCard = ({ title, value, icon, tone = 'blue', hint }: { title: string; value: ReactNode; icon: ReactNode; tone?: StatTone; hint?: ReactNode }) => {
+/**
+ * `sub` is a caption under the number, and is not `hint`.
+ *
+ * `hint` renders as an emerald badge beside the value — it was built for a
+ * growth delta, and on the accounting page it was carrying `"12.6% ↗"` typed
+ * into the markup, in the same green as a real one. A caption that says what
+ * the number is made of ("موزّعة على 7 معاملات") is a different thing and
+ * must not borrow that styling, or the next reader cannot tell a measured
+ * figure from a described one.
+ */
+export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { title: string; value: ReactNode; icon: ReactNode; tone?: StatTone; hint?: ReactNode; sub?: ReactNode }) => {
   const color = statTones[tone];
 
   return (
@@ -92,6 +102,9 @@ export const StatCard = ({ title, value, icon, tone = 'blue', hint }: { title: s
             )}
             <span className="text-xl font-black leading-none text-slate-950 sm:text-2xl">{value}</span>
           </div>
+          {sub != null && sub !== false && (
+            <div className="mt-1 truncate text-[11px] font-semibold text-slate-400 sm:text-xs">{sub}</div>
+          )}
         </div>
       </CardContent>
     </Card>

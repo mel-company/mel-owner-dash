@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CreditCard, FileSearch, FileText, ReceiptText, Wallet } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { CreditCard, FileSearch, FileText, ReceiptText, Wallet, X } from 'lucide-react';
 import {
   AlertMessage,
   EmptyState,
@@ -23,17 +23,29 @@ import {
   type AccountingTransaction,
 } from '../services/accountingService';
 import { platformPaymentService } from '../services/platformPaymentService';
+import {
+  asPaymentMethodFilter,
+  describePaymentMethod,
+  PAYMENT_METHOD_FILTERS,
+  type PaymentMethodArt,
+  type PaymentMethodCategory,
+} from '@/lib/payment-method';
 
 type FiltersState = {
   type: string;
-  method: string;
+  /**
+   * The union rather than `string`, so a value the server would refuse cannot
+   * be put in here. The server answers `400` for a bucket it does not serve —
+   * deliberately, so a mismatch between the two surfaces is a loud error
+   * rather than an empty table nobody can explain — and this is what stops
+   * the client being the one that causes it.
+   */
+  method: '' | PaymentMethodCategory;
   status: string;
   amount: string;
   dateFrom: string;
   dateTo: string;
 };
-
-type CardBrand = 'visa' | 'mastercard' | 'gpay' | 'bank';
 
 const defaultFilters: FiltersState = {
   type: '',
@@ -50,13 +62,6 @@ const typeOptions = [
   { value: 'PAYMENT', label: 'دفعة' },
 ];
 
-const methodOptions = [
-  { value: '', label: 'الكل' },
-  { value: 'bank', label: 'تحويل بنكي' },
-  { value: 'card', label: 'بطاقة ائتمانية' },
-  { value: 'electronic', label: 'دفع الكتروني' },
-];
-
 const statusOptions = [
   { value: '', label: 'الكل' },
   { value: 'COMPLETED', label: 'مكتملة' },
@@ -69,6 +74,7 @@ const Accounting = () => {
   const [stats, setStats] = useState<AccountingStats>({
     totalRevenue: 0,
     pendingAmount: 0,
+    pendingTransactions: 0,
     monthlyTransactions: 0,
     averageTransaction: 0,
   });
@@ -101,6 +107,10 @@ const Accounting = () => {
           status: filters.status || undefined,
           from: filters.dateFrom || undefined,
           to: filters.dateTo || undefined,
+          // Every filter goes to the server. Narrowing the page we were
+          // handed is what made the pager offer five pages of nothing.
+          method: filters.method || undefined,
+          amount: filters.amount || undefined,
         }),
         accountingService.getStats(),
       ]);
@@ -113,39 +123,81 @@ const Accounting = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters.dateFrom, filters.dateTo, filters.status, filters.type, page, pageSize, search]);
+  }, [
+    filters.amount,
+    filters.dateFrom,
+    filters.dateTo,
+    filters.method,
+    filters.status,
+    filters.type,
+    page,
+    pageSize,
+    search,
+  ]);
 
   useEffect(() => {
     fetchAccounting();
   }, [fetchAccounting]);
 
-  const visibleTransactions = useMemo(() => transactions.filter((transaction) => {
-    const methodKey = getMethodKey(transaction);
-    const matchesMethod = !filters.method || methodKey === filters.method;
-    const matchesAmount = !filters.amount || String(transaction.amount).includes(filters.amount.replace(/[^\d]/g, ''));
-    const searchable = [transaction.store?.name, transaction.method, transaction.type, transaction.id]
-      .join(' ')
-      .toLowerCase();
-    const matchesSearch = searchable.includes(search.trim().toLowerCase());
-    return matchesMethod && matchesAmount && matchesSearch;
-  }), [filters.amount, filters.method, search, transactions]);
+  /**
+   * What the server sent, rendered as sent.
+   *
+   * This page used to re-filter and re-count the rows it had been given, which
+   * is only ever correct for an unpaginated list: `method` and `amount` were
+   * applied to the ten rows on screen while `total` and the pager counted the
+   * whole table, so a filter emptied page one and still offered the rest, and
+   * matches further in were unreachable. `search` was applied twice — once by
+   * the server and again here. The server owns all of it now.
+   */
 
-  const pendingCount = useMemo(
-    () => transactions.filter((item) => item.status === 'PENDING').length,
-    [transactions]
-  );
+  /**
+   * The narrowed state, as something you can see and undo.
+   *
+   * Worth building only because the filters now reach the whole table: while
+   * they narrowed the page in hand, "23 معاملة" and a badge reading "2" were
+   * describing different things and neither was the truth. Now the count is
+   * real, so what produced it should be legible without reopening the drawer
+   * — and removable one at a time, which the drawer cannot do.
+   */
+  const activeFilters: Array<{ key: keyof FiltersState; label: string }> = [
+    filters.type && {
+      key: 'type' as const,
+      label: typeOptions.find((option) => option.value === filters.type)?.label ?? filters.type,
+    },
+    filters.method && {
+      key: 'method' as const,
+      label:
+        PAYMENT_METHOD_FILTERS.find((option) => option.value === filters.method)?.label ??
+        filters.method,
+    },
+    filters.status && {
+      key: 'status' as const,
+      label:
+        statusOptions.find((option) => option.value === filters.status)?.label ?? filters.status,
+    },
+    filters.amount && { key: 'amount' as const, label: `المبلغ يحتوي ${filters.amount}` },
+    filters.dateFrom && { key: 'dateFrom' as const, label: `من ${filters.dateFrom}` },
+    filters.dateTo && { key: 'dateTo' as const, label: `إلى ${filters.dateTo}` },
+  ].filter(Boolean) as Array<{ key: keyof FiltersState; label: string }>;
 
-  const filterCount = [
-    filters.type,
-    filters.method,
-    filters.status,
-    filters.amount,
-    filters.dateFrom,
-    filters.dateTo,
-  ].filter(Boolean).length;
+  const filterCount = activeFilters.length;
 
-  const totalPages = Math.max(1, Math.ceil((total || visibleTransactions.length || 1) / pageSize));
-  const listCount = total || visibleTransactions.length;
+  /** Clearing one chip re-fetches from the first page: the result set changed. */
+  const clearFilter = (key: keyof FiltersState) => {
+    setFilters((current) => ({ ...current, [key]: '' }));
+    setDraftFilters((current) => ({ ...current, [key]: '' }));
+    setPage(1);
+  };
+
+  const clearAllFilters = () => {
+    setFilters(defaultFilters);
+    setDraftFilters(defaultFilters);
+    setSearch('');
+    setPage(1);
+  };
+
+  const totalPages = Math.max(1, Math.ceil((total || transactions.length || 1) / pageSize));
+  const listCount = total || transactions.length;
   const listTitle = search || filterCount > 0 ? 'نتائج البحث والفلاتر' : 'قائمة الحسابات المالية';
 
   const handleExport = async (format: 'xlsx' | 'pdf') => {
@@ -159,6 +211,9 @@ const Accounting = () => {
         status: filters.status || undefined,
         from: filters.dateFrom || undefined,
         to: filters.dateTo || undefined,
+        // The operator pressed export *because* they had narrowed the view.
+        method: filters.method || undefined,
+        amount: filters.amount || undefined,
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'فشل في تصدير القائمة.');
@@ -272,28 +327,38 @@ const Accounting = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+      {/*
+        Three cards, not four.
+        «عدد المعاملات المعلقة» and «المعاملات المعلقة» were the same fact
+        twice — a count and an amount, competing for attention as peers. The
+        amount is what an operator is chasing, so it is the headline and the
+        count is what it is made of.
+      */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         <RevenueCard value={stats.totalRevenue} />
         <StatCard
           title="المعاملات لهذا الشهر"
           value={stats.monthlyTransactions.toLocaleString()}
           icon={<FileText />}
           tone="blue"
-          hint="12.6% ↗"
-        />
-        <StatCard
-          title="عدد المعاملات المعلقة"
-          value={(
-            <>
-              {pendingCount} <span className="text-sm font-bold text-slate-500">معاملة</span>
-            </>
-          )}
-          icon={<FileSearch />}
-          tone="amber"
+          /**
+           * No `hint`.
+           *
+           * This card carried `hint="12.6% ↗"` — a growth figure typed into
+           * the markup, rendered in the same place and the same style as the
+           * real numbers beside it. Nothing computes it and nothing ever did;
+           * it survived from a mockup. A number an operator cannot trust next
+           * to three they can is worse than no number, and it is a large part
+           * of why this page is hard to read. The average-transaction card
+           * carried `hint="0% ↗"` for the same reason.
+           *
+           * A real month-over-month delta is worth having and needs the
+           * server to return last month's totals — a follow-up, not a string.
+           */
           hint={null}
         />
         <StatCard
-          title="المعاملات المعلقة"
+          title="قيد المراجعة"
           value={(
             <>
               {stats.pendingAmount.toLocaleString()} <span className="text-sm font-bold text-slate-500">د.ع</span>
@@ -301,7 +366,8 @@ const Accounting = () => {
           )}
           icon={<ReceiptText />}
           tone="amber"
-          hint="0% ↗"
+          hint={null}
+          sub={`موزّعة على ${stats.pendingTransactions.toLocaleString()} معاملة`}
         />
       </div>
 
@@ -354,6 +420,43 @@ const Accounting = () => {
         </div>
       </div>
 
+      {(filterCount > 0 || search) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-slate-500">يُعرض:</span>
+          {search && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setPage(1);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition hover:bg-violet-100"
+            >
+              <span>بحث: {search}</span>
+              <X className="h-3 w-3" strokeWidth={3} />
+            </button>
+          )}
+          {activeFilters.map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => clearFilter(filter.key)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition hover:bg-violet-100"
+            >
+              <span>{filter.label}</span>
+              <X className="h-3 w-3" strokeWidth={3} />
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="px-1 py-1.5 text-xs font-bold text-slate-500 underline transition hover:text-slate-700"
+          >
+            مسح الكل
+          </button>
+        </div>
+      )}
+
       <TableShell
         footer={(
           <Pagination
@@ -368,48 +471,76 @@ const Accounting = () => {
           />
         )}
       >
-        {visibleTransactions.length === 0 ? (
+        {transactions.length === 0 ? (
           <EmptyState title="لا توجد معاملات مالية" />
         ) : (
           <table className="w-full min-w-[1080px]">
             <thead>
+              {/*
+                Six columns, down from eight.
+
+                The `#` column numbered the *page* — `(page - 1) * pageSize +
+                index + 1` — so the same record was 01 on page one and 11 on
+                page two. It identified nothing and cost a column.
+
+                «تاريخ الدفع» moved under the transaction label, where it reads
+                as a property of the thing rather than a column to scan, and
+                «إجراء» lost its header: one button, named by itself.
+              */}
               <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
-                <th className="px-5 py-5 text-right">#</th>
                 <th className="px-5 py-5 text-right">المعاملة</th>
                 <th className="px-5 py-5 text-right">المتجر</th>
-                <th className="px-5 py-5 text-right">مبلغ الدفع</th>
-                <th className="px-5 py-5 text-right">تاريخ الدفع</th>
                 <th className="px-5 py-5 text-right">طريقة الدفع</th>
+                <th className="px-5 py-5 text-left">المبلغ</th>
                 <th className="px-5 py-5 text-right">الحالة</th>
-                <th className="px-5 py-5 text-right">إجراء</th>
+                <th className="px-5 py-5 text-right"><span className="sr-only">إجراء</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {visibleTransactions.map((transaction, index) => {
+              {transactions.map((transaction) => {
                 const status = getStatusMeta(transaction.status);
-                const method = getMethodMeta(transaction);
+                const method = describePaymentMethod(transaction);
                 const txnLabel = getTransactionLabel(transaction);
                 return (
                   <tr key={transaction.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
-                    <td className="px-5 py-4 text-xs font-semibold text-slate-500">
-                      {String((page - 1) * pageSize + index + 1).padStart(2, '0')}
+                    <td className="px-5 py-4">
+                      <div className="font-black text-slate-950">{txnLabel}</div>
+                      <div className="text-xs font-semibold text-slate-400">{formatDate(transaction.date)}</div>
                     </td>
-                    <td className="px-5 py-4 font-black text-slate-950">{txnLabel}</td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <StoreAvatar name={transaction.store?.name || 'متجر'} />
                         <span className="font-bold text-slate-800">{transaction.store?.name || '-'}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4 font-black text-slate-950">
-                      {transaction.amount.toLocaleString()} <span className="text-xs font-bold text-slate-400">د.ع</span>
-                    </td>
-                    <td className="px-5 py-4 text-slate-600">{formatDate(transaction.date)}</td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <PaymentMethodIcon brand={method.brand} />
-                        <span className="font-semibold text-slate-700">{method.label}</span>
+                        <PaymentMethodIcon art={method.art} />
+                        <div className="leading-tight">
+                          <div className="font-semibold text-slate-700">{method.label}</div>
+                          {method.maskedPan ? (
+                            <div className="font-mono text-[11px] text-slate-400">{method.maskedPan}</div>
+                          ) : method.network === null && method.category !== 'bank' ? (
+                            // The gateway's own brand, when it never named a
+                            // network. Said rather than guessed.
+                            <div className="text-[11px] text-slate-400">
+                              {transaction.provider === 'QI_CARD' ? 'كي كارد' : 'زين كاش'}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
+                    </td>
+                    {/*
+                      The amount is what a financial table is scanned for, and
+                      it had the same weight as the date beside it. Larger,
+                      tabular figures so columns of digits line up, and on the
+                      trailing edge where the eye runs down them.
+                    */}
+                    <td className="px-5 py-4 text-left">
+                      <span className="text-[15px] font-black tabular-nums text-slate-950">
+                        {transaction.amount.toLocaleString()}
+                      </span>{' '}
+                      <span className="text-xs font-bold text-slate-400">د.ع</span>
                     </td>
                     <td className="px-5 py-4">
                       <StatusPill tone={status.tone}>{status.label}</StatusPill>
@@ -487,8 +618,13 @@ const Accounting = () => {
             <SelectField
               label="نوع عملية الدفع"
               value={draftFilters.method}
-              options={methodOptions}
-              onChange={(value) => setDraftFilters((current) => ({ ...current, method: value }))}
+              options={PAYMENT_METHOD_FILTERS}
+              onChange={(value) =>
+                setDraftFilters((current) => ({
+                  ...current,
+                  method: asPaymentMethodFilter(value),
+                }))
+              }
             />
             <div className="grid grid-cols-2 gap-3">
               <FormField
@@ -614,8 +750,33 @@ const StoreAvatar = ({ name }: { name: string }) => (
   </div>
 );
 
-const PaymentMethodIcon = ({ brand }: { brand: CardBrand }) => {
-  if (brand === 'bank') {
+/**
+ * The mark for a payment method, including when there is no mark to draw.
+ *
+ * The version this replaces ended in `return <visa>` — so every payment whose
+ * brand could not be sniffed rendered a Visa logo, and the function feeding it
+ * picked between Visa and Mastercard with `hash % 2` when sniffing failed. A
+ * brand is a fact about a transaction; if the gateway did not tell us, the
+ * honest mark is the gateway's own, or a plain card.
+ */
+const PaymentMethodIcon = ({ art }: { art: PaymentMethodArt }) => {
+  if (art === 'visa') {
+    return (
+      <span className="flex h-6 w-10 items-center justify-center overflow-hidden rounded bg-white ring-1 ring-slate-100">
+        <img src="/accounting/visa.svg" alt="Visa" className="h-3 w-7" />
+      </span>
+    );
+  }
+
+  if (art === 'mastercard') {
+    return (
+      <span className="flex h-6 w-10 items-center justify-center overflow-hidden rounded bg-white ring-1 ring-slate-100">
+        <img src="/accounting/mastercard.svg" alt="MasterCard" className="h-4 w-7" />
+      </span>
+    );
+  }
+
+  if (art === 'bank') {
     return (
       <span className="grid h-6 w-10 place-items-center">
         <img src="/accounting/bank.svg" alt="" className="h-5 w-5" />
@@ -623,74 +784,46 @@ const PaymentMethodIcon = ({ brand }: { brand: CardBrand }) => {
     );
   }
 
-  if (brand === 'gpay') {
+  /**
+   * ZainCash is an Iraqi wallet and used to be drawn with a **Google Pay**
+   * logo. A wallet glyph in the brand's own colour says what it is and claims
+   * nothing that is not true.
+   */
+  if (art === 'zaincash') {
     return (
-      <span className="relative grid h-6 w-10 place-items-center overflow-hidden rounded bg-white ring-1 ring-slate-100">
-        <img src="/accounting/gpay-g.svg" alt="" className="absolute left-1 top-1 h-3.5 w-3.5" />
-        <img src="/accounting/gpay-text.svg" alt="" className="absolute right-1 top-1.5 h-3 w-5" />
+      <span className="grid h-6 w-10 place-items-center rounded bg-violet-50 ring-1 ring-violet-100">
+        <Wallet className="h-3.5 w-3.5 text-violet-600" strokeWidth={2.5} />
       </span>
     );
   }
 
-  if (brand === 'mastercard') {
+  if (art === 'qicard') {
     return (
-      <span className="relative flex h-6 w-10 items-center justify-center overflow-hidden rounded bg-white ring-1 ring-slate-100">
-        <img src="/accounting/mastercard.svg" alt="" className="h-4 w-7" />
+      <span className="grid h-6 w-10 place-items-center rounded bg-amber-50 ring-1 ring-amber-100">
+        <CreditCard className="h-3.5 w-3.5 text-amber-600" strokeWidth={2.5} />
       </span>
     );
   }
 
+  // A card whose network nobody reported.
   return (
-    <span className="relative flex h-6 w-10 items-center justify-center overflow-hidden rounded bg-white ring-1 ring-slate-100">
-      <img src="/accounting/visa.svg" alt="" className="h-3 w-7" />
+    <span className="grid h-6 w-10 place-items-center rounded bg-slate-50 ring-1 ring-slate-200">
+      <CreditCard className="h-3.5 w-3.5 text-slate-400" strokeWidth={2.5} />
     </span>
   );
 };
 
-const getMethodKey = (transaction: AccountingTransaction): 'bank' | 'card' | 'electronic' => {
-  const raw = `${transaction.method || ''} ${transaction.provider || ''}`.toUpperCase();
-  if (raw.includes('MANUAL') || raw.includes('BANK')) return 'bank';
-  if (raw.includes('ZAIN')) return 'electronic';
-  if (raw.includes('QI_CARD') || raw.includes('CARD')) return 'card';
-  if (transaction.type === 'SUBSCRIPTION' && !transaction.provider) return 'bank';
-  return 'card';
-};
-
-const getCardBrand = (transaction: AccountingTransaction, methodKey: 'bank' | 'card' | 'electronic'): CardBrand => {
-  if (methodKey === 'bank') return 'bank';
-  if (methodKey === 'electronic') return 'gpay';
-
-  const raw = `${transaction.method || ''} ${transaction.provider || ''}`.toLowerCase();
-  if (raw.includes('master')) return 'mastercard';
-  if (raw.includes('visa')) return 'visa';
-  if (raw.includes('google') || raw.includes('gpay') || raw.includes('zain')) return 'gpay';
-
-  const hash = [...String(transaction.id)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return hash % 2 === 0 ? 'mastercard' : 'visa';
-};
-
-const getMethodMeta = (transaction: AccountingTransaction) => {
-  const provider = (transaction.provider || transaction.method || '').toUpperCase();
-  if (provider === 'QI_CARD') {
-    return { key: 'card' as const, label: 'كي كارد', brand: getCardBrand(transaction, 'card') };
-  }
-  if (provider === 'ZAIN_CASH') {
-    return { key: 'electronic' as const, label: 'زين كاش', brand: getCardBrand(transaction, 'electronic') };
-  }
-  if (provider === 'MANUAL' || (!transaction.provider && transaction.type === 'SUBSCRIPTION')) {
-    return { key: 'bank' as const, label: 'تحويل بنكي', brand: 'bank' as const };
-  }
-  const key = getMethodKey(transaction);
-  const labels = {
-    bank: 'تحويل بنكي',
-    card: 'بطاقة ائتمانية',
-    electronic: 'دفع إلكتروني',
-  } as const;
-  return { key, label: labels[key], brand: getCardBrand(transaction, key) };
-};
-
+/**
+ * What the row is for, in words.
+ *
+ * It used to prefix a number taken from the last two digits of the row's uuid
+ * — `String(id).replace(/\D/g,'').slice(-2) || '01'` — which is not an
+ * identifier: two rows showing «أشتراك #01» is the normal case, and an
+ * operator reading a support ticket cannot use it to find anything. The table
+ * already numbers its rows for the eye, and the real id is in the drawer, so
+ * the label says what was bought and nothing it cannot back up.
+ */
 const getTransactionLabel = (transaction: AccountingTransaction) => {
-  const digits = String(transaction.id).replace(/\D/g, '').slice(-2) || '01';
   const kind =
     transaction.type === 'SUBSCRIPTION'
       ? 'أشتراك'
@@ -706,7 +839,7 @@ const getTransactionLabel = (transaction: AccountingTransaction) => {
                 ? 'اشتراك'
                 : 'دفعة';
   const planName = transaction.plan?.name ? ` — ${transaction.plan.name}` : '';
-  return `${kind} #${digits}${planName}`;
+  return `${kind}${planName}`;
 };
 
 const getStatusMeta = (status: string) => {

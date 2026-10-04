@@ -39,6 +39,18 @@ export interface AccountingTransaction {
     name: string;
   } | null;
   provider?: string | null;
+  /**
+   * `bank | card | wallet`, decided by the server.
+   *
+   * Optional only so a client built against a newer server than it is talking
+   * to does not crash; `describePaymentMethod` falls back to `bank`. The page
+   * must not re-derive this — `method` and `provider` carry the *same* value,
+   * so sniffing them was one signal counted twice.
+   */
+  methodCategory?: 'bank' | 'card' | 'wallet';
+  /** The card network the gateway reported. `null` when it reported none. */
+  paymentSystem?: string | null;
+  maskedPan?: string | null;
   refundedAmount?: number;
   canRefund?: boolean;
 }
@@ -58,11 +70,22 @@ export interface AccountingTransactionsParams {
   status?: string;
   from?: string;
   to?: string;
+  /**
+   * Sent to the server, not applied here.
+   *
+   * These two used to be filtered on the client, over the one page it was
+   * holding, while `total` and the pager counted the unfiltered table — so a
+   * filter emptied page one and still offered five more.
+   */
+  method?: 'bank' | 'card' | 'wallet' | '';
+  amount?: string;
 }
 
 export interface AccountingStats {
   totalRevenue: number;
   pendingAmount: number;
+  /** Counted over the whole table by the server, not over the current page. */
+  pendingTransactions: number;
   monthlyTransactions: number;
   averageTransaction: number;
 }
@@ -91,6 +114,7 @@ export const accountingService = {
     return response as unknown as AccountingStats;
   },
 
+  /** Takes the same filters as the list, so the file matches the view. */
   exportTransactions: async (
     format: AccountingExportFormat,
     params?: Omit<AccountingTransactionsParams, 'page' | 'limit'>,

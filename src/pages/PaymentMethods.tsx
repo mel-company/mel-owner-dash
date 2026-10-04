@@ -45,6 +45,40 @@ const defaultProviderForm: CreatePaymentProviderRequest = {
   type: 'ONLINE',
 };
 
+/**
+ * The server's own words, when it sent any.
+ *
+ * Every refusal on this page is one an operator can act on — a provider that
+ * cannot be switched on because `QICARD_TERMINAL_ID` is unset, a method whose
+ * provider the platform has withdrawn — and the response carries which. One
+ * function so the create path and the toggle path cannot come to disagree
+ * about whether to show it; they already had, and the create path was the one
+ * that threw it away.
+ *
+ * Axios puts it at `response.data.message`; this project's interceptor
+ * sometimes unwraps to `data.message`. Nest sends an array for a validation
+ * failure, so that case is joined rather than rendered as `[object Object]`.
+ */
+const serverMessage = (error: unknown, fallback: string): string => {
+  const candidate = error as {
+    response?: { data?: { message?: unknown } };
+    data?: { message?: unknown };
+    message?: unknown;
+  };
+
+  const raw =
+    candidate?.response?.data?.message ??
+    candidate?.data?.message ??
+    candidate?.message;
+
+  if (Array.isArray(raw)) {
+    const joined = raw.filter((item) => typeof item === 'string').join('، ');
+    return joined || fallback;
+  }
+
+  return typeof raw === 'string' && raw.trim() ? raw : fallback;
+};
+
 const PaymentMethods = () => {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [providers, setProviders] = useState<PaymentProvider[]>([]);
@@ -153,7 +187,17 @@ const PaymentMethods = () => {
       closeDrawer();
       fetchData();
     } catch (err) {
-      setError('فشل في حفظ بيانات الدفع.');
+      /**
+       * The same extraction `toggleProvider` does, for the same reason.
+       *
+       * Creating a provider is gated on its gateway being configured, exactly
+       * as switching one on is — `create` defaults `isActive` to true, so it
+       * was the door beside the guarded one. The server names the missing
+       * environment variables in its refusal; a generic "something went
+       * wrong" here would send the operator to the logs for an answer the
+       * response already carried, and the drawer would look simply broken.
+       */
+      setError(serverMessage(err, 'فشل في حفظ بيانات الدفع.'));
       console.error('Error saving payment data:', err);
     }
   };
@@ -176,20 +220,14 @@ const PaymentMethods = () => {
       });
       setDeactivateTarget(null);
       fetchData();
-    } catch (err: any) {
+    } catch (err) {
       /**
        * The server refuses an activation it cannot honour and says exactly
        * which environment variables are missing. Swallowing that for a
        * generic "something went wrong" would send the operator to the logs
        * for an answer the response already carried.
        */
-      const message =
-        err?.response?.data?.message ?? err?.data?.message ?? err?.message;
-      setError(
-        typeof message === 'string' && message
-          ? message
-          : 'تعذر تغيير حالة المزود.',
-      );
+      setError(serverMessage(err, 'تعذر تغيير حالة المزود.'));
       console.error('Error toggling payment provider:', err);
     }
   };
