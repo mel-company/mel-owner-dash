@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
@@ -495,8 +495,26 @@ export const SelectField = ({ label, value, options, onChange, required }: { lab
   </div>
 );
 
-export const StatusPill = ({ children, tone = 'slate' }: { children: ReactNode; tone?: 'slate' | 'green' | 'red' | 'blue' | 'violet' | 'amber' }) => {
-  const tones = {
+export type StatusTone = 'slate' | 'green' | 'red' | 'blue' | 'violet' | 'amber';
+
+/**
+ * `dot` adds a filled circle before the label, in the tone's own colour.
+ *
+ * Optional and off by default, so every existing pill is unchanged. It exists
+ * because the gateways table had grown a private copy of this component for
+ * no reason other than the dot — which is a bad trade: a second pill that
+ * drifts from this one the next time the palette moves, to carry six pixels.
+ */
+export const StatusPill = ({
+  children,
+  tone = 'slate',
+  dot = false,
+}: {
+  children: ReactNode;
+  tone?: StatusTone;
+  dot?: boolean;
+}) => {
+  const tones: Record<StatusTone, string> = {
     slate: 'border-transparent bg-slate-100 text-slate-600',
     green: 'border-transparent bg-emerald-50 text-emerald-600',
     red: 'border-transparent bg-red-50 text-red-500',
@@ -504,12 +522,145 @@ export const StatusPill = ({ children, tone = 'slate' }: { children: ReactNode; 
     violet: 'border-transparent bg-violet-50 text-violet-600',
     amber: 'border-transparent bg-orange-50 text-orange-500',
   };
+  const dots: Record<StatusTone, string> = {
+    slate: 'bg-slate-400',
+    green: 'bg-emerald-500',
+    red: 'bg-red-500',
+    blue: 'bg-blue-500',
+    violet: 'bg-violet-500',
+    amber: 'bg-orange-500',
+  };
+
   return (
     <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs font-black', tones[tone])}>
+      {dot && <span className={cn('me-1.5 h-1.5 w-1.5 rounded-full', dots[tone])} />}
       {children}
     </Badge>
   );
 };
+
+/**
+ * The on/off control, in the two shapes this dashboard uses.
+ *
+ * Both lived as private copies in the pages: `StatusToggle` was defined
+ * verbatim in `PaymentMethods.tsx` *and* `Employees.tsx`, and the gateways
+ * table had a third, switch-shaped one of its own. Three controls for one
+ * idea, none of them reachable from anywhere else, and none of them
+ * announcing itself to a screen reader as anything but an unlabelled button.
+ *
+ * Which to use:
+ *
+ * - `StatusToggle` names the state in words — مفعل / معطل — and is right in a
+ *   dense table where the label is the only thing carrying the meaning.
+ * - `StatusSwitch` is the plain track-and-knob. Use it where a row already
+ *   says the state another way (a status pill beside it), so the words would
+ *   be said twice.
+ *
+ * Both are real `role="switch"` buttons with `aria-checked`, so the control
+ * reads as a switch rather than as a button of unknown effect. `label` is
+ * required on the switch for that reason: it has no text of its own.
+ */
+export const StatusToggle = ({
+  active,
+  onClick,
+  title,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title?: string;
+  label?: string;
+}) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={active}
+    aria-label={label}
+    onClick={onClick}
+    title={title}
+    className={cn(
+      'inline-flex h-9 min-w-[92px] items-center rounded-full px-1 text-xs font-black transition',
+      active
+        ? 'justify-start bg-emerald-100 text-emerald-600'
+        : 'justify-end bg-orange-100 text-orange-500',
+    )}
+  >
+    <span className="grid h-7 place-items-center rounded-full bg-white px-3 shadow">
+      {active ? 'مفعل' : 'معطل'}
+    </span>
+  </button>
+);
+
+export const StatusSwitch = ({
+  active,
+  onClick,
+  label,
+  disabled,
+}: {
+  active: boolean;
+  onClick: () => void;
+  /** Required: the control carries no text, so this is its whole name. */
+  label: string;
+  disabled?: boolean;
+}) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={active}
+    aria-label={label}
+    disabled={disabled}
+    onClick={onClick}
+    className={cn(
+      'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition',
+      active ? 'bg-emerald-500' : 'bg-slate-200',
+      disabled && 'cursor-not-allowed opacity-60',
+    )}
+  >
+    <span
+      className={cn(
+        'absolute h-5 w-5 rounded-full bg-white shadow transition-all',
+        // RTL: "on" sits at the leading (right) edge.
+        active ? 'right-1' : 'right-6',
+      )}
+    />
+  </button>
+);
+
+/**
+ * Row actions, with names a screen reader can tell apart.
+ *
+ * `subject` is appended to each label — «تعديل زين كاش» rather than a column
+ * of identical «تعديل» buttons, which is what a non-visual reader otherwise
+ * gets on a table of twenty rows.
+ */
+export const ActionButtons = ({
+  onEdit,
+  onDelete,
+  subject,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+  subject?: string;
+}) => (
+  <div className="flex items-center gap-3">
+    <button
+      type="button"
+      onClick={onDelete}
+      className="text-red-400 transition hover:text-red-600"
+      aria-label={subject ? `حذف ${subject}` : 'حذف'}
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+    <button
+      type="button"
+      onClick={onEdit}
+      className="text-slate-400 transition hover:text-blue-500"
+      aria-label={subject ? `تعديل ${subject}` : 'تعديل'}
+    >
+      <Pencil className="h-4 w-4" />
+    </button>
+  </div>
+);
 
 export const LoadingState = () => (
   <div className="page-shell space-y-4 bg-[#f8fafc] text-right" dir="rtl">

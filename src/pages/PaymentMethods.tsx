@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CheckCircle2, CreditCard, Database, Landmark, Pencil, Plus, Settings2, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, CreditCard, Database, Landmark, Plus, Settings2, XCircle } from 'lucide-react';
 import {
+  ActionButtons,
   AlertMessage,
   ConfirmDeleteModal,
   DrawerFooter,
@@ -15,6 +16,7 @@ import {
   SideDrawer,
   StatCard,
   StatusPill,
+  StatusToggle,
   TableShell,
   TextAreaField,
 } from '@/components/dashboard';
@@ -627,32 +629,6 @@ const PaymentMethods = () => {
  * The same control `Employees.tsx` uses, so an operator meets one idiom for
  * "this row is on" across the dashboard.
  */
-const StatusToggle = ({
-  active,
-  onClick,
-  title,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title?: string;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    title={title}
-    className={[
-      'inline-flex h-9 min-w-[92px] items-center rounded-full px-1 text-xs font-black transition',
-      active
-        ? 'justify-start bg-emerald-100 text-emerald-600'
-        : 'justify-end bg-orange-100 text-orange-500',
-    ].join(' ')}
-  >
-    <span className="grid h-7 place-items-center rounded-full bg-white px-3 shadow">
-      {active ? 'مفعل' : 'معطل'}
-    </span>
-  </button>
-);
-
 const providerOf = (method: PaymentMethod, providers: PaymentProvider[]) =>
   method.provider ?? providers.find((p) => p.id === method.providerId);
 
@@ -685,20 +661,13 @@ const MethodsTable = ({ rows, providers, onEdit, onDelete, onToggle }: { rows: P
               <StatusToggle active={!!method.isActive} onClick={() => onToggle(method)} />
             )}
           </td>
-          <td className="px-5 py-4"><ActionButtons onEdit={() => onEdit(method)} onDelete={() => onDelete(method)} /></td>
+          <td className="px-5 py-4"><ActionButtons onEdit={() => onEdit(method)} onDelete={() => onDelete(method)} subject={method.name} /></td>
         </tr>
       ))}
     </tbody>
   </table>
 );
 
-
-const ActionButtons = ({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) => (
-  <div className="flex items-center gap-3">
-    <button onClick={onDelete} className="text-red-400 transition hover:text-red-600" aria-label="حذف"><Trash2 className="h-4 w-4" /></button>
-    <button onClick={onEdit} className="text-slate-400 transition hover:text-blue-500" aria-label="تعديل"><Pencil className="h-4 w-4" /></button>
-  </div>
-);
 
 const tabClass = (active: boolean) => active
   ? 'rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white'

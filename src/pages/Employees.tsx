@@ -13,6 +13,7 @@ import {
   SideDrawer,
   StatCard,
   StatusPill,
+  StatusToggle,
   TableShell,
 } from '@/components/dashboard';
 import { cn } from '@/lib/utils';
@@ -656,21 +657,6 @@ const RoleCount = ({ label, value, className }: { label: string; value: number; 
     <span className={cn('text-xs font-bold', className)}>{label}</span>
     <span>{value}</span>
   </div>
-);
-
-const StatusToggle = ({ active, onClick }: { active: boolean; onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      'inline-flex h-9 min-w-[92px] items-center rounded-full px-1 text-xs font-black transition',
-      active ? 'justify-start bg-emerald-100 text-emerald-600' : 'justify-end bg-orange-100 text-orange-500',
-    )}
-  >
-    <span className="grid h-7 place-items-center rounded-full bg-white px-3 shadow">
-      {active ? 'مفعل' : 'معطل'}
-    </span>
-  </button>
 );
 
 const ConfirmNameModal = ({

@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { Activity, Check, Pencil, Trash2, X } from 'lucide-react';
+import { Activity, Check, X } from 'lucide-react';
+import {
+  ActionButtons,
+  StatusPill,
+  StatusSwitch,
+} from '@/components/dashboard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -108,51 +113,6 @@ const Sparkline = ({
   );
 };
 
-const StatusPill = ({ provider }: { provider: PaymentProvider }) => {
-  const meta = gatewayStatus(provider);
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold',
-        meta.pill,
-      )}
-    >
-      <span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} />
-      {meta.label}
-    </span>
-  );
-};
-
-const Toggle = ({
-  on,
-  onClick,
-  label,
-}: {
-  on: boolean;
-  onClick: () => void;
-  label: string;
-}) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={on}
-    aria-label={label}
-    onClick={onClick}
-    className={cn(
-      'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition',
-      on ? 'bg-emerald-500' : 'bg-slate-200',
-    )}
-  >
-    <span
-      className={cn(
-        'absolute h-5 w-5 rounded-full bg-white shadow transition-all',
-        // RTL: "on" sits at the leading (right) edge.
-        on ? 'right-1' : 'right-6',
-      )}
-    />
-  </button>
-);
-
 export type GatewayRowAction = {
   onToggle: (provider: PaymentProvider) => void;
   onEdit: (provider: PaymentProvider) => void;
@@ -215,7 +175,9 @@ export const GatewaysTable = ({
             </td>
 
             <td className="px-5 py-4">
-              <StatusPill provider={provider} />
+              <StatusPill tone={gatewayStatus(provider).tone} dot>
+                {gatewayStatus(provider).label}
+              </StatusPill>
             </td>
 
             <td className="px-5 py-4">
@@ -274,36 +236,19 @@ export const GatewaysTable = ({
             </td>
 
             <td className="px-5 py-4">
-              <Toggle
-                on={!!provider.isActive}
+              <StatusSwitch
+                active={!!provider.isActive}
                 onClick={() => actions.onToggle(provider)}
                 label={`تفعيل ${provider.name}`}
               />
             </td>
 
             <td className="px-5 py-4">
-              <span className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`تعديل ${provider.name}`}
-                  onClick={() => actions.onEdit(provider)}
-                  className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`حذف ${provider.name}`}
-                  onClick={() => actions.onDelete(provider)}
-                  className="h-8 w-8 rounded-lg text-slate-400 hover:text-rose-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </span>
+              <ActionButtons
+                onEdit={() => actions.onEdit(provider)}
+                onDelete={() => actions.onDelete(provider)}
+                subject={provider.name}
+              />
             </td>
           </tr>
         );
@@ -377,20 +322,14 @@ export const GatewayDetailPanel = ({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          <Toggle
-            on={!!provider.isActive}
+          <StatusSwitch
+            active={!!provider.isActive}
             onClick={onToggle}
             label={`تفعيل ${provider.name}`}
           />
-          <span
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold',
-              status.pill,
-            )}
-          >
-            <span className={cn('h-1.5 w-1.5 rounded-full', status.dot)} />
+          <StatusPill tone={status.tone} dot>
             {status.label}
-          </span>
+          </StatusPill>
         </div>
       </div>
 
@@ -460,10 +399,11 @@ export const GatewayDetailPanel = ({
                   </div>
                 </div>
                 {editable ? (
-                  <Toggle
-                    on={enabled}
+                  <StatusSwitch
+                    active={enabled}
                     onClick={() => onSurfaceToggle?.(entry.surface, !enabled)}
                     label={`${entry.label} — ${provider.name}`}
+                    disabled={saving}
                   />
                 ) : (
                   // A provider with no integration behind it has no gateway to

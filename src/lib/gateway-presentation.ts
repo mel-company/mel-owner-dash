@@ -1,3 +1,4 @@
+import type { StatusTone } from '@/components/dashboard';
 import type { GatewayActivity } from '@/services/paymentGatewaysService';
 import type { PaymentProvider } from '@/services/paymentProviderService';
 
@@ -28,27 +29,21 @@ export type GatewayStatus = 'active' | 'needs-setup' | 'disabled';
 export type GatewayStatusMeta = {
   status: GatewayStatus;
   label: string;
-  /** Tailwind classes for the pill. */
-  pill: string;
-  dot: string;
+  /**
+   * The shared `StatusPill`'s own vocabulary, not raw Tailwind.
+   *
+   * This used to hand back class strings, which is what made the gateways
+   * table grow a private pill component: once a module is emitting colours,
+   * the component that renders them has to be the one that understands them.
+   * Naming a tone instead lets the shared pill stay the only pill.
+   */
+  tone: StatusTone;
 };
 
 const STATUS_META: Record<GatewayStatus, Omit<GatewayStatusMeta, 'status'>> = {
-  active: {
-    label: 'مفعلة',
-    pill: 'bg-emerald-50 text-emerald-700',
-    dot: 'bg-emerald-500',
-  },
-  'needs-setup': {
-    label: 'تحتاج إعداد',
-    pill: 'bg-amber-50 text-amber-700',
-    dot: 'bg-amber-500',
-  },
-  disabled: {
-    label: 'معطلة',
-    pill: 'bg-slate-100 text-slate-600',
-    dot: 'bg-slate-400',
-  },
+  active: { label: 'مفعلة', tone: 'green' },
+  'needs-setup': { label: 'تحتاج إعداد', tone: 'amber' },
+  disabled: { label: 'معطلة', tone: 'slate' },
 };
 
 /**
