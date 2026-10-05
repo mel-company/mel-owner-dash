@@ -11,7 +11,7 @@ import {
   Truck,
   XCircle,
 } from 'lucide-react';
-import { SideDrawer, StatusPill } from './index';
+import { SideDrawer, StatTile, StatusPill } from './index';
 import { CourierLogo } from './CourierLogo';
 import {
   courierService,
@@ -87,31 +87,6 @@ const sinceLabel = (iso: string | null): string => {
 /** A share of parcels, or a dash when there is nothing to take a share of. */
 const share = (part: number, whole: number): string =>
   whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : '—';
-
-const StatTile = ({
-  label,
-  value,
-  hint,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone: string;
-  icon: React.ReactNode;
-}) => (
-  <div className="flex items-start justify-between gap-3 px-4 py-3">
-    <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${tone}`}>
-      {icon}
-    </span>
-    <div className="min-w-0 text-right">
-      <p className="text-xs font-bold text-slate-400">{label}</p>
-      <p className="mt-0.5 text-xl font-black text-slate-950">{value}</p>
-      {hint && <p className="text-[11px] font-bold text-slate-400">{hint}</p>}
-    </div>
-  </div>
-);
 
 export const CourierDetailDrawer = ({
   courier,

@@ -2,18 +2,15 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type FormEvent,
 } from 'react';
-import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   Check,
   ChevronLeft,
   ChevronRight,
   MapPinned,
-  MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
@@ -25,8 +22,10 @@ import {
   DrawerFooter,
   FormField,
   LoadingState,
+  MenuItem,
   PageHeader,
   PrimaryActionButton,
+  RowMenu,
   SearchFiltersBar,
   SelectField,
   SideDrawer,
@@ -161,154 +160,6 @@ const syncTone = (iso: string | null | undefined): string => {
 };
 
 /** The ••• menu, closed by a click anywhere else. */
-/**
- * The ••• menu, rendered into `document.body`.
- *
- * **A portal, not a `z-index`.** The obvious fix for a dropdown hidden behind
- * the table is to raise its stacking order, and it cannot work here: this menu
- * lives inside `TableShell`, whose card is `overflow-hidden` and whose body is
- * `overflow-x-auto`, and no `z-index` lets a child escape an overflow
- * ancestor — it is clipped, not covered. Raising the number moves nothing,
- * which is exactly why it reads as a z-index fight.
- *
- * So the menu is positioned `fixed` against the trigger's own rectangle and
- * mounted outside the table entirely. That brings two things the absolute
- * version got for free and now has to handle: it does not move when anything
- * scrolls, so any scroll closes it; and it would hang off the bottom of the
- * window on the last row, so it flips above the trigger when there is no room
- * below.
- */
-const MENU_WIDTH = 192;
-const MENU_GAP = 8;
-
-const RowMenu = ({ children }: { children: (close: () => void) => React.ReactNode }) => {
-  const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<DOMRect | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  /**
-   * Measure and place in the ref callback, not an effect.
-   *
-   * The flip has to know the menu's height, and that depends on how many items
-   * the row offers — a company with no integration has one fewer — so a
-   * guessed height would misplace it for some rows and not others. Measuring
-   * in an effect and storing the answer in state would re-render to move it;
-   * a ref callback runs during commit, before the browser paints, so the menu
-   * is only ever drawn once and in the right place.
-   */
-  const placeMenu = useCallback(
-    (node: HTMLDivElement | null) => {
-      menuRef.current = node;
-      if (!node || !anchor) return;
-
-      const flipUp =
-        anchor.bottom + MENU_GAP + node.offsetHeight > window.innerHeight;
-
-      node.style.top = flipUp ? '' : `${anchor.bottom + MENU_GAP}px`;
-      node.style.bottom = flipUp
-        ? `${window.innerHeight - anchor.top + MENU_GAP}px`
-        : '';
-    },
-    [anchor],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-
-    const close = () => setOpen(false);
-    const onDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target)) return;
-      if (triggerRef.current?.contains(target)) return;
-      close();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close();
-    };
-
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    // Capture, so the table's own horizontal scroll closes it too — a fixed
-    // menu would otherwise sit still while the row it belongs to slides away.
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
-    };
-  }, [open]);
-
-  const toggle = () => {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    setAnchor(triggerRef.current?.getBoundingClientRect() ?? null);
-    setOpen(true);
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        ref={triggerRef}
-        onClick={toggle}
-        className="grid size-9 place-items-center rounded-xl border border-slate-100 text-slate-400 transition-all duration-150 hover:bg-slate-50 hover:text-slate-600 active:scale-90"
-      >
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
-
-      {open &&
-        anchor &&
-        createPortal(
-          <div
-            ref={placeMenu}
-            dir="rtl"
-            className="fixed z-[9998] w-48 overflow-hidden rounded-2xl bg-white py-1.5 shadow-lg ring-1 ring-slate-100 animate-in fade-in zoom-in-95 duration-150"
-            style={{
-              // Below the trigger to begin with; `placeMenu` moves it above
-              // when there is no room, before this is ever painted.
-              top: anchor.bottom + MENU_GAP,
-              // The trigger sits at the row's left edge in RTL, so the menu
-              // hangs from the same edge; clamped so it cannot leave the window.
-              left: Math.max(MENU_GAP, Math.min(anchor.left, window.innerWidth - MENU_WIDTH - MENU_GAP)),
-            }}
-          >
-            {children(() => setOpen(false))}
-          </div>,
-          document.body,
-        )}
-    </>
-  );
-};
-
-const MenuItem = ({
-  icon,
-  label,
-  onClick,
-  tone,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  tone?: 'danger';
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-right text-sm font-bold transition-colors duration-150 hover:bg-slate-50 ${
-      tone === 'danger' ? 'text-red-600' : 'text-slate-600'
-    }`}
-  >
-    {icon}
-    {label}
-  </button>
-);
-
 const DeliveryCompanies = () => {
   const [companies, setCompanies] = useState<DeliveryCompany[]>([]);
   const [health, setHealth] = useState<CourierHealth[]>([]);

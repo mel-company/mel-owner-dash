@@ -1,5 +1,8 @@
 import type { StatusTone } from '@/components/dashboard';
-import type { GatewayActivity } from '@/services/paymentGatewaysService';
+import type {
+  GatewayActivity,
+  PaymentSurface,
+} from '@/services/paymentGatewaysService';
 import type { PaymentProvider } from '@/services/paymentProviderService';
 
 /**
@@ -66,42 +69,68 @@ export function gatewayStatus(provider: PaymentProvider): GatewayStatusMeta {
   return { status, ...STATUS_META[status] };
 }
 
-export type GatewayUsage = {
-  key: 'storeCheckout' | 'platformBilling';
+/** Which lucide glyph stands for a surface. Named, not imported — this module stays React-free. */
+export type SurfaceIcon = 'store' | 'users';
+
+export type GatewaySurface = {
+  /** The code the settings route writes. */
+  surface: PaymentSurface;
+  /** The matching counter on `GatewayActivity.surfaces`. */
+  counter: keyof GatewayActivity['surfaces'];
   label: string;
-  /** Tailwind classes for the chip. */
+  /** One line under the label, in the drawer's cards. */
+  hint: string;
+  /** Tailwind classes for the table's chip. */
   chip: string;
-  transactions: number;
+  icon: SurfaceIcon;
 };
 
 /**
- * Where a gateway has actually been used.
+ * The two places the platform can open a payment, described once.
  *
- * Derived from recorded traffic rather than drawn as editable checkboxes,
- * because there is no per-gateway surface setting to edit: platform billing
- * follows `PLATFORM_PAYMENT_PROVIDER` and store checkout follows the
- * catalogue. Checkboxes that write nowhere are worse than a read-only answer
- * — they invite an operator to change something and then silently discard it.
+ * The table's chips, the drawer's switches and the usage filter are three
+ * views of this list, and they each used to carry their own copy of the
+ * labels — the drawer's inline array said «واجهة التاجر» while the chip said
+ * the same thing from a different literal, which is a rename away from a page
+ * that calls one surface two names. There is no third entry: the server's
+ * `PAYMENT_SURFACES` has exactly these two, and a control for a surface the
+ * settings route would reject is a switch that writes nowhere.
+ */
+export const GATEWAY_SURFACES: readonly GatewaySurface[] = [
+  {
+    surface: 'STORE_CHECKOUT',
+    counter: 'storeCheckout',
+    label: 'واجهة التاجر',
+    hint: 'دفع المنتجات والخدمات في المتجر',
+    chip: 'bg-violet-50 text-violet-700',
+    icon: 'store',
+  },
+  {
+    surface: 'PLATFORM_BILLING',
+    counter: 'platformBilling',
+    label: 'اشتراكات العملاء',
+    hint: 'الخطط الشهرية والسنوية',
+    chip: 'bg-sky-50 text-sky-700',
+    icon: 'users',
+  },
+];
+
+export type GatewayUsage = GatewaySurface & { transactions: number };
+
+/**
+ * Where a gateway has actually been used — recorded traffic, not permission.
+ *
+ * The drawer's switches answer the neighbouring question (where it *may* be
+ * used) and are backed by `PaymentGatewaySetting`. These chips are the
+ * ledger's answer, so a gateway switched on everywhere and used nowhere still
+ * shows nothing here, which is the state worth seeing.
  */
 export function gatewayUsage(activity?: GatewayActivity | null): GatewayUsage[] {
   if (!activity) return [];
-
-  const usages: GatewayUsage[] = [
-    {
-      key: 'storeCheckout',
-      label: 'واجهة التاجر',
-      chip: 'bg-violet-50 text-violet-700',
-      transactions: activity.surfaces.storeCheckout,
-    },
-    {
-      key: 'platformBilling',
-      label: 'اشتراكات العملاء',
-      chip: 'bg-sky-50 text-sky-700',
-      transactions: activity.surfaces.platformBilling,
-    },
-  ];
-
-  return usages.filter((usage) => usage.transactions > 0);
+  return GATEWAY_SURFACES.map((surface) => ({
+    ...surface,
+    transactions: activity.surfaces[surface.counter] ?? 0,
+  })).filter((usage) => usage.transactions > 0);
 }
 
 /**
@@ -157,3 +186,36 @@ export function sparklineBars(activity?: GatewayActivity | null): number[] {
 
 /** `2,480,000` — grouped, never rounded into a lie. */
 export const formatIqd = (amount: number): string => amount.toLocaleString('en-US');
+
+/**
+ * The 30-day window as a chart reads it: one bar per day, labelled.
+ *
+ * Returns `[]` when the window carried nothing, so the caller draws its empty
+ * state instead of an axis over a flat row of zeroes — a chart with no bars
+ * reads as broken rather than as quiet.
+ *
+ * `ar-IQ-u-nu-latn` is the dashboard's date idiom (`CourierDetailDrawer` uses
+ * it for the same axis): Iraqi month names, Latin digits, matching the Latin
+ * digits every other figure on this page is grouped with.
+ */
+export type GatewayChartPoint = { label: string; transactions: number };
+
+export function chartPoints(
+  activity?: GatewayActivity | null,
+): GatewayChartPoint[] {
+  const series = activity?.window.series ?? [];
+  if (!series.some((point) => point.transactions > 0)) return [];
+
+  return series.map((point) => {
+    const parsed = new Date(point.date);
+    return {
+      label: Number.isNaN(parsed.getTime())
+        ? point.date
+        : parsed.toLocaleDateString('ar-IQ-u-nu-latn', {
+            day: 'numeric',
+            month: 'short',
+          }),
+      transactions: point.transactions,
+    };
+  });
+}

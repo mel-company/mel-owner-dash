@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, MoreVertical, Pencil, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
@@ -119,6 +119,77 @@ export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { tit
         </div>
       </CardContent>
     </Card>
+  );
+};
+
+/**
+ * A labelled figure with its own icon — the drawer counterpart to `StatCard`.
+ *
+ * Denser and flatter than the card, because a drawer puts three or four of
+ * these in a row beside a chart. It was written privately inside
+ * `CourierDetailDrawer`, and the gateways drawer needed the same three-up row
+ * of figures; a second copy is how two panels that should look identical stop
+ * looking identical the next time one of them is touched.
+ *
+ * `hint` is a caption, not a growth badge. There is no delta here on purpose:
+ * neither the courier stats route nor the gateway activity route returns a
+ * previous period, and a figure the server did not send must not be drawn.
+ */
+export const StatTile = ({
+  label,
+  value,
+  hint,
+  tone,
+  icon,
+  layout = 'row',
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  /** Tailwind background + foreground for the icon chip, e.g. `bg-sky-50 text-sky-600`. */
+  tone: string;
+  icon: ReactNode;
+  /**
+   * `row` puts the icon beside the figure and `stack` puts it underneath.
+   *
+   * Not decoration: the row shares its width with the icon, which is fine for
+   * a count and not for money. `2,480,000 د.ع` in a third of a 512px drawer
+   * has about 75px to live in beside a 36px chip, and it shipped reading
+   * «...,000» — a truncated figure that still looks like a figure, which is
+   * the worst way for a number to be wrong.
+   */
+  layout?: 'row' | 'stack';
+}) => {
+  const chip = (
+    <span className={cn('grid size-9 shrink-0 place-items-center rounded-xl', tone)}>
+      {icon}
+    </span>
+  );
+
+  if (layout === 'stack') {
+    return (
+      // `h-full` + `mt-auto` so the chips share a baseline across a row of
+      // tiles whether or not each one carries a hint line.
+      <div className="flex h-full flex-col px-3 py-3 text-right">
+        <p className="text-[11px] font-bold text-slate-400">{label}</p>
+        <p className="mt-0.5 text-lg font-black leading-tight text-slate-950">
+          {value}
+        </p>
+        {hint && <p className="text-[11px] font-bold text-slate-400">{hint}</p>}
+        <div className="mt-auto flex justify-start pt-2">{chip}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-3 px-4 py-3">
+      {chip}
+      <div className="min-w-0 text-right">
+        <p className="text-xs font-bold text-slate-400">{label}</p>
+        <p className="mt-0.5 truncate text-xl font-black text-slate-950">{value}</p>
+        {hint && <p className="text-[11px] font-bold text-slate-400">{hint}</p>}
+      </div>
+    </div>
   );
 };
 
@@ -660,6 +731,179 @@ export const ActionButtons = ({
       <Pencil className="h-4 w-4" />
     </button>
   </div>
+);
+
+/**
+ * The row's overflow menu — «⋮» and a portalled list of actions.
+ *
+ * Use it where `ActionButtons` runs out of room: more than two actions, or an
+ * action that is not edit/delete. It lived privately in `DeliveryCompanies`
+ * and the gateways table needed the same control, which is the moment a
+ * private copy becomes two controls for one idea.
+ *
+ * **Portalled, and that is the whole difficulty.** The menu is mounted on
+ * `document.body` rather than inside the row, because `TableShell`'s card is
+ * `overflow-hidden` and its body is `overflow-x-auto`: a menu positioned
+ * inside the table is *clipped* by those boundaries, not merely covered, so
+ * no `z-index` rescues it. The case that breaks is the easy one to miss —
+ * filter down to one row and the card is shorter than the menu, which then
+ * loses its last item.
+ *
+ * Being `fixed` brings two things the absolute version got for free: it does
+ * not move when anything scrolls, so any scroll closes it; and it would hang
+ * off the bottom of the window on the last row, so it flips above the trigger
+ * when there is no room below.
+ */
+const MENU_WIDTH = 192;
+const MENU_GAP = 8;
+
+export const RowMenu = ({
+  children,
+  label,
+}: {
+  children: (close: () => void) => ReactNode;
+  /** Names the trigger — a column of identical «⋮» buttons otherwise. */
+  label?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Measure and place in the ref callback, not an effect.
+   *
+   * The flip has to know the menu's height, and that depends on how many
+   * items the row offers — a provider with no integration behind it has one
+   * fewer — so a guessed height would misplace it for some rows and not
+   * others. Measuring in an effect and storing the answer in state would
+   * re-render to move it; a ref callback runs during commit, before the
+   * browser paints, so the menu is only ever drawn once and in the right
+   * place.
+   */
+  const placeMenu = useCallback(
+    (node: HTMLDivElement | null) => {
+      menuRef.current = node;
+      if (!node || !anchor) return;
+
+      const flipUp =
+        anchor.bottom + MENU_GAP + node.offsetHeight > window.innerHeight;
+
+      node.style.top = flipUp ? '' : `${anchor.bottom + MENU_GAP}px`;
+      node.style.bottom = flipUp
+        ? `${window.innerHeight - anchor.top + MENU_GAP}px`
+        : '';
+    },
+    [anchor],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    const close = () => setOpen(false);
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    // Capture, so the table's own horizontal scroll closes it too — a fixed
+    // menu would otherwise sit still while the row it belongs to slides away.
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
+  const toggle = () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setAnchor(triggerRef.current?.getBoundingClientRect() ?? null);
+    setOpen(true);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        ref={triggerRef}
+        onClick={toggle}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label ?? 'إجراءات'}
+        className="grid size-9 place-items-center rounded-xl border border-slate-100 text-slate-400 transition-all duration-150 hover:bg-slate-50 hover:text-slate-600 active:scale-90"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+
+      {open &&
+        anchor &&
+        createPortal(
+          <div
+            ref={placeMenu}
+            dir="rtl"
+            role="menu"
+            className="fixed z-[9998] w-48 overflow-hidden rounded-2xl bg-white py-1.5 shadow-lg ring-1 ring-slate-100 animate-in fade-in zoom-in-95 duration-150"
+            style={{
+              // Below the trigger to begin with; `placeMenu` moves it above
+              // when there is no room, before this is ever painted.
+              top: anchor.bottom + MENU_GAP,
+              // The trigger sits at the row's left edge in RTL, so the menu
+              // hangs from the same edge; clamped so it cannot leave the window.
+              left: Math.max(
+                MENU_GAP,
+                Math.min(anchor.left, window.innerWidth - MENU_WIDTH - MENU_GAP),
+              ),
+            }}
+          >
+            {children(() => setOpen(false))}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+};
+
+export const MenuItem = ({
+  icon,
+  label,
+  onClick,
+  tone,
+  disabled,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  tone?: 'danger';
+  disabled?: boolean;
+}) => (
+  <button
+    type="button"
+    role="menuitem"
+    onClick={onClick}
+    disabled={disabled}
+    className={cn(
+      'flex w-full items-center gap-2.5 px-4 py-2.5 text-right text-sm font-bold transition-colors duration-150 hover:bg-slate-50',
+      tone === 'danger' ? 'text-red-600' : 'text-slate-600',
+      disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent',
+    )}
+  >
+    {icon}
+    {label}
+  </button>
 );
 
 export const LoadingState = () => (

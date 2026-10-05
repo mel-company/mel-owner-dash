@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CheckCircle2, CreditCard, Database, Landmark, Plus, Settings2, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CreditCard, Database, Landmark, Plus, Settings2, XCircle } from 'lucide-react';
 import {
   ActionButtons,
   AlertMessage,
@@ -20,12 +20,15 @@ import {
   TableShell,
   TextAreaField,
 } from '@/components/dashboard';
-import { GatewayHealthStrip } from '@/components/dashboard/GatewayHealthStrip';
 import {
   GatewayDetailPanel,
   GatewaysTable,
 } from '@/components/payments/GatewaysTable';
-import { gatewayStatus } from '@/lib/gateway-presentation';
+import {
+  gatewayStatus,
+  gatewayUsage,
+  GATEWAY_SURFACES,
+} from '@/lib/gateway-presentation';
 import {
   paymentGatewaysService,
   type GatewayActivity,
@@ -115,6 +118,20 @@ const PaymentMethods = () => {
   const [probed, setProbed] = useState<PaymentGatewayHealth | null>(null);
   const [probing, setProbing] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  /** Where a gateway has *been used*, mirroring the column of the same name. */
+  const [usageFilter, setUsageFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  /**
+   * Every gateway the platform has an adapter for, whether or not the
+   * catalogue has a row for it.
+   *
+   * Read for one purpose: to name the ones with no provider row. The payment
+   * catalogue is hand-built in production — the seeder has never run there —
+   * so an adapter the platform ships and nobody listed is a real state, and
+   * it is invisible in a table drawn from providers. Nothing else on the page
+   * uses it; per-gateway health belongs to the row and its drawer.
+   */
+  const [knownGateways, setKnownGateways] = useState<PaymentGatewayHealth[]>([]);
   const [gatewaySettings, setGatewaySettings] = useState<GatewaySurfaceSetting[]>([]);
   const [savingSurface, setSavingSurface] = useState<PaymentSurface | null>(null);
 
@@ -135,11 +152,18 @@ const PaymentMethods = () => {
        * this route should still get its gateways list, with the activity
        * columns reading «—» rather than the whole page failing.
        */
-      const [providersResponse, methodsResponse, activityResponse, settingsResponse] = await Promise.all([
+      const [
+        providersResponse,
+        methodsResponse,
+        activityResponse,
+        settingsResponse,
+        gatewaysResponse,
+      ] = await Promise.all([
         paymentProviderService.getAllPaymentProviders({ page: 1, limit: 100 }),
         paymentMethodService.getAllPaymentMethods({ page: 1, limit: 100 }),
         paymentGatewaysService.getActivity().catch(() => ({ data: [] })),
         paymentGatewaysService.getSettings().catch(() => ({ data: [] })),
+        paymentGatewaysService.getGateways().catch(() => ({ data: [] })),
       ]);
       setProviders(providersResponse.data || []);
       setMethods(methodsResponse.data || []);
@@ -149,6 +173,7 @@ const PaymentMethods = () => {
         ),
       );
       setGatewaySettings(settingsResponse.data || []);
+      setKnownGateways(gatewaysResponse.data || []);
     } catch (err) {
       setError('فشل في جلب بيانات الدفع. يرجى المحاولة مرة أخرى.');
       console.error('Error fetching payment data:', err);
@@ -169,13 +194,66 @@ const PaymentMethods = () => {
     return counts;
   }, [providers]);
 
+  /**
+   * Gateways the platform can charge through but nobody has listed.
+   *
+   * A provider row is what makes a gateway offerable; without one the adapter
+   * is configured, healthy and unreachable by any shopper. That is silent in
+   * a table drawn from providers, so it is said above the table instead.
+   */
+  const unlistedGateways = useMemo(() => {
+    const listed = new Set(
+      providers.map((provider) => provider.gateway?.gateway).filter(Boolean),
+    );
+    return knownGateways.filter((gateway) => !listed.has(gateway.gateway));
+  }, [knownGateways, providers]);
+
+  /**
+   * The three filters, and all of them read the columns they sit above.
+   *
+   * «الاستخدام» is recorded traffic rather than the drawer's per-surface
+   * switches, because the column it filters is the traffic one — a gateway
+   * switched on for subscriptions and never used for one belongs under «بلا
+   * نشاط», which is the state an operator is looking for when they reach for
+   * this.
+   */
   const rows =
     activeTab === 'methods'
       ? methods.filter((method) => !method.is_deleted)
-      : providers.filter(
-          (provider) =>
-            !statusFilter || gatewayStatus(provider).status === statusFilter,
-        );
+      : providers.filter((provider) => {
+          if (statusFilter && gatewayStatus(provider).status !== statusFilter) {
+            return false;
+          }
+          // A row that never named a type is read as أونلاين, which is what
+          // the create form defaults it to — not as "neither", which would
+          // hide it under both options and look like a broken filter.
+          if (typeFilter && (provider.type ?? 'ONLINE') !== typeFilter) {
+            return false;
+          }
+          if (usageFilter) {
+            const usage = gatewayUsage(
+              provider.gateway
+                ? activity[provider.gateway.gateway]
+                : undefined,
+            );
+            return usageFilter === 'none'
+              ? usage.length === 0
+              : usage.some((item) => item.surface === usageFilter);
+          }
+          return true;
+        });
+
+  const activeFilters = [statusFilter, usageFilter, typeFilter].filter(
+    Boolean,
+  ).length;
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setUsageFilter('');
+    setTypeFilter('');
+    setPage(1);
+  };
   const filteredRows = useMemo(() => rows.filter((item) => {
     const text = activeTab === 'methods'
       ? [item.name, (item as PaymentMethod).code, (item as PaymentMethod).provider?.name].join(' ')
@@ -412,31 +490,11 @@ const PaymentMethods = () => {
       <PageHeader
         title="بوابات الدفع"
         /*
-          The page is «بوابات الدفع» and opens on the gateways, so the line
-          under the title counts gateways. It read «هناك 0 طريقة دفع و 4 مزود»
-          — leftover from when this was a methods-first page, and it led with
-          a zero that was true and irrelevant.
+          A description, not a tally. It counted gateways here until the four
+          cards below started doing it a line later, in bigger type and split
+          by state — so the line said the same thing worse, and twice.
         */
-        description={
-          <>
-            <span className="font-black text-violet-600">{providers.length} بوابة</span>
-            {gatewayCounts.needsSetup > 0 ? (
-              <>
-                {' — '}
-                <span className="font-black text-amber-600">
-                  {gatewayCounts.needsSetup} تحتاج إعداد
-                </span>
-              </>
-            ) : (
-              <>
-                {' — '}
-                <span className="font-black text-emerald-600">
-                  {gatewayCounts.active} مفعلة
-                </span>
-              </>
-            )}
-          </>
-        }
+        description="إدارة وربط بوابات الدفع في المنصة."
         icon={<CreditCard className="h-6 w-6" />}
         action={<PrimaryActionButton onClick={openCreateDrawer}>إضافة {activeTab === 'methods' ? 'طريقة دفع' : 'مزود دفع'}<Plus className="h-4 w-4" /></PrimaryActionButton>}
       />
@@ -461,24 +519,72 @@ const PaymentMethods = () => {
         <StatCard title="تحتاج إعداد" value={gatewayCounts.needsSetup} icon={<Settings2 />} tone="amber" />
       </div>
 
-      <GatewayHealthStrip />
+      {/*
+        The one fact the gateways table structurally cannot carry: an
+        integration the platform ships that no catalogue row offers. It is
+        never a fault — a gateway can be deliberately unlisted — so it is a
+        notice, not an alert, and it names them rather than counting them.
+      */}
+      {activeTab === 'providers' && unlistedGateways.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            بوابات مدمجة في المنصة بلا سجل في القائمة، فلا يمكن عرضها للمشتري:
+          </span>
+          <span className="font-black">
+            {unlistedGateways.map((gateway) => gateway.name).join('، ')}
+          </span>
+        </div>
+      )}
 
-      <SearchFiltersBar search={search} onSearchChange={setSearch} placeholder="ابحث عن بوابة دفع..." onFilterClick={() => setSearch('')}>
+      <SearchFiltersBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="ابحث عن بوابة دفع..."
+        filterCount={activeFilters}
+        onFilterClick={clearFilters}
+      >
         <div className="flex flex-wrap items-center gap-2">
           {activeTab === 'providers' && (
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value);
-                setPage(1);
-              }}
-              className="h-11 rounded-2xl bg-white px-4 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-100 outline-none"
-            >
-              <option value="">جميع الحالات</option>
-              <option value="active">مفعلة</option>
-              <option value="disabled">معطلة</option>
-              <option value="needs-setup">تحتاج إعداد</option>
-            </select>
+            <>
+              <FilterSelect
+                label="حالة البوابة"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                onPick={() => setPage(1)}
+                options={[
+                  { value: '', label: 'جميع الحالات' },
+                  { value: 'active', label: 'مفعلة' },
+                  { value: 'disabled', label: 'معطلة' },
+                  { value: 'needs-setup', label: 'تحتاج إعداد' },
+                ]}
+              />
+              <FilterSelect
+                label="الاستخدام في المنصة"
+                value={usageFilter}
+                onChange={setUsageFilter}
+                onPick={() => setPage(1)}
+                options={[
+                  { value: '', label: 'جميع الاستخدامات' },
+                  ...GATEWAY_SURFACES.map((surface) => ({
+                    value: surface.surface as string,
+                    label: surface.label,
+                  })),
+                  { value: 'none', label: 'بلا نشاط' },
+                ]}
+              />
+              <FilterSelect
+                label="نوع البوابة"
+                value={typeFilter}
+                onChange={setTypeFilter}
+                onPick={() => setPage(1)}
+                options={[
+                  { value: '', label: 'جميع الأنواع' },
+                  { value: 'ONLINE', label: 'أونلاين' },
+                  { value: 'OFFLINE', label: 'أوفلاين' },
+                ]}
+              />
+            </>
           )}
           <div className="flex gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
             <button onClick={() => { setActiveTab('providers'); setPage(1); }} className={tabClass(activeTab === 'providers')}>البوابات</button>
@@ -509,6 +615,7 @@ const PaymentMethods = () => {
           <GatewaysTable
             rows={visibleRows as PaymentProvider[]}
             activityByGateway={activity}
+            activeId={detailProvider?.id}
             actions={{
               onOpen: openDetail,
               onEdit: openEditProvider,
@@ -526,6 +633,12 @@ const PaymentMethods = () => {
           title="تفاصيل بوابة الدفع"
           subtitle={detailProvider.name}
           icon={<CreditCard className="h-5 w-5" />}
+          /*
+            Narrow on purpose: this panel is read *against* the row it was
+            opened from, which stays lit behind it. A full-width drawer covers
+            the table and turns a glance into a close-and-reopen.
+          */
+          maxWidth="max-w-lg"
           onClose={() => setDetailProvider(null)}
         >
           <GatewayDetailPanel
@@ -668,6 +781,48 @@ const MethodsTable = ({ rows, providers, onEdit, onDelete, onToggle }: { rows: P
   </table>
 );
 
+
+/**
+ * One of the filter dropdowns above the table.
+ *
+ * Three of them, so the styling is written once; `label` is the accessible
+ * name, since the chosen option reads as «جميع الحالات» and a screen reader
+ * otherwise meets three unnamed selects in a row.
+ */
+const FilterSelect = ({
+  label,
+  value,
+  options,
+  onChange,
+  onPick,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  /** Runs after any pick — the page uses it to return to the first page. */
+  onPick?: () => void;
+}) => (
+  <select
+    aria-label={label}
+    value={value}
+    onChange={(event) => {
+      onChange(event.target.value);
+      onPick?.();
+    }}
+    className={`h-11 rounded-2xl px-4 text-sm font-bold shadow-sm ring-1 outline-none transition ${
+      value
+        ? 'bg-violet-50 text-violet-700 ring-violet-200'
+        : 'bg-white text-slate-700 ring-slate-100'
+    }`}
+  >
+    {options.map((option) => (
+      <option key={option.value} value={option.value}>
+        {option.label}
+      </option>
+    ))}
+  </select>
+);
 
 const tabClass = (active: boolean) => active
   ? 'rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white'
