@@ -28,12 +28,20 @@ export interface Subscription {
   store: SubscriptionStore;
 }
 
+/**
+ * What `GET /subscription/system/search` actually takes.
+ *
+ * This used to declare `{ storeId, planId, status, dateFrom, dateTo }` and be
+ * sent as a `PUT` body. The route is a `GET` and reads one `query` parameter,
+ * matched against the store's name — so the method was wrong, the shape was
+ * wrong, and every filter named here was silently discarded. Nothing in the UI
+ * calls it yet, which is the only reason it never showed up as a bug.
+ */
 export interface SearchSubscriptionsRequest {
-  storeId?: string;
-  planId?: string;
-  status?: 'ACTIVE' | 'CANCELLED' | 'EXPIRED' | 'PAUSED';
-  dateFrom?: string;
-  dateTo?: string;
+  /** Free text, matched against the store name. */
+  query?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface UpdateSubscriptionRequest {
@@ -42,8 +50,16 @@ export interface UpdateSubscriptionRequest {
   end_at?: string;
 }
 
+/**
+ * `durationMonths`, which is the field the server reads.
+ *
+ * It was `{ duration: 'monthly' | 'yearly' }` — a name and a vocabulary the
+ * server has never had — so a renewal silently fell back to the default of one
+ * month however long an operator asked for. Capped at 24 to match
+ * `InitPlatformPaymentDto`, which is the ceiling the paid path enforces.
+ */
 export interface RenewSubscriptionRequest {
-  duration?: 'monthly' | 'yearly';
+  durationMonths?: number;
 }
 
 /**
@@ -65,14 +81,14 @@ export const systemSubscriptionsService = {
 
   /**
    * البحث في الاشتراكات (System)
-   * PUT /subscription/system/search
+   * GET /subscription/system/search
    */
   searchSubscriptions: async (
     searchParams: SearchSubscriptionsRequest
   ): Promise<Subscription[]> => {
-    const response = await axiosInstance.put<Subscription[]>(
+    const response = await axiosInstance.get<Subscription[]>(
       '/subscription/system/search',
-      searchParams
+      { params: searchParams }
     );
     return response as unknown as Subscription[]; // eslint-disable-line @typescript-eslint/no-explicit-any
   },

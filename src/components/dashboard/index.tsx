@@ -566,6 +566,80 @@ export const SelectField = ({ label, value, options, onChange, required }: { lab
   </div>
 );
 
+/**
+ * Pick several rows by id.
+ *
+ * The plan drawer used two comma-separated text boxes for features and modules,
+ * which could never have worked: the server validates what it is sent as uuids,
+ * so a typed feature name came back "One or more feature IDs are invalid". There
+ * was also no endpoint listing either table, which is presumably why somebody
+ * reached for free text. Both now exist, so this offers the real rows.
+ *
+ * `empty` says why the list is blank rather than rendering nothing — an operator
+ * looking at an empty picker needs to know whether there is nothing to choose or
+ * whether the request failed.
+ */
+export const CheckboxListField = ({
+  label,
+  options,
+  selected,
+  onChange,
+  empty = 'لا توجد عناصر متاحة',
+  hint,
+}: {
+  label: string;
+  options: Array<{ id: string; name: string; description?: string }>;
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  empty?: string;
+  hint?: string;
+}) => {
+  const toggle = (id: string) =>
+    onChange(
+      selected.includes(id)
+        ? selected.filter((value) => value !== id)
+        : [...selected, id],
+    );
+
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <label className="block text-sm font-bold text-slate-700">{label}</label>
+        {hint ? <span className="text-xs text-slate-400">{hint}</span> : null}
+      </div>
+      <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2">
+        {options.length === 0 ? (
+          <p className="px-2 py-3 text-sm text-slate-400">{empty}</p>
+        ) : (
+          options.map((option) => (
+            <label
+              key={option.id}
+              className="flex cursor-pointer items-start gap-3 rounded-xl px-2 py-2 hover:bg-slate-50"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(option.id)}
+                onChange={() => toggle(option.id)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-violet-600"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-700">
+                  {option.name}
+                </span>
+                {option.description ? (
+                  <span className="block text-xs text-slate-400">
+                    {option.description}
+                  </span>
+                ) : null}
+              </span>
+            </label>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
 export type StatusTone = 'slate' | 'green' | 'red' | 'blue' | 'violet' | 'amber';
 
 /**

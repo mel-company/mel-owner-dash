@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { CheckCircle, Crown, Layers3, Pencil, Plus, ReceiptText, Sparkles, Trash2 } from 'lucide-react';
 import {
   AlertMessage,
+  CheckboxListField,
   ConfirmDeleteModal,
   DrawerFooter,
   FormField,
@@ -16,10 +17,26 @@ import {
   TableShell,
   TextAreaField,
 } from '@/components/dashboard';
-import { plansService, type Plan, type PlanFeature, type PlanPayload } from '../services/plansService';
+import {
+  plansService,
+  type FeatureOption,
+  type ModuleOption,
+  type Plan,
+  type PlanFeature,
+  type PlanPayload,
+} from '../services/plansService';
 import { systemSubscriptionsService, type Subscription } from '../services/systemSubscriptionsService';
 import { renderText } from '@/utils/renderText';
 
+/**
+ * The defaults a new plan starts from — MEL GO's shape, so an operator adjusts
+ * rather than discovers that everything fell to a schema default.
+ *
+ * This used to carry only the six fields the form showed, and `featureIds` was
+ * absent entirely, which is what made `create` reject any feature text: the
+ * server reads `featureIds ?? features`, so the free-text names were validated as
+ * uuids.
+ */
 const defaultPlanForm: PlanPayload = {
   name: '',
   description: '',
@@ -27,9 +44,22 @@ const defaultPlanForm: PlanPayload = {
   yearly_price: 0,
   enabled: true,
   most_popular: false,
-  features: [],
-  modules: [],
+  code: '',
+  max_users: 1,
+  ai_store_credits: 2,
+  ai_editor_credits: 0,
+  has_mobile_app: false,
+  has_ai_editor: false,
+  is_free: false,
+  order_number: null,
+  featureIds: [],
+  moduleIds: [],
 };
+
+const YES_NO = [
+  { value: 'false', label: 'لا' },
+  { value: 'true', label: 'نعم' },
+];
 
 const SubscriptionPlans = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -41,8 +71,8 @@ const SubscriptionPlans = () => {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
   const [formData, setFormData] = useState<PlanPayload>(defaultPlanForm);
-  const [featuresText, setFeaturesText] = useState('');
-  const [modulesText, setModulesText] = useState('');
+  const [featureOptions, setFeatureOptions] = useState<FeatureOption[]>([]);
+  const [moduleOptions, setModuleOptions] = useState<ModuleOption[]>([]);
 
   useEffect(() => {
     loadData();
@@ -52,12 +82,16 @@ const SubscriptionPlans = () => {
     try {
       setLoading(true);
       setError('');
-      const [plansRes, subsRes] = await Promise.all([
-        plansService.getAllPlans({ page: 1, limit: 100 }),
+      const [plansRes, subsRes, features, modules] = await Promise.all([
+        plansService.getAllPlans(),
         systemSubscriptionsService.getAllSubscriptions(),
+        plansService.getFeatureOptions(),
+        plansService.getModuleOptions(),
       ]);
       setPlans(plansRes.data || []);
       setSubscriptions(subsRes || []);
+      setFeatureOptions(features);
+      setModuleOptions(modules);
     } catch (err) {
       setError('فشل في جلب بيانات الباقات.');
       console.error('Error loading plans:', err);
@@ -74,8 +108,6 @@ const SubscriptionPlans = () => {
   const openCreateDrawer = () => {
     setEditingPlan(null);
     setFormData(defaultPlanForm);
-    setFeaturesText('');
-    setModulesText('');
     setShowDrawer(true);
   };
 
@@ -88,11 +120,17 @@ const SubscriptionPlans = () => {
       yearly_price: plan.yearly_price || 0,
       enabled: plan.enabled,
       most_popular: plan.most_popular,
+      code: plan.code ?? '',
+      max_users: plan.max_users ?? 1,
+      ai_store_credits: plan.ai_store_credits ?? 0,
+      ai_editor_credits: plan.ai_editor_credits ?? 0,
+      has_mobile_app: plan.has_mobile_app ?? false,
+      has_ai_editor: plan.has_ai_editor ?? false,
+      is_free: plan.is_free ?? false,
+      order_number: plan.order_number ?? null,
       featureIds: plan.features?.map((item) => item.feature.id) || [],
       moduleIds: plan.modules?.map((item) => item.id) || [],
     });
-    setFeaturesText(plan.features?.map((item) => renderText(item.feature.name)).join(', ') || '');
-    setModulesText(plan.modules?.map((item) => renderText(item.name)).join(', ') || '');
     setShowDrawer(true);
   };
 
@@ -100,16 +138,19 @@ const SubscriptionPlans = () => {
     setShowDrawer(false);
     setEditingPlan(null);
     setFormData(defaultPlanForm);
-    setFeaturesText('');
-    setModulesText('');
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const payload: PlanPayload = {
       ...formData,
-      features: splitTextList(featuresText),
-      modules: splitTextList(modulesText),
+      // Empty means "no machine key", which the column allows. Sending '' would
+      // claim the unique index for the empty string and block the next plan.
+      code: formData.code?.trim() ? formData.code.trim() : null,
+      order_number:
+        formData.order_number === null || Number.isNaN(formData.order_number)
+          ? null
+          : Number(formData.order_number),
     };
 
     try {
@@ -122,7 +163,19 @@ const SubscriptionPlans = () => {
       closeDrawer();
       loadData();
     } catch (err) {
-      setError(editingPlan ? 'فشل في تحديث الباقة.' : 'فشل في إنشاء الباقة.');
+      // The server's own message, which says *what* was wrong. The generic line
+      // this replaces hid "One or more feature IDs are invalid" — the error the
+      // old free-text fields produced every time.
+      const detail = (err as { response?: { data?: { message?: string | string[] } } })
+        ?.response?.data?.message;
+      setError(
+        [
+          editingPlan ? 'فشل في تحديث الباقة.' : 'فشل في إنشاء الباقة.',
+          Array.isArray(detail) ? detail.join(' — ') : detail,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      );
       console.error('Error saving plan:', err);
     }
   };
@@ -223,11 +276,91 @@ const SubscriptionPlans = () => {
               <div className="md:col-span-2">
                 <TextAreaField label="الوصف" value={formData.description} rows={4} onChange={(value) => setFormData((current) => ({ ...current, description: value }))} />
               </div>
+              {/* What the plan actually grants. None of these were on the form,
+                  so every one fell to its schema default: a plan created here got
+                  `code: null`, one seat, no AI editor and no mobile app, whatever
+                  the operator had in mind. Entitlement checks read these columns,
+                  and `upgradeAvailable` reads `code !== 'PLUS'`. */}
+              <FormField
+                label="الرمز (GO / PLUS) — يُستخدم للتحقق من المزايا"
+                value={formData.code ?? ''}
+                placeholder="اتركه فارغاً إن لم يكن باقة أساسية"
+                onChange={(value) => setFormData((current) => ({ ...current, code: value }))}
+              />
+              <FormField
+                label="ترتيب العرض"
+                type="number"
+                value={formData.order_number ?? ''}
+                onChange={(value) =>
+                  setFormData((current) => ({
+                    ...current,
+                    order_number: value === '' ? null : Number(value),
+                  }))
+                }
+              />
+              <FormField
+                label="عدد المستخدمين (يشمل المالك)"
+                type="number"
+                value={formData.max_users}
+                required
+                onChange={(value) => setFormData((current) => ({ ...current, max_users: Number(value) }))}
+              />
+              <FormField
+                label="رصيد توليد المتاجر شهرياً"
+                type="number"
+                value={formData.ai_store_credits}
+                required
+                onChange={(value) => setFormData((current) => ({ ...current, ai_store_credits: Number(value) }))}
+              />
+              <FormField
+                label="رصيد محرر الذكاء الاصطناعي شهرياً"
+                type="number"
+                value={formData.ai_editor_credits}
+                required
+                onChange={(value) => setFormData((current) => ({ ...current, ai_editor_credits: Number(value) }))}
+              />
+              <SelectField
+                label="محرر الذكاء الاصطناعي"
+                value={formData.has_ai_editor ? 'true' : 'false'}
+                options={YES_NO}
+                onChange={(value) => setFormData((current) => ({ ...current, has_ai_editor: value === 'true' }))}
+              />
+              <SelectField
+                label="تطبيق الهاتف"
+                value={formData.has_mobile_app ? 'true' : 'false'}
+                options={YES_NO}
+                onChange={(value) => setFormData((current) => ({ ...current, has_mobile_app: value === 'true' }))}
+              />
+              <SelectField
+                label="باقة مجانية"
+                value={formData.is_free ? 'true' : 'false'}
+                options={YES_NO}
+                onChange={(value) => setFormData((current) => ({ ...current, is_free: value === 'true' }))}
+              />
+
+              {/* Picked by id from the real rows. These were two comma-separated
+                  text boxes, and the server validates what it is sent as uuids —
+                  so creating a plan with any feature typed in failed, and editing
+                  one ignored the box because `featureIds` won. */}
               <div className="md:col-span-2">
-                <TextAreaField label="الميزات (افصل بينها بفارزة)" value={featuresText} rows={3} onChange={setFeaturesText} />
+                <CheckboxListField
+                  label="الميزات"
+                  hint={`${formData.featureIds.length} مختارة`}
+                  options={featureOptions}
+                  selected={formData.featureIds}
+                  onChange={(featureIds) => setFormData((current) => ({ ...current, featureIds }))}
+                  empty="لا توجد ميزات معرّفة — أضفها من قاعدة البيانات أولاً"
+                />
               </div>
               <div className="md:col-span-2">
-                <TextAreaField label="الموديولات (افصل بينها بفارزة)" value={modulesText} rows={3} onChange={setModulesText} />
+                <CheckboxListField
+                  label="الموديولات"
+                  hint={`${formData.moduleIds.length} مختارة`}
+                  options={moduleOptions}
+                  selected={formData.moduleIds}
+                  onChange={(moduleIds) => setFormData((current) => ({ ...current, moduleIds }))}
+                  empty="لا توجد موديولات معرّفة"
+                />
               </div>
             </div>
           </SideDrawer>
@@ -257,6 +390,17 @@ const PlanCard = ({ plan, onEdit, onDelete }: { plan: Plan; onEdit: (plan: Plan)
       <div>
         <h2 className="text-xl font-black text-slate-950">{renderText(plan.name)}</h2>
         <p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-400">{renderText(plan.description)}</p>
+        {/* The list now includes disabled and free plans, because the one screen
+            that can re-enable a plan was reading a feed that hid it. That makes
+            saying which is which the card's job — without this, a plan nobody can
+            buy looks exactly like a live one. */}
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+          {plan.code ? <StatusPill tone="violet">{plan.code}</StatusPill> : null}
+          {plan.is_free ? <StatusPill tone="blue">مجانية</StatusPill> : null}
+          <StatusPill tone={plan.enabled ? 'green' : 'red'} dot>
+            {plan.enabled ? 'مفعلة' : 'معطلة'}
+          </StatusPill>
+        </div>
       </div>
       <div className="grid h-12 w-12 place-items-center rounded-2xl bg-violet-50 text-violet-600">
         <Crown className="h-6 w-6" />
@@ -289,6 +433,5 @@ const PlanCard = ({ plan, onEdit, onDelete }: { plan: Plan; onEdit: (plan: Plan)
   </div>
 );
 
-const splitTextList = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean);
 
 export default SubscriptionPlans;
