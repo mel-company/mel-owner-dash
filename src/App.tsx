@@ -11,6 +11,7 @@ import Employees from './pages/Employees';
 import Accounting from './pages/Accounting';
 import FinancialAi from './pages/FinancialAi';
 import SubscriptionPlans from './pages/SubscriptionPlans';
+import Subscriptions from './pages/Subscriptions';
 import Support from './pages/Support';
 import DeliveryCompanies from './pages/DeliveryCompanies';
 import DeliveryZones from './pages/DeliveryZones';
@@ -80,6 +81,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['owner']}>
                   <SubscriptionPlans />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="subscriptions"
+              element={
+                <ProtectedRoute requiredRoles={['owner']}>
+                  <Subscriptions />
                 </ProtectedRoute>
               }
             />

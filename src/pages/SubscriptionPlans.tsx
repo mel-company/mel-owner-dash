@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Crown, Layers3, Pencil, Plus, ReceiptText, Sparkles, Trash2 } from 'lucide-react';
 import {
   AlertMessage,
@@ -27,6 +28,10 @@ import {
 } from '../services/plansService';
 import { systemSubscriptionsService, type Subscription } from '../services/systemSubscriptionsService';
 import { renderText } from '@/utils/renderText';
+import {
+  subscriptionStatusLabel,
+  subscriptionStatusTone,
+} from '@/utils/subscriptionStatus';
 
 /**
  * The defaults a new plan starts from — MEL GO's shape, so an operator adjusts
@@ -50,6 +55,7 @@ const defaultPlanForm: PlanPayload = {
   ai_editor_credits: 0,
   has_mobile_app: false,
   has_ai_editor: false,
+  has_pos: false,
   is_free: false,
   order_number: null,
   featureIds: [],
@@ -62,8 +68,10 @@ const YES_NO = [
 ];
 
 const SubscriptionPlans = () => {
+  const navigate = useNavigate();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscriptionTotal, setSubscriptionTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -84,12 +92,13 @@ const SubscriptionPlans = () => {
       setError('');
       const [plansRes, subsRes, features, modules] = await Promise.all([
         plansService.getAllPlans(),
-        systemSubscriptionsService.getAllSubscriptions(),
+        systemSubscriptionsService.getAllSubscriptions({ page: 1, limit: 10 }),
         plansService.getFeatureOptions(),
         plansService.getModuleOptions(),
       ]);
       setPlans(plansRes.data || []);
-      setSubscriptions(subsRes || []);
+      setSubscriptions(subsRes?.data || []);
+      setSubscriptionTotal(subsRes?.total || 0);
       setFeatureOptions(features);
       setModuleOptions(modules);
     } catch (err) {
@@ -126,10 +135,15 @@ const SubscriptionPlans = () => {
       ai_editor_credits: plan.ai_editor_credits ?? 0,
       has_mobile_app: plan.has_mobile_app ?? false,
       has_ai_editor: plan.has_ai_editor ?? false,
+      has_pos: plan.has_pos ?? false,
       is_free: plan.is_free ?? false,
       order_number: plan.order_number ?? null,
       featureIds: plan.features?.map((item) => item.feature.id) || [],
-      moduleIds: plan.modules?.map((item) => item.id) || [],
+      // `item.module.id`, not `item.id`: the server wraps each module in a join
+      // row, exactly as it does features one line above. Reading the wrapper
+      // produced `[undefined]`, so a plan with any module attached could not be
+      // saved again.
+      moduleIds: plan.modules?.map((item) => item.module.id) || [],
     });
     setShowDrawer(true);
   };
@@ -199,7 +213,7 @@ const SubscriptionPlans = () => {
     <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="باقات الاشتراك"
-        description={<>هناك <span className="font-black text-violet-600">{plans.length} باقة</span> و <span className="font-black text-violet-600">{subscriptions.length} اشتراك</span></>}
+        description={<>هناك <span className="font-black text-violet-600">{plans.length} باقة</span> و <span className="font-black text-violet-600">{subscriptionTotal} اشتراك</span></>}
         icon={<Crown className="h-6 w-6" />}
         action={<PrimaryActionButton onClick={openCreateDrawer}>إضافة باقة<Plus className="h-4 w-4" /></PrimaryActionButton>}
       />
@@ -210,7 +224,7 @@ const SubscriptionPlans = () => {
         <StatCard title="إجمالي الباقات" value={plans.length} icon={<Layers3 />} tone="blue" />
         <StatCard title="الباقات المفعلة" value={plans.filter((plan) => plan.enabled).length} icon={<CheckCircle />} tone="teal" />
         <StatCard title="الأكثر شيوعاً" value={plans.filter((plan) => plan.most_popular).length} icon={<Sparkles />} tone="amber" />
-        <StatCard title="الاشتراكات" value={subscriptions.length} icon={<ReceiptText />} tone="violet" />
+        <StatCard title="الاشتراكات" value={subscriptionTotal} icon={<ReceiptText />} tone="violet" />
       </div>
 
       <SearchFiltersBar search={search} onSearchChange={setSearch} placeholder="ابحث عن باقة" onFilterClick={() => setSearch('')} />
@@ -234,10 +248,25 @@ const SubscriptionPlans = () => {
           <tbody className="divide-y divide-slate-100">
             {subscriptions.map((sub) => (
               <tr key={sub.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
-                <td className="px-5 py-4 font-black text-slate-950">{renderText(sub.store)}</td>
-                <td className="px-5 py-4 font-semibold text-slate-600">{renderText(sub.plan)}</td>
-                <td className="px-5 py-4"><StatusPill tone={sub.status === 'ACTIVE' ? 'green' : 'amber'}>{sub.status}</StatusPill></td>
-                <td className="px-5 py-4"><button className="rounded-xl bg-violet-50 px-4 py-2 text-sm font-black text-violet-600">عرض</button></td>
+                {/* `.name`, not `renderText(sub.store)` — that only printed the
+                    right thing by accident, via renderText's object fallback. */}
+                <td className="px-5 py-4 font-black text-slate-950">{sub.store?.name || '—'}</td>
+                <td className="px-5 py-4 font-semibold text-slate-600">{sub.plan?.name || '—'}</td>
+                <td className="px-5 py-4">
+                  <StatusPill tone={subscriptionStatusTone(sub.status)}>
+                    {subscriptionStatusLabel(sub.status)}
+                  </StatusPill>
+                </td>
+                {/* Had no onClick at all. */}
+                <td className="px-5 py-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/dashboard/stores/${sub.storeId}`)}
+                    className="rounded-xl bg-violet-50 px-4 py-2 text-sm font-black text-violet-600"
+                  >
+                    عرض
+                  </button>
+                </td>
               </tr>
             ))}
             {subscriptions.length === 0 && (
@@ -330,6 +359,12 @@ const SubscriptionPlans = () => {
                 value={formData.has_mobile_app ? 'true' : 'false'}
                 options={YES_NO}
                 onChange={(value) => setFormData((current) => ({ ...current, has_mobile_app: value === 'true' }))}
+              />
+              <SelectField
+                label="نقطة البيع POS"
+                value={formData.has_pos ? 'true' : 'false'}
+                options={YES_NO}
+                onChange={(value) => setFormData((current) => ({ ...current, has_pos: value === 'true' }))}
               />
               <SelectField
                 label="باقة مجانية"

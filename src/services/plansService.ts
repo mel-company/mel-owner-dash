@@ -8,10 +8,21 @@ export interface PlanFeature {
   };
 }
 
+/**
+ * A module attached to a plan, **as the server sends it**.
+ *
+ * `findAllForOperator` selects `modules: { select: { module: { select: { id,
+ * name } } } }`, so each element is a join row wrapping the module — exactly
+ * like `PlanFeature` above it. This was declared flat, so the edit drawer read
+ * `item.id` off the wrapper and got `undefined`: attach a module to a plan once
+ * and every later save sent `moduleIds: [undefined]`, which the server rejects.
+ */
 export interface PlanModule {
-  id: string;
-  name: string;
-  description?: string;
+  module: {
+    id: string;
+    name: string;
+    description?: string;
+  };
 }
 
 export interface Plan {
@@ -29,6 +40,8 @@ export interface Plan {
   ai_editor_credits: number;
   has_mobile_app: boolean;
   has_ai_editor: boolean;
+  /** POS is a gated PLUS feature; two server gates read this column. */
+  has_pos: boolean;
   is_free: boolean;
   order_number: number | null;
   features: PlanFeature[];
@@ -82,6 +95,14 @@ export interface PlanPayload {
   ai_editor_credits: number;
   has_mobile_app: boolean;
   has_ai_editor: boolean;
+  /**
+   * Missing until now, so a plan created here always got the schema default of
+   * `false` whatever the operator intended — and POS is gated on this column by
+   * `PlanService.assertPosAccess` and by the POS sign-in check. An operator
+   * could not grant POS to a plan they had made. The same defect the docblock
+   * above records for `code`, `max_users` and the rest, one column later.
+   */
+  has_pos: boolean;
   is_free: boolean;
   order_number?: number | null;
   featureIds: string[];

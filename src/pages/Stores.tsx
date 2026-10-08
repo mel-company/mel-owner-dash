@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState, type Dispatch, type FormEven
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarDays,
-  ChevronDown,
   CirclePlus,
   ImagePlus,
   Pencil,
@@ -27,7 +26,12 @@ import {
   TableShell,
 } from '@/components/dashboard';
 import { cn } from '@/lib/utils';
-import { systemStoresService, type CreateStoreRequest, type Store } from '../services/systemStoresService';
+import {
+  systemStoresService,
+  type CreateStoreRequest,
+  type Store,
+  type UpdateStoreRequest,
+} from '../services/systemStoresService';
 
 type StoreRating = 'ضعيف' | 'متوسط' | 'ممتاز';
 
@@ -39,12 +43,32 @@ type FiltersState = {
   addedBy: 'all' | 'owner' | 'manager';
 };
 
-type StoreFormState = CreateStoreRequest & {
+/**
+ * The drawer's own fields, declared here rather than extending
+ * `CreateStoreRequest`.
+ *
+ * Deriving the form state from the wire type is what let the two drift: the
+ * inputs were named after a request shape that named nothing the server
+ * accepts, so renaming one silently renamed the other. The payload builders are
+ * the mapping layer now, and they are the only place that knows both names.
+ */
+type StoreFormState = {
+  name: string;
+  owner: string;
+  ownerEmail: string;
   phone: string;
   storeType: string;
-  subscriptionType: 'basic' | 'premium';
-  subscriptionDuration: 'monthly' | 'yearly' | '';
   imagePreview: string;
+  /**
+   * The file itself, which the form used to throw away.
+   *
+   * Only a preview URL was kept, so the logo an operator was *required* to
+   * upload was never transmitted: the payload carried no logo and the request
+   * went as JSON, while `POST /store/system` accepts a multipart `logo` and
+   * uploads it to R2. The operator was blocked until they chose a file, and the
+   * store was created without it.
+   */
+  imageFile: File | null;
 };
 
 type StoreRow = {
@@ -81,13 +105,10 @@ const defaultFormData: StoreFormState = {
   name: '',
   owner: '',
   ownerEmail: '',
-  subscriptionPlanId: '',
-  status: 'active',
   phone: '',
   storeType: storeTypeOptions[0],
-  subscriptionType: 'basic',
-  subscriptionDuration: '',
   imagePreview: '',
+  imageFile: null,
 };
 
 const defaultFilters: FiltersState = {
@@ -203,31 +224,82 @@ const Stores = () => {
 
   const openEditModal = (store: Store) => {
     setEditingStore(store);
+    /**
+     * No plan and no status: both were read here, both were derived wrongly
+     * (`subscriptionType` matched plan names against 'pro'/'premium', which is
+     * never true for MEL GO or MEL PLUS), and neither could be written back by
+     * `PUT /store/system/:id`. The subscription panel owns them.
+     */
     setFormData({
       name: store.name,
       owner: store.owner?.name || '',
       ownerEmail: store.owner?.email || store.email || '',
-      subscriptionPlanId: store.subscription?.plan.id || '',
-      status: store.subscription?.status === 'CANCELLED' || store.subscription?.status === 'EXPIRED' ? 'inactive' : 'active',
       phone: store.phone || store.owner?.phone || '',
       storeType: getStoreTypeText(store.store_type),
-      subscriptionType: store.subscription?.plan.name?.toLowerCase().includes('pro') || store.subscription?.plan.name?.toLowerCase().includes('premium') ? 'premium' : 'basic',
-      subscriptionDuration: 'monthly',
       imagePreview: store.logo || '',
+      // `PUT /store/system/:id` has no file interceptor and its `logo` is a
+      // string, so a replacement file cannot be sent from here at all.
+      imageFile: null,
     });
     setSubmitted(false);
     setShowModal(true);
   };
 
-  const toApiPayload = (data: StoreFormState): CreateStoreRequest => ({
+  /**
+   * The field names the server declares, which these were not.
+   *
+   * `{ owner, ownerEmail, subscriptionPlanId, status }` matched no store DTO, so
+   * `whitelist: true` removed all four and `createSystem` saw a name and nothing
+   * else — no owner attached, no plan. The owner's phone is what decides whether
+   * an owner is created at all, so it is what the form must collect.
+   */
+  const toCreatePayload = (data: StoreFormState): CreateStoreRequest => ({
     name: data.name,
-    owner: data.owner,
-    ownerEmail: data.ownerEmail,
-    subscriptionPlanId: data.subscriptionPlanId || data.subscriptionType,
-    status: data.status,
+    owner_name: data.owner || undefined,
+    owner_email: data.ownerEmail || undefined,
+    owner_phone: data.phone,
+    ...(data.phone ? { phone: data.phone } : {}),
+    ...(data.ownerEmail ? { email: data.ownerEmail } : {}),
+    // The file the form required and used to discard.
+    logo: data.imageFile,
   });
 
-  const isFormValid = Boolean(formData.name && formData.owner && formData.subscriptionDuration && formData.imagePreview);
+  /**
+   * An update carries the store's own columns only.
+   *
+   * `updateSystem` writes 13 `Store` columns and reads no subscription and no
+   * owner, so sending a plan or an owner here is a request that answers 200 and
+   * changes nothing. The owner inputs are disabled while editing for the same
+   * reason, and the plan is managed from the subscription panel.
+   */
+  const toUpdatePayload = (data: StoreFormState): UpdateStoreRequest => ({
+    name: data.name,
+    ...(data.phone ? { phone: data.phone } : {}),
+  });
+
+  /**
+   * `subscriptionDuration` was part of this, and the control that set it has
+   * been removed — it was hardcoded to 'monthly' on open and reached no server
+   * field. Leaving it in the test would have made the form permanently invalid.
+   */
+  /**
+   * What each mode actually needs, rather than one rule for both.
+   *
+   * Creating sends the owner and the logo, so it requires them. Updating sends
+   * neither — `toUpdatePayload` carries the store's own columns — and the owner
+   * field is read-only there, so demanding an owner name made a store with no
+   * owner permanently unsaveable through this drawer: the one field that could
+   * satisfy the check was the one that could not be typed into. Same for a
+   * store with no logo.
+   */
+  const isFormValid = editingStore
+    ? Boolean(formData.name)
+    : Boolean(
+        formData.name &&
+          formData.owner &&
+          formData.phone &&
+          formData.imagePreview,
+      );
 
   const handleCreateStore = async (event: FormEvent) => {
     event.preventDefault();
@@ -236,7 +308,7 @@ const Stores = () => {
 
     try {
       setError('');
-      await systemStoresService.createStore(toApiPayload(formData));
+      await systemStoresService.createStore(toCreatePayload(formData));
       closeDrawer();
       fetchStores(page, pageSize);
     } catch (err) {
@@ -253,7 +325,7 @@ const Stores = () => {
 
     try {
       setError('');
-      await systemStoresService.updateStore(editingStore.id, toApiPayload(formData));
+      await systemStoresService.updateStore(editingStore.id, toUpdatePayload(formData));
       closeDrawer();
       fetchStores(page, pageSize);
     } catch (err) {
@@ -309,6 +381,7 @@ const Stores = () => {
     setFormData((current) => ({
       ...current,
       imagePreview: URL.createObjectURL(file),
+      imageFile: file,
     }));
   };
 
@@ -473,6 +546,7 @@ const Stores = () => {
             )}
           >
             <StoreFormFields
+              isEditing={Boolean(editingStore)}
               formData={formData}
               setFormData={setFormData}
               submitted={submitted}
@@ -665,14 +739,25 @@ const StoreFormFields = ({
   setFormData,
   submitted,
   onImageChange,
+  isEditing,
 }: {
   formData: StoreFormState;
   setFormData: Dispatch<SetStateAction<StoreFormState>>;
   submitted: boolean;
   onImageChange: (file: File | undefined) => void;
+  /** Editing an existing store, where the owner cannot be changed. */
+  isEditing: boolean;
 }) => {
-  const missingImage = submitted && !formData.imagePreview;
-  const missingOwner = submitted && !formData.owner;
+  /**
+   * Both track what the *mode* actually requires, as `isFormValid` does.
+   *
+   * `missingImage` did not, so pressing save on an edit turned the image field
+   * red with «يجب رفع صورة المتجر» while the update went through — `toUpdatePayload`
+   * neither requires a logo nor sends one. A field marked as an error that the
+   * form does not validate is worse than no marking at all.
+   */
+  const missingImage = !isEditing && submitted && !formData.imagePreview;
+  const missingOwner = !isEditing && submitted && !formData.owner;
 
   return (
     <div className="space-y-2">
@@ -698,6 +783,25 @@ const StoreFormFields = ({
           <label className={cn('mb-2 block text-sm font-bold text-slate-700', missingImage && 'text-red-500')}>
             صورة المتجر
           </label>
+          {/* `PUT /store/system/:id` has no file interceptor and its `logo` is a
+              string, so a replacement cannot be uploaded from here. Shown rather
+              than offered, for the same reason the owner fields are: a control
+              that accepts a file and drops it is worse than no control. */}
+          {isEditing ? (
+            <>
+              <div className="flex h-40 items-center justify-center overflow-hidden rounded-3xl bg-slate-50">
+                {formData.imagePreview ? (
+                  <img src={formData.imagePreview} alt="store" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-sm font-bold text-slate-400">لا توجد صورة</span>
+                )}
+              </div>
+              <p className="mt-2 text-sm font-semibold text-slate-400">
+                تُرفع صورة المتجر عند الإنشاء ولا تُعدَّل من هنا.
+              </p>
+            </>
+          ) : (
+          <>
           <label
             className={cn(
               'flex h-40 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-slate-50 text-center transition',
@@ -716,20 +820,45 @@ const StoreFormFields = ({
             <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(event) => onImageChange(event.target.files?.[0])} />
           </label>
           {missingImage && <p className="mt-2 text-sm font-bold text-red-500">يجب رفع صورة المتجر</p>}
+          </>
+          )}
         </div>
       </div>
 
       <SectionTitle>معلومات المالك</SectionTitle>
+      {/* `updateSystem` writes the store's own columns and touches no owner, so
+          these are create-only. Shown read-only while editing rather than
+          accepting a change that would answer 200 and do nothing. */}
+      {isEditing && (
+        <p className="mb-4 rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+          بيانات المالك تُسجَّل عند إنشاء المتجر ولا تُعدَّل من هنا.
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         <div>
-          <FormField
-            label="اسم المالك"
-            value={formData.owner}
-            placeholder="اكتب اسم المالك الثلاثي"
-            required
-            onChange={(value) => setFormData((current) => ({ ...current, owner: value }))}
-          />
-          {missingOwner && <p className="mt-2 text-sm font-bold text-red-500">يجب كتابة اسم مالك المتجر</p>}
+          {/* Rendered as text, not as a disabled-looking input that still takes
+              focus. It was a live `FormField` whose `onChange` returned
+              `undefined`, so it accepted keystrokes and silently dropped every
+              one of them — worse than the no-op-on-save it replaced. */}
+          {isEditing ? (
+            <>
+              <label className="mb-2 block text-sm font-bold text-slate-700">اسم المالك</label>
+              <p className="flex h-12 items-center rounded-2xl bg-slate-50 px-4 text-sm font-bold text-slate-500">
+                {formData.owner || 'غير محدد'}
+              </p>
+            </>
+          ) : (
+            <>
+              <FormField
+                label="اسم المالك"
+                value={formData.owner}
+                placeholder="اكتب اسم المالك الثلاثي"
+                required
+                onChange={(value) => setFormData((current) => ({ ...current, owner: value }))}
+              />
+              {missingOwner && <p className="mt-2 text-sm font-bold text-red-500">يجب كتابة اسم مالك المتجر</p>}
+            </>
+          )}
         </div>
         <div>
           <label className="mb-2 block text-sm font-bold text-slate-700">رقم الهاتف</label>
@@ -753,57 +882,29 @@ const StoreFormFields = ({
           <input
             value={formData.ownerEmail}
             placeholder="Faisal@alphabet.com"
+            disabled={isEditing}
             onChange={(event) => setFormData((current) => ({ ...current, ownerEmail: event.target.value }))}
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none placeholder:text-slate-400 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100 disabled:bg-slate-50 disabled:text-slate-400"
           />
         </div>
       </div>
 
+      {/* The subscription section used to live here, and none of it worked.
+          `PUT /store/system/:id` touches the `Store` row only — it reads no
+          subscription and writes none — and `ValidationPipe({ whitelist: true })`
+          stripped `subscriptionPlanId` and `status` before the service saw them,
+          so the operator changed a plan, got a success toast and nothing moved.
+          Two of the three controls could not have worked even then:
+          `subscriptionType` was derived by matching plan names against
+          'pro'/'premium' (always 'basic' for MEL GO and MEL PLUS) and
+          `subscriptionDuration` was hardcoded to 'monthly' whenever the drawer
+          opened.
+
+          A store's plan and term are now managed where they live — the
+          subscription panel on the store's detail page, and /dashboard/subscriptions. */}
       <SectionTitle>معلومات الاشتراك</SectionTitle>
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        <SelectField
-          label="نوع الاشتراك"
-          value={formData.subscriptionType}
-          options={subscriptionOptions}
-          onChange={(value) => setFormData((current) => ({
-            ...current,
-            subscriptionType: value as StoreFormState['subscriptionType'],
-            subscriptionPlanId: value,
-          }))}
-        />
-        <div>
-          <label className={cn('mb-2 block text-sm font-bold text-slate-700', submitted && !formData.subscriptionDuration && 'text-red-500')}>
-            مدة الاشتراك
-          </label>
-          <div className={cn('relative flex h-12 items-center rounded-2xl border bg-white px-4 shadow-sm', submitted && !formData.subscriptionDuration ? 'border-red-300 bg-red-50' : 'border-slate-200')}>
-            <select
-              value={formData.subscriptionDuration}
-              onChange={(event) => setFormData((current) => ({ ...current, subscriptionDuration: event.target.value as StoreFormState['subscriptionDuration'] }))}
-              className="h-full w-full appearance-none bg-transparent text-sm font-semibold outline-none"
-            >
-              <option value="">أختيار نوع الاشتراك</option>
-              {durationOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute left-4 h-4 w-4 text-slate-400" />
-          </div>
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-bold text-slate-700">حالة الاشتراك</label>
-          <button
-            type="button"
-            onClick={() => setFormData((current) => ({ ...current, status: current.status === 'active' ? 'inactive' : 'active' }))}
-            className={cn(
-              'flex h-11 w-24 items-center rounded-full p-1 text-xs font-black transition',
-              formData.status === 'active' ? 'justify-start bg-teal-100 text-teal-600' : 'justify-end bg-red-100 text-red-500'
-            )}
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-white shadow">
-              {formData.status === 'active' ? 'نشط' : 'لا'}
-            </span>
-          </button>
-        </div>
+      <div className="rounded-2xl bg-slate-50 p-5 text-sm font-semibold text-slate-500">
+        تُدار الخطة ومدة الاشتراك من صفحة تفاصيل المتجر أو من صفحة الاشتراكات.
       </div>
     </div>
   );

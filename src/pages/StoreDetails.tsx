@@ -11,6 +11,14 @@ import {
   TableShell,
 } from '@/components/dashboard';
 import { StoreCourierAccounts } from '@/components/dashboard/StoreCourierAccounts';
+import {
+  CreateSubscriptionPanel,
+  SubscriptionActions,
+} from '@/components/dashboard/SubscriptionActions';
+import {
+  subscriptionStatusLabel,
+  subscriptionStatusTone,
+} from '@/utils/subscriptionStatus';
 import { systemStoresService, type Store } from '../services/systemStoresService';
 
 const publicAssetBaseUrl = import.meta.env.VITE_PUBLIC_URL || 'https://pub-fe6c304a027a4a3b9e3efb4fd3520dcf.r2.dev/';
@@ -65,7 +73,7 @@ const StoreDetails = () => {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <StatCard title="نوع المتجر" value={getStoreType(store.store_type)} icon={<StoreIcon />} tone="blue" hint={null} />
-        <StatCard title="حالة الاشتراك" value={getStatusText(subscriptionStatus)} icon={<CalendarDays />} tone={subscriptionStatus === 'ACTIVE' ? 'teal' : 'amber'} hint={null} />
+        <StatCard title="حالة الاشتراك" value={subscriptionStatusLabel(subscriptionStatus)} icon={<CalendarDays />} tone={subscriptionStatus === 'ACTIVE' ? 'teal' : 'amber'} hint={null} />
         <StatCard title="المالك" value={store.owner?.name || 'غير محدد'} icon={<UserRound />} tone="violet" hint={null} />
         <StatCard title="النطاق" value={store.domain || 'غير محدد'} icon={<Globe />} tone="cyan" hint={null} />
       </div>
@@ -94,7 +102,9 @@ const StoreDetails = () => {
           {store.subscription ? (
             <>
               <div className="mb-4 flex items-center justify-between rounded-2xl bg-violet-50 px-4 py-3">
-                <StatusPill tone={subscriptionStatus === 'ACTIVE' ? 'green' : 'amber'}>{getStatusText(subscriptionStatus)}</StatusPill>
+                <StatusPill tone={subscriptionStatusTone(subscriptionStatus)}>
+                  {subscriptionStatusLabel(subscriptionStatus)}
+                </StatusPill>
                 <div>
                   <p className="text-sm font-bold text-slate-400">الخطة</p>
                   <p className="text-lg font-black text-violet-700">{store.subscription.plan.name}</p>
@@ -103,9 +113,35 @@ const StoreDetails = () => {
               <InfoItem label="وصف الخطة" value={store.subscription.plan.description} />
               <InfoItem label="تاريخ البدء" value={formatDate(store.subscription.start_at)} />
               <InfoItem label="تاريخ الانتهاء" value={formatDate(store.subscription.end_at)} />
+
+              {/* This card was read-only, while all five operator routes
+                  existed on the server with no caller at all. */}
+              <div className="pt-2">
+                <SubscriptionActions
+                  subscription={{
+                    ...store.subscription,
+                    store: { name: store.name },
+                  }}
+                  onDone={() => (id ? fetchStoreDetails(id) : undefined)}
+                />
+              </div>
             </>
           ) : (
-            <p className="rounded-2xl bg-slate-50 p-5 text-sm font-bold text-slate-400">لا يوجد اشتراك مرتبط بهذا المتجر</p>
+            /* An operator-created store arrives here: `createSystem` makes no
+               subscription at all, and until now nothing in the dashboard could
+               give it one. */
+            <div className="space-y-4">
+              <p className="rounded-2xl bg-slate-50 p-5 text-sm font-bold text-slate-400">
+                لا يوجد اشتراك مرتبط بهذا المتجر
+              </p>
+              {id && (
+                <CreateSubscriptionPanel
+                  storeId={id}
+                  storeName={store.name}
+                  onDone={() => fetchStoreDetails(id)}
+                />
+              )}
+            </div>
           )}
         </DetailsCard>
 
@@ -173,16 +209,6 @@ const getPublicAssetUrl = (path?: string | null) => {
 };
 
 const getStoreType = (type?: string | null) => type === 'ECOMMERCE' ? 'متجر إلكتروني' : type || 'غير محدد';
-
-const getStatusText = (status?: string | null) => {
-  const statusMap: Record<string, string> = {
-    ACTIVE: 'نشط',
-    CANCELLED: 'ملغى',
-    EXPIRED: 'منتهي',
-    PAUSED: 'متوقف',
-  };
-  return status ? statusMap[status] || status : 'بدون اشتراك';
-};
 
 const formatDate = (date: string) => new Date(date).toLocaleDateString('ar-IQ');
 

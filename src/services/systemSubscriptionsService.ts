@@ -1,4 +1,5 @@
 import axiosInstance from '../utils/AxiosInstance';
+import type { SubscriptionStatus } from '@/utils/subscriptionStatus';
 
 export interface SubscriptionPlan {
   id: string;
@@ -19,7 +20,8 @@ export interface Subscription {
   planId: string;
   start_at: string;
   end_at: string;
-  status: 'ACTIVE' | 'CANCELLED' | 'EXPIRED' | 'PAUSED';
+  /** `INACTIVE` is an operator's pause. There is no `PAUSED` in the enum. */
+  status: SubscriptionStatus;
   createdAt: string;
   updatedAt: string;
   is_deleted: boolean;
@@ -44,6 +46,26 @@ export interface SearchSubscriptionsRequest {
   limit?: number;
 }
 
+/**
+ * `POST /subscription/system`.
+ *
+ * Needed because `createSystem` — the operator's store-creation route — creates
+ * **no subscription**: it ignores `planId` entirely, so a store made from the
+ * admin dashboard has no plan and no term until one is created here. There was
+ * no method for it and no screen that could call one, so those stores stayed
+ * unsubscribed with nothing in the product able to fix it.
+ *
+ * `status` is genuinely optional now; the DTO used to carry `@IsNotEmpty()`
+ * without `@IsOptional()`, which made it required while documenting a default.
+ */
+export interface CreateSubscriptionRequest {
+  storeId: string;
+  planId: string;
+  start_at: string;
+  end_at: string;
+  status?: SubscriptionStatus;
+}
+
 export interface UpdateSubscriptionRequest {
   planId?: string;
   start_at?: string;
@@ -62,6 +84,19 @@ export interface RenewSubscriptionRequest {
   durationMonths?: number;
 }
 
+/** A page of subscriptions, as `GET /subscription/system/all` answers it. */
+export interface SubscriptionsListResponse {
+  data: Subscription[];
+  total: number;
+  page?: number | null;
+  limit?: number | null;
+}
+
+export interface SubscriptionsListParams {
+  page?: number;
+  limit?: number;
+}
+
 /**
  * System Subscriptions Service
  * Handles system-level subscription management endpoints
@@ -71,12 +106,31 @@ export const systemSubscriptionsService = {
    * جميع الاشتراكات (System)
    * GET /subscription/system/all
    */
-  getAllSubscriptions: async (): Promise<Subscription[]> => {
-    const response = await axiosInstance.get<Subscription[]>(
-      '/subscription/system/all'
-    );
-    // Response is directly an array
-    return response as unknown as Subscription[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /**
+   * Takes `page`/`limit`, which the server has always supported and this never
+   * sent — so the only subscriptions view loaded every row on the platform in
+   * one request and counted the array for its stat.
+   *
+   * The response shape depends on the parameters: with both, the server returns
+   * `{ data, total, page, limit }`; with neither, a bare array. Normalized here
+   * so callers do not have to know that.
+   */
+  getAllSubscriptions: async (
+    params?: SubscriptionsListParams,
+  ): Promise<SubscriptionsListResponse> => {
+    const response = (await axiosInstance.get('/subscription/system/all', {
+      params,
+    })) as unknown as Subscription[] | SubscriptionsListResponse;
+
+    if (Array.isArray(response)) {
+      return { data: response, total: response.length };
+    }
+    return {
+      data: response?.data ?? [],
+      total: response?.total ?? response?.data?.length ?? 0,
+      page: response?.page,
+      limit: response?.limit,
+    };
   },
 
   /**
@@ -84,13 +138,39 @@ export const systemSubscriptionsService = {
    * GET /subscription/system/search
    */
   searchSubscriptions: async (
-    searchParams: SearchSubscriptionsRequest
-  ): Promise<Subscription[]> => {
-    const response = await axiosInstance.get<Subscription[]>(
+    searchParams: SearchSubscriptionsRequest,
+  ): Promise<SubscriptionsListResponse> => {
+    const response = (await axiosInstance.get(
       '/subscription/system/search',
-      { params: searchParams }
+      { params: searchParams },
+    )) as unknown as Subscription[] | SubscriptionsListResponse;
+
+    if (Array.isArray(response)) {
+      return { data: response, total: response.length };
+    }
+    return {
+      data: response?.data ?? [],
+      total: response?.total ?? response?.data?.length ?? 0,
+      page: response?.page,
+      limit: response?.limit,
+    };
+  },
+
+  /**
+   * إنشاء اشتراك (System)
+   * POST /subscription/system
+   *
+   * Revives a previously deleted subscription for the same store rather than
+   * failing — `Subscription.storeId` is unique, so the dead row holds the key.
+   */
+  createSubscription: async (
+    payload: CreateSubscriptionRequest,
+  ): Promise<Subscription> => {
+    const response = await axiosInstance.post<Subscription>(
+      '/subscription/system',
+      payload,
     );
-    return response as unknown as Subscription[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as Subscription;
   },
 
   /**
@@ -105,7 +185,7 @@ export const systemSubscriptionsService = {
       `/subscription/system/${id}`,
       updateData
     );
-    return response as unknown as Subscription; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as Subscription;  
   },
 
   /**
@@ -116,7 +196,7 @@ export const systemSubscriptionsService = {
     const response = await axiosInstance.put<Subscription>(
       `/subscription/system/${id}/pause`
     );
-    return response as unknown as Subscription; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as Subscription;  
   },
 
   /**
@@ -127,7 +207,7 @@ export const systemSubscriptionsService = {
     const response = await axiosInstance.put<Subscription>(
       `/subscription/system/${id}/resume`
     );
-    return response as unknown as Subscription; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as Subscription;  
   },
 
   /**
@@ -138,7 +218,7 @@ export const systemSubscriptionsService = {
     const response = await axiosInstance.put<Subscription>(
       `/subscription/system/${id}/cancel`
     );
-    return response as unknown as Subscription; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as Subscription;  
   },
 
   /**
@@ -153,6 +233,6 @@ export const systemSubscriptionsService = {
       `/subscription/system/${id}/renew`,
       renewData
     );
-    return response as unknown as Subscription; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return response as unknown as Subscription;  
   },
 };
