@@ -58,6 +58,10 @@ const defaultPlanForm: PlanPayload = {
   has_pos: false,
   is_free: false,
   order_number: null,
+  promo_enabled: true,
+  promo_free_months: 1,
+  promo_discount_months: 6,
+  promo_discount_percent: 50,
   featureIds: [],
   moduleIds: [],
 };
@@ -138,6 +142,10 @@ const SubscriptionPlans = () => {
       has_pos: plan.has_pos ?? false,
       is_free: plan.is_free ?? false,
       order_number: plan.order_number ?? null,
+      promo_enabled: plan.promo_enabled ?? true,
+      promo_free_months: plan.promo_free_months ?? 1,
+      promo_discount_months: plan.promo_discount_months ?? 6,
+      promo_discount_percent: plan.promo_discount_percent ?? 50,
       featureIds: plan.features?.map((item) => item.feature.id) || [],
       // `item.module.id`, not `item.id`: the server wraps each module in a join
       // row, exactly as it does features one line above. Reading the wrapper
@@ -373,6 +381,43 @@ const SubscriptionPlans = () => {
                 onChange={(value) => setFormData((current) => ({ ...current, is_free: value === 'true' }))}
               />
 
+              {/* The intro offer new customers get on monthly billing. The
+                  server bills from these columns, and the landing page shows
+                  them, so editing them changes both. */}
+              <div className="md:col-span-2 rounded-2xl bg-violet-50 p-4 text-right">
+                <p className="text-sm font-black text-violet-700">عرض المشتركين الجدد (الدفع الشهري)</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  أشهر مجانية للعميل الجديد، ثم أشهر بخصم، ثم السعر الكامل. إيقاف العرض يحاسب الجميع بالسعر الكامل من دفعتهم القادمة.
+                </p>
+              </div>
+              <SelectField
+                label="تفعيل العرض"
+                value={formData.promo_enabled ? 'true' : 'false'}
+                options={YES_NO}
+                onChange={(value) => setFormData((current) => ({ ...current, promo_enabled: value === 'true' }))}
+              />
+              <FormField
+                label="الأشهر المجانية"
+                type="number"
+                value={formData.promo_free_months}
+                required
+                onChange={(value) => setFormData((current) => ({ ...current, promo_free_months: Number(value) }))}
+              />
+              <FormField
+                label="أشهر الخصم بعد المجانية"
+                type="number"
+                value={formData.promo_discount_months}
+                required
+                onChange={(value) => setFormData((current) => ({ ...current, promo_discount_months: Number(value) }))}
+              />
+              <FormField
+                label="نسبة الخصم %"
+                type="number"
+                value={formData.promo_discount_percent}
+                required
+                onChange={(value) => setFormData((current) => ({ ...current, promo_discount_percent: Number(value) }))}
+              />
+
               {/* Picked by id from the real rows. These were two comma-separated
                   text boxes, and the server validates what it is sent as uuids —
                   so creating a plan with any feature typed in failed, and editing
@@ -432,6 +477,11 @@ const PlanCard = ({ plan, onEdit, onDelete }: { plan: Plan; onEdit: (plan: Plan)
         <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
           {plan.code ? <StatusPill tone="violet">{plan.code}</StatusPill> : null}
           {plan.is_free ? <StatusPill tone="blue">مجانية</StatusPill> : null}
+          {plan.promo_enabled ?? true ? (
+            <StatusPill tone="amber">
+              {`${plan.promo_free_months ?? 1} شهر مجاني · خصم ${plan.promo_discount_percent ?? 50}% لـ ${plan.promo_discount_months ?? 6} أشهر`}
+            </StatusPill>
+          ) : null}
           <StatusPill tone={plan.enabled ? 'green' : 'red'} dot>
             {plan.enabled ? 'مفعلة' : 'معطلة'}
           </StatusPill>

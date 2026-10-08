@@ -44,6 +44,15 @@ export interface Plan {
   has_pos: boolean;
   is_free: boolean;
   order_number: number | null;
+  /**
+   * The intro offer on monthly billing: `promo_free_months` free for a new
+   * customer, then `promo_discount_months` at `promo_discount_percent` off.
+   * Optional because a server without the columns does not send them.
+   */
+  promo_enabled?: boolean;
+  promo_free_months?: number;
+  promo_discount_months?: number;
+  promo_discount_percent?: number;
   features: PlanFeature[];
   modules: PlanModule[];
   _count?: {
@@ -105,6 +114,10 @@ export interface PlanPayload {
   has_pos: boolean;
   is_free: boolean;
   order_number?: number | null;
+  promo_enabled: boolean;
+  promo_free_months: number;
+  promo_discount_months: number;
+  promo_discount_percent: number;
   featureIds: string[];
   moduleIds: string[];
 }
