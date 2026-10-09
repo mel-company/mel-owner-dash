@@ -161,7 +161,7 @@ const Subscriptions = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 max-md:[&>*:last-child:nth-child(odd)]:col-span-2 gap-4 md:grid-cols-4">
         <StatCard
           title="إجمالي الاشتراكات"
           value={total}

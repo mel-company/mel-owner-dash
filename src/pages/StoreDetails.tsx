@@ -71,7 +71,7 @@ const StoreDetails = () => {
         action={<PrimaryActionButton onClick={() => navigate('/dashboard/stores')}><ArrowRight className="h-4 w-4" />العودة إلى المتاجر</PrimaryActionButton>}
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 max-md:[&>*:last-child:nth-child(odd)]:col-span-2 gap-4 md:grid-cols-4">
         <StatCard title="نوع المتجر" value={getStoreType(store.store_type)} icon={<StoreIcon />} tone="blue" hint={null} />
         <StatCard title="حالة الاشتراك" value={subscriptionStatusLabel(subscriptionStatus)} icon={<CalendarDays />} tone={subscriptionStatus === 'ACTIVE' ? 'teal' : 'amber'} hint={null} />
         <StatCard title="المالك" value={store.owner?.name || 'غير محدد'} icon={<UserRound />} tone="violet" hint={null} />

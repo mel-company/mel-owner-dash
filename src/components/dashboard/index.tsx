@@ -105,7 +105,7 @@ export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { tit
           <div className={cn('[&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.4] sm:[&_svg]:h-6 sm:[&_svg]:w-6', color.icon)}>{icon}</div>
         </div>
         <div className="min-w-0 flex-1 text-right">
-          <CardTitle className="truncate text-xs font-black text-slate-700 sm:text-sm">{title}</CardTitle>
+          <CardTitle className="line-clamp-2 text-xs leading-snug font-black text-slate-700 sm:truncate sm:text-sm">{title}</CardTitle>
           <div className="mt-1.5 flex items-center justify-start gap-2" dir="ltr">
             {hint != null && hint !== false && (
               <Badge variant="secondary" className="bg-emerald-50 text-[10px] font-bold text-emerald-600 sm:text-xs">
@@ -1062,7 +1062,7 @@ export const LoadingState = () => (
       </div>
       <Skeleton className="h-11 w-full rounded-2xl sm:w-36" />
     </div>
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <div key={index} className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-start justify-between gap-3">

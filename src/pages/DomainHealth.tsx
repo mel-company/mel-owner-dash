@@ -277,7 +277,7 @@ const DomainHealth = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-3">
         <StatCard
           title="نطاقات مفحوصة"
           value={audit?.checked ?? 0}
