@@ -32,7 +32,7 @@ import {
 import { supportMessagesService, type SupportMessage } from '../services/supportMessagesService';
 import { useSupportUnread } from '../contexts/SupportUnreadContext';
 import { markTicketReadLocally } from '../utils/supportUnread';
-import { PageHeader, PrimaryActionButton } from '@/components/dashboard';
+import { CardTable, PageHeader, PrimaryActionButton } from '@/components/dashboard';
 import { cn } from '@/lib/utils';
 
 type TicketFilters = {
@@ -777,8 +777,8 @@ const TicketTable = ({
   const pages = getVisiblePages(page, totalPages);
 
   return (
-    <div className="overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-100">
-      <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-100 max-md:overflow-visible max-md:rounded-none max-md:bg-transparent max-md:shadow-none max-md:ring-0">
+      <CardTable className="overflow-x-auto">
         <table className="w-full min-w-[1050px]">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
@@ -862,7 +862,7 @@ const TicketTable = ({
             )}
           </tbody>
         </table>
-      </div>
+      </CardTable>
 
       <div className="flex flex-row-reverse items-center justify-between border-t border-slate-100 px-5 py-4 text-xs text-slate-500">
         <label className="flex items-center gap-2 font-bold text-slate-600">

@@ -189,3 +189,108 @@
     @apply flex w-full items-center gap-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100 sm:w-auto sm:min-w-[240px];
   }
 }
+
+/*
+ * `CardTable` (components/dashboard): below md, each table row is a card.
+ * Unlayered on purpose, so it wins over the `px-5 py-4`, `divide-y` and
+ * `min-w-[…]` utilities the pages put on the same elements.
+ *
+ * The card's top row is [media] [title] [actions]. The title is the first cell
+ * unless a cell says `data-card="title"`; `data-card="media"` puts a cell (a
+ * logo) before it, and `data-card="hide"` drops a cell from the card.
+ */
+@media (max-width: 767.98px) {
+  .table-cards table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .table-cards thead {
+    display: none;
+  }
+
+  .table-cards tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .table-cards tbody > tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    border: 0;
+    border-radius: 1.25rem;
+    background: #fff;
+    padding: 0.35rem 1rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 0 0 1px #f1f5f9;
+  }
+
+  .table-cards tbody > tr > td {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    min-width: 0;
+    padding: 0.6rem 0;
+    border-top: 1px solid #f1f5f9;
+    text-align: left;
+  }
+
+  /* The label takes the start edge and pushes the cell's content to the end,
+     kept together however many elements the cell holds. */
+  .table-cards tbody > tr > td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    margin-inline-end: auto;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-align: right;
+  }
+
+  .table-cards tbody > tr > td:first-child:not([data-card]),
+  .table-cards tbody > tr > td[data-card='title'] {
+    grid-column: 2;
+    grid-row: 1;
+    border-top: 0;
+    text-align: right;
+  }
+
+  .table-cards tbody > tr > td[data-card='media'] {
+    grid-column: 1;
+    grid-row: 1;
+    margin-inline-end: 0.75rem;
+    border-top: 0;
+  }
+
+  .table-cards tbody > tr > td[data-card-actions] {
+    grid-column: 3;
+    grid-row: 1;
+    margin-inline-start: 0.75rem;
+    border-top: 0;
+  }
+
+  .table-cards tbody > tr > td[data-card='hide'] {
+    display: none;
+  }
+
+  .table-cards tbody > tr > td:first-child:not([data-card])::before,
+  .table-cards tbody > tr > td[data-card='title']::before,
+  .table-cards tbody > tr > td[data-card='media']::before,
+  .table-cards tbody > tr > td[data-card-actions]::before,
+  .table-cards tbody > tr > td[data-label='']::before,
+  .table-cards tbody > tr > td[colspan]::before {
+    content: none;
+  }
+
+  /* A spanning cell is an empty state or a loading row. */
+  .table-cards tbody > tr > td[colspan] {
+    grid-column: 1 / -1;
+    display: block;
+    border-top: 0;
+    text-align: center;
+  }
+}

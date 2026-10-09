@@ -487,13 +487,13 @@ const Stores = () => {
                 const row = getStoreDisplay(store, index);
                 return (
                   <tr key={store.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4" data-card="media">
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-semibold text-slate-500">{String(index + 1).padStart(2, '0')}</span>
                         <BrandMark logo={row.logo} accent={row.accent} />
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4" data-card="title">
                       <button
                         type="button"
                         onClick={() => navigate(`/dashboard/stores/${store.id}`)}

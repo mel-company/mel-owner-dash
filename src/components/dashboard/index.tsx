@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -343,9 +344,78 @@ export const SearchFiltersBar = ({
   );
 };
 
+/**
+ * A table that turns into one card per row below `md`, and stays a table above.
+ *
+ * Every list screen here is a wide table (`min-w-[900px]` and up) in a
+ * horizontally scrolling box, which on a phone showed two columns at a time and
+ * hid the actions off the far edge. Rather than write a second, card-shaped
+ * render for each screen — two layouts to keep in sync per page — the same
+ * markup is restyled by `.table-cards` in `index.css`: the header row is hidden
+ * and each body row stacks its cells, each prefixed by its column's header.
+ *
+ * Those labels come from `<thead>`, so pages need no extra props: this copies
+ * each header's text onto the cells under it as `data-label`, which the CSS
+ * prints with `attr()`. It re-runs whenever rows change, and counts `colSpan`
+ * so a spanning cell (an empty state) gets no label and does not shift the
+ * cells after it. The first cell is the card's title and is printed unlabelled;
+ * the row's actions column (by its header, or an unlabelled last column) moves
+ * up beside it.
+ */
+const ACTION_HEADERS = new Set(['إجراء', 'إجراءات', 'العمليات']);
+
+export const CardTable = ({ children, className }: { children: ReactNode; className?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+
+    const label = () => {
+      root.querySelectorAll('table').forEach((table) => {
+        const heads = Array.from(table.querySelectorAll(':scope > thead th')).map(
+          (th) => th.textContent?.trim() ?? '',
+        );
+        const actions = heads.findIndex(
+          (text, index) => ACTION_HEADERS.has(text) || (index > 0 && index === heads.length - 1 && text === ''),
+        );
+        table.querySelectorAll(':scope > tbody > tr').forEach((row) => {
+          let column = 0;
+          Array.from(row.children).forEach((cell) => {
+            const span = (cell as HTMLTableCellElement).colSpan || 1;
+            const text = span > 1 ? '' : heads[column] ?? '';
+            if (cell.getAttribute('data-label') !== text) cell.setAttribute('data-label', text);
+            cell.toggleAttribute('data-card-actions', span === 1 && column === actions);
+            column += span;
+          });
+        });
+      });
+    };
+
+    label();
+    // Not `attributes`: the labels written above must not re-trigger this.
+    const observer = new MutationObserver(label);
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={cn('table-cards', className)}>
+      {children}
+    </div>
+  );
+};
+
+/**
+ * The card a list screen's table sits in. Below `md` the card itself steps
+ * back (no fill, border or shadow) so the row cards `CardTable` draws are not
+ * boxed inside another card.
+ */
 export const TableShell = ({ children, footer }: { children: ReactNode; footer?: ReactNode }) => (
-  <Card className="gap-0 overflow-hidden rounded-[1.5rem] py-0 shadow-sm sm:rounded-[2rem]">
-    <CardContent className="overflow-x-auto overscroll-x-contain p-0 [-webkit-overflow-scrolling:touch]">{children}</CardContent>
+  <Card className="gap-0 overflow-hidden rounded-[1.5rem] py-0 shadow-sm max-md:overflow-visible max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:shadow-none sm:rounded-[2rem]">
+    <CardContent className="overflow-x-auto overscroll-x-contain p-0 [-webkit-overflow-scrolling:touch]">
+      <CardTable>{children}</CardTable>
+    </CardContent>
     {footer}
   </Card>
 );
