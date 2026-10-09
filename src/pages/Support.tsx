@@ -1025,8 +1025,12 @@ const TicketDetailsDrawer = ({
     <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
       <div onMouseDown={(event) => event.stopPropagation()} className="fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-5xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8">
         <DrawerHeader title="تفاصيل التذكرة" subtitle={`#${ticket.id.slice(0, 8)}`} onClose={onClose} />
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-hidden lg:grid-cols-[360px_1fr]">
-          <div className="flex min-h-0 flex-col">
+        {/* Below lg the two columns stack, so the whole body scrolls as one
+            page; squeezing both into the drawer's height made the fields
+            spill over the conversation. Only side by side do the columns
+            share the height and scroll their own lists. */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-5 overflow-y-auto [scrollbar-width:none] lg:grid-cols-[360px_1fr] lg:content-stretch lg:overflow-hidden [&::-webkit-scrollbar]:hidden">
+          <div className="flex flex-col lg:min-h-0">
             {/* A contact-form visitor has no account and never sees this
                 thread — a reply reaches them by email or WhatsApp, so the
                 address has to be one click away, not buried in the body. */}
@@ -1070,7 +1074,7 @@ const TicketDetailsDrawer = ({
                 </button>
               )}
             </div>
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-3xl bg-slate-50 p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="max-h-80 space-y-3 overflow-y-auto rounded-3xl bg-slate-50 p-4 [scrollbar-width:none] lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden">
               {attachments.map((attachment) => {
                 const available = isAttachmentAvailable(attachment);
                 const fileUrl = getAttachmentUrl(attachment);
@@ -1121,9 +1125,9 @@ const TicketDetailsDrawer = ({
             <button onClick={onClose} className="mt-3 h-14 rounded-2xl bg-slate-100 font-black text-slate-600">إلغاء</button>
           </div>
 
-          <div className="flex min-h-0 flex-col">
+          <div className="flex flex-col lg:min-h-0">
             <h3 className="mb-3 text-lg font-black text-slate-800">المحادثة</h3>
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-3xl bg-slate-50 p-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="h-[60dvh] space-y-4 overflow-y-auto rounded-3xl bg-slate-50 p-5 [scrollbar-width:none] lg:h-auto lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden">
               {messages.map((message) => {
                 const isStoreSide = message.senderType === 'STORE_USER' || message.senderType === 'CUSTOMER' || message.senderType === 'USER';
                 const senderName = getMessageSenderName(message);
