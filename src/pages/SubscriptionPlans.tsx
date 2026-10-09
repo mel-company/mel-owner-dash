@@ -228,7 +228,7 @@ const SubscriptionPlans = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title="إجمالي الباقات" value={plans.length} icon={<Layers3 />} tone="blue" />
         <StatCard title="الباقات المفعلة" value={plans.filter((plan) => plan.enabled).length} icon={<CheckCircle />} tone="teal" />
         <StatCard title="الأكثر شيوعاً" value={plans.filter((plan) => plan.most_popular).length} icon={<Sparkles />} tone="amber" />
@@ -243,8 +243,22 @@ const SubscriptionPlans = () => {
         ))}
       </div>
 
+      {/* The table had no heading, so on desktop it read as part of the plan
+          grid. It shows the latest page only; the full list lives on its own
+          screen. */}
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <h2 className="text-lg font-black text-slate-950">أحدث الاشتراكات</h2>
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard/subscriptions')}
+          className="rounded-xl bg-violet-50 px-4 py-2 text-sm font-black text-violet-600"
+        >
+          عرض الكل
+        </button>
+      </div>
+
       <TableShell>
-        <table className="w-full min-w-[760px]">
+        <table className="w-full min-w-[640px]">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60 text-sm text-slate-700">
               <th className="px-5 py-5 text-right">المتجر</th>
@@ -461,59 +475,72 @@ const SubscriptionPlans = () => {
   );
 };
 
+/**
+ * The page is RTL, so the card is laid out from the right: icon first, then the
+ * text, and every row starts at the right edge. It was written LTR-first
+ * (`justify-end`, icon after the text), which in RTL pushed the header, badges
+ * and feature list to the *left* edge of the card while the price block stayed
+ * right-aligned — most visible on a plan with a short name.
+ */
 const PlanCard = ({ plan, onEdit, onDelete }: { plan: Plan; onEdit: (plan: Plan) => void; onDelete: (plan: Plan) => void }) => (
-  <div className="relative overflow-hidden rounded-[1.7rem] bg-white p-6 shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-lg">
-    {plan.most_popular && (
-      <span className="absolute left-5 top-5 rounded-full bg-violet-600 px-3 py-1 text-xs font-black text-white">الأكثر شيوعاً</span>
-    )}
-    <div className="mb-5 flex items-center justify-end gap-3">
-      <div>
-        <h2 className="text-xl font-black text-slate-950">{renderText(plan.name)}</h2>
-        <p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-400">{renderText(plan.description)}</p>
+  <div className="flex h-full flex-col rounded-[1.7rem] bg-white p-6 text-right shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-lg">
+    <div className="mb-5 flex items-start gap-3">
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-600">
+        <Crown className="h-6 w-6" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="min-w-0 truncate text-xl font-black text-slate-950">{renderText(plan.name)}</h2>
+          {plan.most_popular && (
+            <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1 text-xs font-black text-white">الأكثر شيوعاً</span>
+          )}
+        </div>
+        {renderText(plan.description) ? (
+          <p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-400">{renderText(plan.description)}</p>
+        ) : null}
         {/* The list now includes disabled and free plans, because the one screen
             that can re-enable a plan was reading a feed that hid it. That makes
             saying which is which the card's job — without this, a plan nobody can
             buy looks exactly like a live one. */}
-        <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-          {plan.code ? <StatusPill tone="violet">{plan.code}</StatusPill> : null}
-          {plan.is_free ? <StatusPill tone="blue">مجانية</StatusPill> : null}
-          {plan.promo_enabled ?? true ? (
-            <StatusPill tone="amber">
-              {`${plan.promo_free_months ?? 1} شهر مجاني · خصم ${plan.promo_discount_percent ?? 50}% لـ ${plan.promo_discount_months ?? 6} أشهر`}
-            </StatusPill>
-          ) : null}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <StatusPill tone={plan.enabled ? 'green' : 'red'} dot>
             {plan.enabled ? 'مفعلة' : 'معطلة'}
           </StatusPill>
+          {plan.code ? <StatusPill tone="violet">{plan.code}</StatusPill> : null}
+          {plan.is_free ? <StatusPill tone="blue">مجانية</StatusPill> : null}
         </div>
-      </div>
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-violet-50 text-violet-600">
-        <Crown className="h-6 w-6" />
       </div>
     </div>
     <div className="mb-5 rounded-3xl bg-slate-50 p-4">
       <p className="text-sm font-bold text-slate-400">السعر الشهري</p>
       <p className="mt-1 text-3xl font-black text-slate-950">{plan.monthly_price?.toLocaleString('en-US') || 0} <span className="text-sm text-slate-500">د.ع</span></p>
       <p className="mt-3 text-sm font-bold text-slate-400">السعر السنوي: <span className="text-slate-700">{plan.yearly_price?.toLocaleString('en-US') || 0} د.ع</span></p>
+      {plan.promo_enabled ?? true ? (
+        <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-700">
+          {`عرض المشتركين الجدد: ${plan.promo_free_months ?? 1} شهر مجاني، ثم خصم ${plan.promo_discount_percent ?? 50}% لـ ${plan.promo_discount_months ?? 6} أشهر`}
+        </p>
+      ) : null}
     </div>
     <ul className="space-y-3">
       {Array.isArray(plan.features) && plan.features.length > 0 ? (
         plan.features.slice(0, 5).map((feature: PlanFeature) => (
-          <li key={feature.feature.id} className="flex items-center justify-end gap-2 text-sm font-semibold text-slate-600">
-            <span>{renderText(feature.feature.name)}</span>
-            <CheckCircle className="h-4 w-4 text-emerald-500" />
+          <li key={feature.feature.id} className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+            <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
+            <span className="min-w-0">{renderText(feature.feature.name)}</span>
           </li>
         ))
       ) : (
         <li className="text-sm font-semibold text-slate-400">لا توجد ميزات</li>
       )}
     </ul>
-    <div className="mt-6 grid grid-cols-[auto_1fr] gap-2">
-      <button type="button" onClick={() => onDelete(plan)} className="grid h-12 w-12 place-items-center rounded-2xl bg-red-50 text-red-500"><Trash2 className="h-4 w-4" /></button>
+    {/* `mt-auto`: cards in a row stretch to the tallest, so the buttons line up
+        along the bottom instead of floating under a short feature list. */}
+    <div className="mt-auto grid grid-cols-[1fr_auto] gap-2 pt-6">
       <button type="button" onClick={() => onEdit(plan)} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 font-black text-white">
-        إدارة الباقة
         <Pencil className="h-4 w-4" />
+        إدارة الباقة
       </button>
+      <button type="button" onClick={() => onDelete(plan)} aria-label="حذف الباقة" className="grid h-12 w-12 place-items-center rounded-2xl bg-red-50 text-red-500"><Trash2 className="h-4 w-4" /></button>
     </div>
   </div>
 );
