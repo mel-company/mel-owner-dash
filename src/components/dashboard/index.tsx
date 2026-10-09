@@ -95,6 +95,10 @@ export const PrimaryActionButton = ({
  * must not borrow that styling, or the next reader cannot tell a measured
  * figure from a described one.
  */
+/** Text that is not a figure: has a letter in it (Latin or Arabic). */
+const isWordValue = (value: ReactNode) =>
+  typeof value === 'string' && /[A-Za-z\u0600-\u06FF]/.test(value);
+
 export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { title: string; value: ReactNode; icon: ReactNode; tone?: StatTone; hint?: ReactNode; sub?: ReactNode }) => {
   const color = statTones[tone];
 
@@ -106,13 +110,26 @@ export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { tit
         </div>
         <div className="min-w-0 flex-1 text-right">
           <CardTitle className="line-clamp-2 text-xs leading-snug font-black text-slate-700 sm:truncate sm:text-sm">{title}</CardTitle>
-          <div className="mt-1.5 flex items-center justify-start gap-2" dir="ltr">
+          <div className="mt-1.5 flex min-w-0 items-center justify-start gap-2" dir="ltr">
             {hint != null && hint !== false && (
               <Badge variant="secondary" className="bg-emerald-50 text-[10px] font-bold text-emerald-600 sm:text-xs">
                 {hint}
               </Badge>
             )}
-            <span className="text-xl font-black leading-none text-slate-950 sm:text-2xl">{value}</span>
+            {/* A worded value (a domain, an owner's name) is set smaller and
+                may wrap: two to a row on a phone, at figure size it ran over
+                the icon beside it. Figures keep the large size. */}
+            <span
+              dir="auto"
+              className={cn(
+                'min-w-0 font-black text-slate-950',
+                isWordValue(value)
+                  ? 'text-sm leading-snug wrap-anywhere sm:text-lg'
+                  : 'text-xl leading-none sm:text-2xl',
+              )}
+            >
+              {value}
+            </span>
           </div>
           {sub != null && sub !== false && (
             <div className="mt-1 truncate text-[11px] font-semibold text-slate-400 sm:text-xs">{sub}</div>
