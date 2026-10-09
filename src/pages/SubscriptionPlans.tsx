@@ -90,24 +90,40 @@ const SubscriptionPlans = () => {
     loadData();
   }, []);
 
+  /**
+   * Each request settles on its own. With `Promise.all`, one failing endpoint
+   * (the plans query, when the server is ahead of its database) blanked the
+   * subscriptions, features and modules that had loaded fine.
+   */
   const loadData = async () => {
     try {
       setLoading(true);
       setError('');
-      const [plansRes, subsRes, features, modules] = await Promise.all([
+      const [plansRes, subsRes, features, modules] = await Promise.allSettled([
         plansService.getAllPlans(),
         systemSubscriptionsService.getAllSubscriptions({ page: 1, limit: 10 }),
         plansService.getFeatureOptions(),
         plansService.getModuleOptions(),
       ]);
-      setPlans(plansRes.data || []);
-      setSubscriptions(subsRes?.data || []);
-      setSubscriptionTotal(subsRes?.total || 0);
-      setFeatureOptions(features);
-      setModuleOptions(modules);
-    } catch (err) {
-      setError('فشل في جلب بيانات الباقات.');
-      console.error('Error loading plans:', err);
+      if (plansRes.status === 'fulfilled') setPlans(plansRes.value.data || []);
+      if (subsRes.status === 'fulfilled') {
+        setSubscriptions(subsRes.value?.data || []);
+        setSubscriptionTotal(subsRes.value?.total || 0);
+      }
+      if (features.status === 'fulfilled') setFeatureOptions(features.value);
+      if (modules.status === 'fulfilled') setModuleOptions(modules.value);
+
+      const failed = [
+        plansRes.status === 'rejected' && 'الباقات',
+        subsRes.status === 'rejected' && 'الاشتراكات',
+        (features.status === 'rejected' || modules.status === 'rejected') && 'الميزات',
+      ].filter(Boolean);
+      if (failed.length) {
+        setError(`فشل في جلب ${failed.join(' و')}. حاول مرة أخرى بعد قليل.`);
+        [plansRes, subsRes, features, modules].forEach((result) => {
+          if (result.status === 'rejected') console.error('Error loading plans page:', result.reason);
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -228,7 +244,7 @@ const SubscriptionPlans = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title="إجمالي الباقات" value={plans.length} icon={<Layers3 />} tone="blue" />
         <StatCard title="الباقات المفعلة" value={plans.filter((plan) => plan.enabled).length} icon={<CheckCircle />} tone="teal" />
         <StatCard title="الأكثر شيوعاً" value={plans.filter((plan) => plan.most_popular).length} icon={<Sparkles />} tone="amber" />

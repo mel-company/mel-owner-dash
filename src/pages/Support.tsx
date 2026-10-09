@@ -468,7 +468,7 @@ const Support = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 max-md:[&>*:last-child:nth-child(odd)]:col-span-2 gap-4 md:grid-cols-3">
         <StatCard title="إجمالي التذاكر" value={stats.total} tone="cyan" icon={<MessageCircle className="h-6 w-6" />} />
         <StatCard title="عدد التذاكر المفتوح" value={stats.open} tone="amber" icon={<Headphones className="h-6 w-6" />} />
         <StatCard title="عدد التذاكر المغلقة" value={stats.closed} tone="rose" icon={<X className="h-6 w-6" />} />

@@ -282,7 +282,7 @@ const Employees = () => {
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[1fr_1fr_1.4fr]">
+      <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[1fr_1fr_1.4fr]">
         <StatCard
           title="أجمالي الموظفين"
           value={employees.length.toLocaleString()}
