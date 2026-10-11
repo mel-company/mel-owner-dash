@@ -498,8 +498,19 @@ const Accounting = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {transactions.map((transaction) => {
-                const status = getStatusMeta(transaction.status);
-                const method = describePaymentMethod(transaction);
+                const isComplimentary = (transaction.amount ?? 0) === 0;
+                const status = getStatusMeta(
+                  transaction.status,
+                  isComplimentary,
+                );
+                const method = isComplimentary
+                  ? {
+                      ...describePaymentMethod(transaction),
+                      label: 'شهر مجاني',
+                      network: null as string | null,
+                      maskedPan: null as string | null,
+                    }
+                  : describePaymentMethod(transaction);
                 const txnLabel = getTransactionLabel(transaction);
                 return (
                   <tr key={transaction.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
@@ -842,7 +853,13 @@ const getTransactionLabel = (transaction: AccountingTransaction) => {
   return `${kind}${planName}`;
 };
 
-const getStatusMeta = (status: string) => {
+const getStatusMeta = (status: string, complimentary = false) => {
+  if (
+    complimentary &&
+    (status === 'COMPLETED' || status === 'PAID' || status === 'ACTIVE')
+  ) {
+    return { label: 'مجاني', tone: 'slate' as const };
+  }
   if (status === 'COMPLETED' || status === 'PAID' || status === 'ACTIVE') {
     return { label: 'مدفوع', tone: 'green' as const };
   }
