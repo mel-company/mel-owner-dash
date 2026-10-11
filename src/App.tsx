@@ -18,6 +18,7 @@ import DeliveryZones from './pages/DeliveryZones';
 import PaymentMethods from './pages/PaymentMethods';
 import Developer from './pages/Developer';
 import DomainHealth from './pages/DomainHealth';
+import UnlimitedAi from './pages/UnlimitedAi';
 
 function App() {
   return (
@@ -73,6 +74,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['owner']}>
                   <FinancialAi />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="unlimited-ai"
+              element={
+                <ProtectedRoute requiredRoles={['owner']}>
+                  <UnlimitedAi />
                 </ProtectedRoute>
               }
             />
