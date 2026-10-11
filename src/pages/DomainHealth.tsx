@@ -44,7 +44,7 @@ import {
 const ISSUANCE_HINT =
   'تصدر Cloudflare الشهادة بعد إنشاء السجل بدقائق. أعد الفحص بعد قليل.';
 
-type RowState = 'idle' | 'repairing' | 'awaiting';
+type RowState = 'idle' | 'checking' | 'repairing' | 'awaiting';
 
 const DomainHealth = () => {
   const [audit, setAudit] = useState<DashboardTlsAudit | null>(null);
@@ -138,6 +138,28 @@ const DomainHealth = () => {
     });
     return probe.ready;
   }, []);
+
+  /** The row's "فحص" button: spin while probing, then say what it found. */
+  const checkOne = useCallback(
+    async (row: DashboardTlsRow) => {
+      setRowState((state) => ({ ...state, [row.domain]: 'checking' }));
+      setNotice('');
+      setError('');
+      try {
+        const ready = await recheck(row.domain);
+        if (ready) {
+          setNotice(`${row.host} يعمل وشهادته صالحة.`);
+        } else {
+          setError(`${row.host} لا يعمل الآن. استخدم «إصلاح» لإنشاء السجل.`);
+        }
+      } catch (err) {
+        setError(apiErrorMessage(err, `تعذر فحص ${row.host}.`));
+      } finally {
+        setRowState((state) => ({ ...state, [row.domain]: 'idle' }));
+      }
+    },
+    [recheck],
+  );
 
   const repairOne = useCallback(
     async (row: DashboardTlsRow) => {
@@ -365,6 +387,7 @@ const DomainHealth = () => {
               {rows.map((row) => {
                 const state = rowState[row.domain] ?? 'idle';
                 const busy = state === 'repairing';
+                const checking = state === 'checking';
                 return (
                   <tr
                     key={row.storeId}
@@ -411,11 +434,14 @@ const DomainHealth = () => {
                       {row.ready ? (
                         <button
                           type="button"
-                          onClick={() => void recheck(row.domain)}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 text-xs font-bold text-slate-600 shadow-sm transition hover:bg-slate-50"
+                          onClick={() => void checkOne(row)}
+                          disabled={checking}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 text-xs font-bold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
                         >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                          فحص
+                          <RefreshCw
+                            className={checking ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'}
+                          />
+                          {checking ? 'جارٍ الفحص…' : 'فحص'}
                         </button>
                       ) : (
                         <button
