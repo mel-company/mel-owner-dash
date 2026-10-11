@@ -249,7 +249,7 @@ const OwnerDashboard = () => {
         )}
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <KpiCard
           title="إجمالي المتاجر"
           description="كل المتاجر على المنصة"
@@ -409,7 +409,7 @@ const DashboardSkeleton = () => (
       <Skeleton className="h-11 w-full rounded-2xl sm:w-40" />
     </div>
 
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+    <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <Card key={index} className="gap-4 py-5">
           <CardHeader className="gap-3 px-5">

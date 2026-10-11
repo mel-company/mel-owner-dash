@@ -334,7 +334,7 @@ const Accounting = () => {
         amount is what an operator is chasing, so it is the headline and the
         count is what it is made of.
       */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-2 max-sm:[&>*:first-child]:col-span-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         <RevenueCard value={stats.totalRevenue} />
         <StatCard
           title="المعاملات لهذا الشهر"

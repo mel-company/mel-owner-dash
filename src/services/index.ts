@@ -32,3 +32,4 @@ export * from './domainHealthService';
 export * from './platformPaymentService';
 export * from './paymentGatewaysService';
 export * from './courierService';
+export * from './unlimitedAiService';

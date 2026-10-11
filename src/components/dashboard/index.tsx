@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -94,6 +95,10 @@ export const PrimaryActionButton = ({
  * must not borrow that styling, or the next reader cannot tell a measured
  * figure from a described one.
  */
+/** Text that is not a figure: has a letter in it (Latin or Arabic). */
+const isWordValue = (value: ReactNode) =>
+  typeof value === 'string' && /[A-Za-z\u0600-\u06FF]/.test(value);
+
 export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { title: string; value: ReactNode; icon: ReactNode; tone?: StatTone; hint?: ReactNode; sub?: ReactNode }) => {
   const color = statTones[tone];
 
@@ -104,14 +109,27 @@ export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { tit
           <div className={cn('[&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.4] sm:[&_svg]:h-6 sm:[&_svg]:w-6', color.icon)}>{icon}</div>
         </div>
         <div className="min-w-0 flex-1 text-right">
-          <CardTitle className="truncate text-xs font-black text-slate-700 sm:text-sm">{title}</CardTitle>
-          <div className="mt-1.5 flex items-center justify-start gap-2" dir="ltr">
+          <CardTitle className="line-clamp-2 text-xs leading-snug font-black text-slate-700 sm:truncate sm:text-sm">{title}</CardTitle>
+          <div className="mt-1.5 flex min-w-0 items-center justify-start gap-2" dir="ltr">
             {hint != null && hint !== false && (
               <Badge variant="secondary" className="bg-emerald-50 text-[10px] font-bold text-emerald-600 sm:text-xs">
                 {hint}
               </Badge>
             )}
-            <span className="text-xl font-black leading-none text-slate-950 sm:text-2xl">{value}</span>
+            {/* A worded value (a domain, an owner's name) is set smaller and
+                may wrap: two to a row on a phone, at figure size it ran over
+                the icon beside it. Figures keep the large size. */}
+            <span
+              dir="auto"
+              className={cn(
+                'min-w-0 font-black text-slate-950',
+                isWordValue(value)
+                  ? 'text-sm leading-snug wrap-anywhere sm:text-lg'
+                  : 'text-xl leading-none sm:text-2xl',
+              )}
+            >
+              {value}
+            </span>
           </div>
           {sub != null && sub !== false && (
             <div className="mt-1 truncate text-[11px] font-semibold text-slate-400 sm:text-xs">{sub}</div>
@@ -343,9 +361,78 @@ export const SearchFiltersBar = ({
   );
 };
 
+/**
+ * A table that turns into one card per row below `md`, and stays a table above.
+ *
+ * Every list screen here is a wide table (`min-w-[900px]` and up) in a
+ * horizontally scrolling box, which on a phone showed two columns at a time and
+ * hid the actions off the far edge. Rather than write a second, card-shaped
+ * render for each screen — two layouts to keep in sync per page — the same
+ * markup is restyled by `.table-cards` in `index.css`: the header row is hidden
+ * and each body row stacks its cells, each prefixed by its column's header.
+ *
+ * Those labels come from `<thead>`, so pages need no extra props: this copies
+ * each header's text onto the cells under it as `data-label`, which the CSS
+ * prints with `attr()`. It re-runs whenever rows change, and counts `colSpan`
+ * so a spanning cell (an empty state) gets no label and does not shift the
+ * cells after it. The first cell is the card's title and is printed unlabelled;
+ * the row's actions column (by its header, or an unlabelled last column) moves
+ * up beside it.
+ */
+const ACTION_HEADERS = new Set(['إجراء', 'إجراءات', 'العمليات']);
+
+export const CardTable = ({ children, className }: { children: ReactNode; className?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+
+    const label = () => {
+      root.querySelectorAll('table').forEach((table) => {
+        const heads = Array.from(table.querySelectorAll(':scope > thead th')).map(
+          (th) => th.textContent?.trim() ?? '',
+        );
+        const actions = heads.findIndex(
+          (text, index) => ACTION_HEADERS.has(text) || (index > 0 && index === heads.length - 1 && text === ''),
+        );
+        table.querySelectorAll(':scope > tbody > tr').forEach((row) => {
+          let column = 0;
+          Array.from(row.children).forEach((cell) => {
+            const span = (cell as HTMLTableCellElement).colSpan || 1;
+            const text = span > 1 ? '' : heads[column] ?? '';
+            if (cell.getAttribute('data-label') !== text) cell.setAttribute('data-label', text);
+            cell.toggleAttribute('data-card-actions', span === 1 && column === actions);
+            column += span;
+          });
+        });
+      });
+    };
+
+    label();
+    // Not `attributes`: the labels written above must not re-trigger this.
+    const observer = new MutationObserver(label);
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={cn('table-cards', className)}>
+      {children}
+    </div>
+  );
+};
+
+/**
+ * The card a list screen's table sits in. Below `md` the card itself steps
+ * back (no fill, border or shadow) so the row cards `CardTable` draws are not
+ * boxed inside another card.
+ */
 export const TableShell = ({ children, footer }: { children: ReactNode; footer?: ReactNode }) => (
-  <Card className="gap-0 overflow-hidden rounded-[1.5rem] py-0 shadow-sm sm:rounded-[2rem]">
-    <CardContent className="overflow-x-auto overscroll-x-contain p-0 [-webkit-overflow-scrolling:touch]">{children}</CardContent>
+  <Card className="gap-0 overflow-hidden rounded-[1.5rem] py-0 shadow-sm max-md:overflow-visible max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:shadow-none sm:rounded-[2rem]">
+    <CardContent className="overflow-x-auto overscroll-x-contain p-0 [-webkit-overflow-scrolling:touch]">
+      <CardTable>{children}</CardTable>
+    </CardContent>
     {footer}
   </Card>
 );
@@ -565,6 +652,80 @@ export const SelectField = ({ label, value, options, onChange, required }: { lab
     </div>
   </div>
 );
+
+/**
+ * Pick several rows by id.
+ *
+ * The plan drawer used two comma-separated text boxes for features and modules,
+ * which could never have worked: the server validates what it is sent as uuids,
+ * so a typed feature name came back "One or more feature IDs are invalid". There
+ * was also no endpoint listing either table, which is presumably why somebody
+ * reached for free text. Both now exist, so this offers the real rows.
+ *
+ * `empty` says why the list is blank rather than rendering nothing — an operator
+ * looking at an empty picker needs to know whether there is nothing to choose or
+ * whether the request failed.
+ */
+export const CheckboxListField = ({
+  label,
+  options,
+  selected,
+  onChange,
+  empty = 'لا توجد عناصر متاحة',
+  hint,
+}: {
+  label: string;
+  options: Array<{ id: string; name: string; description?: string }>;
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  empty?: string;
+  hint?: string;
+}) => {
+  const toggle = (id: string) =>
+    onChange(
+      selected.includes(id)
+        ? selected.filter((value) => value !== id)
+        : [...selected, id],
+    );
+
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <label className="block text-sm font-bold text-slate-700">{label}</label>
+        {hint ? <span className="text-xs text-slate-400">{hint}</span> : null}
+      </div>
+      <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2">
+        {options.length === 0 ? (
+          <p className="px-2 py-3 text-sm text-slate-400">{empty}</p>
+        ) : (
+          options.map((option) => (
+            <label
+              key={option.id}
+              className="flex cursor-pointer items-start gap-3 rounded-xl px-2 py-2 hover:bg-slate-50"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(option.id)}
+                onChange={() => toggle(option.id)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-violet-600"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-700">
+                  {option.name}
+                </span>
+                {option.description ? (
+                  <span className="block text-xs text-slate-400">
+                    {option.description}
+                  </span>
+                ) : null}
+              </span>
+            </label>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
 
 export type StatusTone = 'slate' | 'green' | 'red' | 'blue' | 'violet' | 'amber';
 
@@ -918,7 +1079,7 @@ export const LoadingState = () => (
       </div>
       <Skeleton className="h-11 w-full rounded-2xl sm:w-36" />
     </div>
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <div key={index} className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-start justify-between gap-3">

@@ -11,12 +11,14 @@ import Employees from './pages/Employees';
 import Accounting from './pages/Accounting';
 import FinancialAi from './pages/FinancialAi';
 import SubscriptionPlans from './pages/SubscriptionPlans';
+import Subscriptions from './pages/Subscriptions';
 import Support from './pages/Support';
 import DeliveryCompanies from './pages/DeliveryCompanies';
 import DeliveryZones from './pages/DeliveryZones';
 import PaymentMethods from './pages/PaymentMethods';
 import Developer from './pages/Developer';
 import DomainHealth from './pages/DomainHealth';
+import UnlimitedAi from './pages/UnlimitedAi';
 
 function App() {
   return (
@@ -76,10 +78,26 @@ function App() {
               }
             />
             <Route
+              path="unlimited-ai"
+              element={
+                <ProtectedRoute requiredRoles={['owner']}>
+                  <UnlimitedAi />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="plans"
               element={
                 <ProtectedRoute requiredRoles={['owner']}>
                   <SubscriptionPlans />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="subscriptions"
+              element={
+                <ProtectedRoute requiredRoles={['owner']}>
+                  <Subscriptions />
                 </ProtectedRoute>
               }
             />

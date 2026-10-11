@@ -470,7 +470,7 @@ const FinancialAi = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           title="كلفة الذكاء الاصطناعي"
           value={formatMoney(summary?.cost, currency, activeRate)}
@@ -862,7 +862,7 @@ const FinancialAi = () => {
             <LoadingState />
           ) : (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-3">
                 <KpiCard title="الكلفة" value={formatMoney(detail.cost, currency, activeRate)} />
                 <KpiCard
                   title="إيراد الاشتراك"

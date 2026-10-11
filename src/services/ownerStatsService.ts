@@ -60,9 +60,21 @@ export interface FeaturesAdoption {
 }
 
 export interface RiskAttention {
+  /**
+   * Stores whose subscription has run out, by either definition.
+   *
+   * `subscriptionStatus` is what distinguishes them, and it matters: `EXPIRED`
+   * means something retired the row, while `ACTIVE` here means the term is in
+   * the past and nothing has retired it yet — which is the normal state, because
+   * `SUBSCRIPTION_AUTO_EXPIRE` is off by default. The server used to report only
+   * the first group, so this list read ~zero while merchants held PLUS features
+   * they had stopped paying for.
+   */
   storesWithExpiredSubscriptions?: Array<{
     storeId: string;
     storeName: string;
+    subscriptionEndDate?: string;
+    subscriptionStatus?: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'CANCELLED';
     [key: string]: unknown;
   }>;
   storesWithHighRefunds?: Array<{
