@@ -47,6 +47,10 @@ export interface Store {
   store_type: string;
   domain: string | null;
   domain_last_update: string | null;
+  /** Bought hostname, e.g. hassuneqwe.com — preferred over *.mel.iq when set. */
+  customDomain?: string | null;
+  /** Public storefront URL from the API (custom domain wins over *.mel.iq). */
+  storeUrl?: string | null;
   ownerId: string | null;
   deliveryCompanyId: string | null;
   subscription: Subscription | null;

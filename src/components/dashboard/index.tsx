@@ -95,9 +95,12 @@ export const PrimaryActionButton = ({
  * must not borrow that styling, or the next reader cannot tell a measured
  * figure from a described one.
  */
-/** Text that is not a figure: has a letter in it (Latin or Arabic). */
-const isWordValue = (value: ReactNode) =>
-  typeof value === 'string' && /[A-Za-z\u0600-\u06FF]/.test(value);
+/** Text that is not a figure: has a letter in it (Latin or Arabic), or is a link/node. */
+const isWordValue = (value: ReactNode) => {
+  if (typeof value === 'string') return /[A-Za-z\u0600-\u06FF]/.test(value);
+  if (typeof value === 'number' || typeof value === 'bigint') return false;
+  return value != null && typeof value !== 'boolean';
+};
 
 export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { title: string; value: ReactNode; icon: ReactNode; tone?: StatTone; hint?: ReactNode; sub?: ReactNode }) => {
   const color = statTones[tone];

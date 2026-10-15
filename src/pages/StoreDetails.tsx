@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, CalendarDays, Globe, Mail, MapPin, Phone, Store as StoreIcon, UserRound } from 'lucide-react';
+import { ArrowRight, CalendarDays, ExternalLink, Globe, Mail, MapPin, Phone, Store as StoreIcon, UserRound } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
   AlertMessage,
   LoadingState,
@@ -61,6 +62,8 @@ const StoreDetails = () => {
 
   const logo = getPublicAssetUrl(store.logo);
   const subscriptionStatus = store.subscription?.status;
+  const storeUrl = getStorePublicUrl(store);
+  const domainLabel = getStorePublicHostLabel(store);
 
   return (
     <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
@@ -75,7 +78,28 @@ const StoreDetails = () => {
         <StatCard title="نوع المتجر" value={getStoreType(store.store_type)} icon={<StoreIcon />} tone="blue" hint={null} />
         <StatCard title="حالة الاشتراك" value={subscriptionStatusLabel(subscriptionStatus)} icon={<CalendarDays />} tone={subscriptionStatus === 'ACTIVE' ? 'teal' : 'amber'} hint={null} />
         <StatCard title="المالك" value={store.owner?.name || 'غير محدد'} icon={<UserRound />} tone="violet" hint={null} />
-        <StatCard title="النطاق" value={store.domain || 'غير محدد'} icon={<Globe />} tone="cyan" hint={null} />
+        <StatCard
+          title="النطاق"
+          value={
+            storeUrl && domainLabel ? (
+              <a
+                href={storeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-full items-center gap-1.5 text-cyan-700 underline-offset-4 transition hover:text-cyan-900 hover:underline"
+                title="فتح المتجر"
+              >
+                <span className="truncate" dir="ltr">{domainLabel}</span>
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+              </a>
+            ) : (
+              'غير محدد'
+            )
+          }
+          icon={<Globe />}
+          tone="cyan"
+          hint={null}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.8fr]">
@@ -146,7 +170,27 @@ const StoreDetails = () => {
         </DetailsCard>
 
         <DetailsCard title="الروابط والنطاق">
-          <InfoItem label="النطاق" value={store.domain ? `${store.domain}.mel.iq` : 'غير محدد'} />
+          <InfoItem
+            label="رابط المتجر"
+            value={
+              storeUrl && domainLabel ? (
+                <StorefrontLink href={storeUrl} label={domainLabel} />
+              ) : (
+                'غير محدد'
+              )
+            }
+          />
+          {store.customDomain && store.domain ? (
+            <InfoItem
+              label="نطاق المنصة"
+              value={
+                <StorefrontLink
+                  href={`https://${store.domain}.mel.iq`}
+                  label={`${store.domain}.mel.iq`}
+                />
+              }
+            />
+          ) : null}
           <InfoItem label="آخر تحديث للنطاق" value={store.domain_last_update ? formatDate(store.domain_last_update) : 'غير محدد'} />
           <InfoItem label="Instagram" value={store.instagram || 'غير محدد'} />
           <InfoItem label="Facebook" value={store.facebook || 'غير محدد'} />
@@ -187,7 +231,7 @@ const DetailsCard = ({ title, children }: { title: string; children: React.React
   </div>
 );
 
-const InfoItem = ({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) => (
+const InfoItem = ({ label, value, icon }: { label: string; value: ReactNode; icon?: ReactNode }) => (
   <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
     {/* label first under dir=rtl → right side; value follows to the left */}
     <span className="flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-400">
@@ -199,6 +243,35 @@ const InfoItem = ({ label, value, icon }: { label: string; value: string; icon?:
     </span>
   </div>
 );
+
+const StorefrontLink = ({ href, label }: { href: string; label: string }) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex max-w-full items-center gap-1.5 text-violet-700 underline-offset-4 transition hover:text-violet-900 hover:underline"
+    title="فتح المتجر"
+  >
+    <span className="truncate" dir="ltr">{label}</span>
+    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+  </a>
+);
+
+/** Same rule as backend `getPublicStoreUrl`: custom domain wins over *.mel.iq. */
+const getStorePublicUrl = (store: Store) => {
+  const custom = store.customDomain?.trim().toLowerCase().replace(/^www\./, '');
+  if (custom) return `https://${custom}`;
+  if (store.storeUrl) return store.storeUrl;
+  if (!store.domain) return null;
+  return `https://${store.domain}.mel.iq`;
+};
+
+const getStorePublicHostLabel = (store: Store) => {
+  const custom = store.customDomain?.trim().toLowerCase().replace(/^www\./, '');
+  if (custom) return custom;
+  if (store.domain) return `${store.domain}.mel.iq`;
+  return null;
+};
 
 const SummaryRow = ({ label, value }: { label: string; value: string }) => (
   <tr className="text-sm text-slate-700 transition hover:bg-slate-50/70">
