@@ -102,25 +102,24 @@ const isWordValue = (value: ReactNode) =>
 export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { title: string; value: ReactNode; icon: ReactNode; tone?: StatTone; hint?: ReactNode; sub?: ReactNode }) => {
   const color = statTones[tone];
 
+  const numericValue = !isWordValue(value);
+
   return (
     <Card className="flex min-h-[72px] flex-row items-center justify-between gap-3 rounded-[1.25rem] py-3 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:min-h-[78px] sm:gap-4 sm:rounded-[1.45rem] sm:py-4">
+      {/*
+        DOM order under dir=rtl: text first → sits on the right (start),
+        icon second → sits on the left (end). The old icon-first order put
+        Arabic titles on the left under an LTR value row.
+      */}
       <CardContent className="flex w-full items-center justify-between gap-3 px-4 sm:gap-4 sm:px-5">
-        <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl shadow-lg sm:h-12 sm:w-12', color.wrap)}>
-          <div className={cn('[&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.4] sm:[&_svg]:h-6 sm:[&_svg]:w-6', color.icon)}>{icon}</div>
-        </div>
         <div className="min-w-0 flex-1 text-right">
           <CardTitle className="line-clamp-2 text-xs leading-snug font-black text-slate-700 sm:truncate sm:text-sm">{title}</CardTitle>
-          <div className="mt-1.5 flex min-w-0 items-center justify-start gap-2" dir="ltr">
-            {hint != null && hint !== false && (
-              <Badge variant="secondary" className="bg-emerald-50 text-[10px] font-bold text-emerald-600 sm:text-xs">
-                {hint}
-              </Badge>
-            )}
+          <div className="mt-1.5 flex min-w-0 items-center justify-start gap-2">
             {/* A worded value (a domain, an owner's name) is set smaller and
                 may wrap: two to a row on a phone, at figure size it ran over
                 the icon beside it. Figures keep the large size. */}
             <span
-              dir="auto"
+              dir={numericValue ? 'ltr' : 'auto'}
               className={cn(
                 'min-w-0 font-black text-slate-950',
                 isWordValue(value)
@@ -130,10 +129,18 @@ export const StatCard = ({ title, value, icon, tone = 'blue', hint, sub }: { tit
             >
               {value}
             </span>
+            {hint != null && hint !== false && (
+              <Badge variant="secondary" className="bg-emerald-50 text-[10px] font-bold text-emerald-600 sm:text-xs">
+                {hint}
+              </Badge>
+            )}
           </div>
           {sub != null && sub !== false && (
             <div className="mt-1 truncate text-[11px] font-semibold text-slate-400 sm:text-xs">{sub}</div>
           )}
+        </div>
+        <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl shadow-lg sm:h-12 sm:w-12', color.wrap)}>
+          <div className={cn('[&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.4] sm:[&_svg]:h-6 sm:[&_svg]:w-6', color.icon)}>{icon}</div>
         </div>
       </CardContent>
     </Card>

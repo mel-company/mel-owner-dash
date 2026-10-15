@@ -188,17 +188,27 @@ const DetailsCard = ({ title, children }: { title: string; children: React.React
 );
 
 const InfoItem = ({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) => (
-  <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-    <span className="max-w-[65%] truncate font-bold text-slate-800">{value}</span>
-    <span className="flex items-center gap-2 text-sm font-semibold text-slate-400">{label}{icon}</span>
+  <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+    {/* label first under dir=rtl → right side; value follows to the left */}
+    <span className="flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-400">
+      {label}
+      {icon}
+    </span>
+    <span className="min-w-0 truncate text-left font-bold text-slate-800" dir="auto">
+      {value}
+    </span>
   </div>
 );
 
 const SummaryRow = ({ label, value }: { label: string; value: string }) => (
   <tr className="text-sm text-slate-700 transition hover:bg-slate-50/70">
-    <td className="px-5 py-4 font-black text-slate-950">{label}</td>
-    <td className="px-5 py-4 font-semibold text-slate-600">{value}</td>
-    <td className="px-5 py-4"><StatusPill tone={value === 'غير محدد' ? 'slate' : 'green'}>{value === 'غير محدد' ? 'ناقص' : 'متوفر'}</StatusPill></td>
+    <td className="px-5 py-4 text-right font-black text-slate-950">{label}</td>
+    <td className="px-5 py-4 text-right font-semibold text-slate-600" dir="auto">{value}</td>
+    <td className="px-5 py-4 text-right">
+      <StatusPill tone={value === 'غير محدد' ? 'slate' : 'green'}>
+        {value === 'غير محدد' ? 'ناقص' : 'متوفر'}
+      </StatusPill>
+    </td>
   </tr>
 );
 

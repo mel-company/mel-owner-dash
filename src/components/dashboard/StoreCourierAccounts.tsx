@@ -162,7 +162,7 @@ export const StoreCourierAccounts = ({ storeId }: { storeId: string }) => {
   }
 
   return (
-    <div className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <div className="rounded-[2rem] bg-white p-6 text-right shadow-sm ring-1 ring-slate-100" dir="rtl">
       <div className="mb-2 flex items-center gap-2">
         <Truck className="h-5 w-5 text-slate-400" />
         <h2 className="text-xl font-black text-slate-950">
