@@ -85,8 +85,8 @@ type StoreRow = {
 };
 
 const subscriptionOptions = [
-  { value: 'basic', label: 'الاشتراك العادي' },
-  { value: 'premium', label: 'الاشتراك الاحترافي' },
+  { value: 'basic', label: 'أساسي' },
+  { value: 'premium', label: 'احترافي / أعلى' },
 ];
 
 const durationOptions = [
@@ -146,15 +146,21 @@ const getStoreTypeText = (storeType: string | null | undefined) => {
 
 const getStoreDisplay = (store: Store, index: number): StoreRow => {
   const statusKey = getStoreStatusKey(store);
-  const planName = store.subscription?.plan.name || 'الاشتراك العادي';
-  const planKey = planName.toLowerCase().includes('pro') || planName.toLowerCase().includes('premium') ? 'premium' : 'basic';
+  // Show the real plan name from the API (e.g. أساسي). The old basic/premium
+  // remap hid every Arabic catalogue name behind «الاشتراك العادي».
+  const planName = store.subscription?.plan.name?.trim() || '';
+  const planText = planName || 'بدون اشتراك';
+  const planKey =
+    /احتراف|professional|premium|enterprise|بلس/i.test(planName)
+      ? 'premium'
+      : 'basic';
   const ratings: StoreRating[] = ['ضعيف', 'متوسط', 'ممتاز', 'متوسط'];
 
   return {
     id: store.id,
     name: store.name,
     owner: store.owner?.name || store.name,
-    planText: planKey === 'premium' ? 'الاشتراك الاحترافي' : 'الاشتراك العادي',
+    planText,
     planKey,
     statusKey,
     endDate: store.subscription?.end_at
