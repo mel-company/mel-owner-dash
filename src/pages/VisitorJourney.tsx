@@ -33,7 +33,7 @@ import {
   TableShell,
   type StatTone,
 } from '@/components/dashboard';
-import { AccountAvatar } from '@/components/AccountAvatar';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
@@ -400,7 +400,7 @@ const VisitorJourney = () => {
                     <tr key={account.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
                       <td className="px-5 py-3.5" data-card="title">
                         <div className="flex items-center gap-3">
-                          <AccountAvatar seed={account.id} />
+                          <UserAvatar seed={account.id} className="shadow-sm ring-2 ring-white" />
                           <div className="min-w-0">
                             <p className="truncate font-black text-slate-900">{account.name?.trim() || 'بدون اسم'}</p>
                             <p className="text-xs font-semibold text-slate-400" dir="ltr">

@@ -17,6 +17,7 @@ import {
   TableShell,
 } from '@/components/dashboard';
 import { cn } from '@/lib/utils';
+import { UserAvatar } from '@/components/UserAvatar';
 import {
   EmployeeRoleEnum,
   systemEmployeesService,
@@ -692,9 +693,7 @@ const ConfirmNameModal = ({
         <div className={cn('mx-auto mb-6 flex min-h-36 max-w-sm items-center justify-center rounded-[1.5rem] p-4 sm:mb-8 sm:min-h-44 sm:rounded-[2rem] sm:p-6', previewBg)}>
           <div className="w-full rounded-3xl bg-white p-4 text-right shadow-sm sm:p-5">
             <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-full bg-violet-50 text-violet-600">
-                <UserRound className="h-6 w-6" />
-              </div>
+              <UserAvatar seed={employee.id} className="size-12" />
               <div className="min-w-0">
                 <p className="truncate text-base font-black text-slate-950 sm:text-lg">{employee.name}</p>
                 <p className="mt-1 text-sm font-semibold text-violet-600">{getRoleMeta(employee.role).label}</p>
