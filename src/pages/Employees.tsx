@@ -87,6 +87,11 @@ const Employees = () => {
   const [formData, setFormData] = useState<EmployeeFormState>(defaultFormData);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  /**
+   * The server's count, not `employees.length`: the list is fetched with
+   * `limit: 100`, so a larger team would have been reported as 100.
+   */
+  const [total, setTotal] = useState<number | null>(null);
 
   useEffect(() => {
     fetchEmployees();
@@ -98,6 +103,7 @@ const Employees = () => {
       setError('');
       const response = await systemEmployeesService.getAllEmployees({ page: 1, limit: 100 });
       setEmployees(response.data || []);
+      setTotal(typeof response.total === 'number' ? response.total : null);
     } catch (err) {
       setError('فشل في جلب الموظفين. يرجى المحاولة مرة أخرى.');
       console.error('Error fetching employees:', err);
@@ -269,7 +275,7 @@ const Employees = () => {
     <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="ادارة الموظفين"
-        description={<>هناك <span className="font-black text-violet-600">{employees.length}</span> موظف في قائمة الموظفين</>}
+        description={<>هناك <span className="font-black text-violet-600">{(total ?? employees.length).toLocaleString()}</span> موظف في قائمة الموظفين</>}
         icon={<Users className="h-5 w-5 sm:h-6 sm:w-6" />}
         action={(
           <PrimaryActionButton onClick={openCreateDrawer}>
@@ -286,7 +292,7 @@ const Employees = () => {
       <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[1fr_1fr_1.4fr]">
         <StatCard
           title="أجمالي الموظفين"
-          value={employees.length.toLocaleString()}
+          value={(total ?? employees.length).toLocaleString()}
           icon={<Users />}
           tone="blue"
           hint={null}
@@ -296,7 +302,7 @@ const Employees = () => {
           value={activeCount}
           icon={<ShieldCheck />}
           tone="amber"
-          hint="0% ↗"
+          hint={null}
         />
         <div className="flex min-h-[72px] items-center justify-between gap-3 rounded-[1.25rem] bg-white px-4 py-3 shadow-[0_12px_35px_rgba(15,23,42,0.04)] ring-1 ring-slate-100 sm:col-span-2 sm:min-h-[78px] sm:gap-4 sm:rounded-[1.45rem] sm:px-5 sm:py-4 xl:col-span-1">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-500 shadow-lg shadow-emerald-100 sm:h-12 sm:w-12">

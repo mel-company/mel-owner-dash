@@ -53,8 +53,20 @@ export interface Store {
   storeUrl?: string | null;
   ownerId: string | null;
   deliveryCompanyId: string | null;
+  /** Detail route only: the linked courier's name, so no raw id is shown. */
+  deliveryCompany?: { id: string; name: string } | null;
+  /** Null when there is none, or it was soft-deleted (the server drops it). */
   subscription: Subscription | null;
   owner: Owner | null;
+  /** Detail route only: live (not soft-deleted) row counts. */
+  _count?: {
+    orders?: number;
+    products?: number;
+    categories?: number;
+    discounts?: number;
+    coupons?: number;
+    users?: number;
+  };
 }
 
 export interface StoresListResponse {
@@ -62,6 +74,17 @@ export interface StoresListResponse {
   total: number;
   page: number | null;
   limit: number | null;
+  /**
+   * Whole-table counts for the stat cards, computed by the server over every
+   * store rather than the loaded page. Optional so an older server that does
+   * not send them yet renders «—» instead of an invented number.
+   */
+  newThisMonth?: number;
+  /** ACTIVE and not past `end_at`. */
+  active?: number;
+  /** EXPIRED, or ACTIVE with `end_at` already passed (auto-expire is off). */
+  expired?: number;
+  noSubscription?: number;
 }
 
 export interface StoresListParams {

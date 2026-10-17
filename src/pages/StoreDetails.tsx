@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, CalendarDays, ExternalLink, Globe, Mail, MapPin, Phone, Store as StoreIcon, UserRound } from 'lucide-react';
+import { ArrowRight, CalendarDays, ExternalLink, Globe, Mail, MapPin, Package, Phone, ShoppingBag, Store as StoreIcon, UserRound } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   AlertMessage,
@@ -61,7 +61,8 @@ const StoreDetails = () => {
   }
 
   const logo = getPublicAssetUrl(store.logo);
-  const subscriptionStatus = store.subscription?.status;
+  const subscriptionStatus = effectiveSubscriptionStatus(store.subscription);
+  const courierName = store.deliveryCompany?.name?.trim() || '';
   const storeUrl = getStorePublicUrl(store);
   const domainLabel = getStorePublicHostLabel(store);
 
@@ -101,6 +102,14 @@ const StoreDetails = () => {
           hint={null}
         />
       </div>
+
+      {/* Live (not soft-deleted) counts from the detail route's `_count`. */}
+      {store._count && (
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard title="الطلبات" value={store._count.orders ?? '—'} icon={<ShoppingBag />} tone="blue" hint={null} />
+          <StatCard title="المنتجات" value={store._count.products ?? '—'} icon={<Package />} tone="violet" hint={null} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <DetailsCard title="المعلومات الأساسية">
@@ -212,7 +221,12 @@ const StoreDetails = () => {
             <SummaryRow label="العملة" value={store.currency || 'غير محدد'} />
             <SummaryRow label="اللغة" value={store.language || 'غير محدد'} />
             <SummaryRow label="المنطقة الزمنية" value={store.timezone || 'غير محدد'} />
-            <SummaryRow label="شركة الشحن" value={store.deliveryCompanyId || 'غير محدد'} />
+            {/* Was the raw deliveryCompanyId (a UUID) with a «متوفر» pill. */}
+            <SummaryRow
+              label="شركة الشحن"
+              value={courierName || (store.deliveryCompanyId ? 'غير معروفة' : 'غير مربوط')}
+              missing={!store.deliveryCompanyId}
+            />
           </tbody>
         </table>
       </TableShell>
@@ -273,17 +287,32 @@ const getStorePublicHostLabel = (store: Store) => {
   return null;
 };
 
-const SummaryRow = ({ label, value }: { label: string; value: string }) => (
+const SummaryRow = ({ label, value, missing = value === 'غير محدد' }: { label: string; value: string; missing?: boolean }) => (
   <tr className="text-sm text-slate-700 transition hover:bg-slate-50/70">
     <td className="px-5 py-4 text-right font-black text-slate-950">{label}</td>
     <td className="px-5 py-4 text-right font-semibold text-slate-600" dir="auto">{value}</td>
     <td className="px-5 py-4 text-right">
-      <StatusPill tone={value === 'غير محدد' ? 'slate' : 'green'}>
-        {value === 'غير محدد' ? 'ناقص' : 'متوفر'}
+      <StatusPill tone={missing ? 'slate' : 'green'}>
+        {missing ? 'ناقص' : 'متوفر'}
       </StatusPill>
     </td>
   </tr>
 );
+
+/**
+ * The status to show, not the raw column: the server's auto-expire job is off
+ * by default, so an ACTIVE subscription past its `end_at` is really expired.
+ */
+const effectiveSubscriptionStatus = (subscription: Store['subscription']) => {
+  if (!subscription) return undefined;
+  if (
+    subscription.status === 'ACTIVE' &&
+    new Date(subscription.end_at).getTime() < Date.now()
+  ) {
+    return 'EXPIRED' as const;
+  }
+  return subscription.status;
+};
 
 const getPublicAssetUrl = (path?: string | null) => {
   if (!path) return '';

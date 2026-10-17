@@ -90,11 +90,30 @@ export interface SubscriptionsListResponse {
   total: number;
   page?: number | null;
   limit?: number | null;
+  /**
+   * The status breakdown over the whole table (deleted stores excluded),
+   * ignoring `status` and `search`. Disjoint buckets. Absent from `/search`
+   * and from an older server.
+   */
+  counts?: SubscriptionCounts;
 }
+
+/** The server's four disjoint buckets. */
+export type SubscriptionBucket = 'live' | 'expired' | 'paused' | 'cancelled';
+
+export type SubscriptionCounts = Record<SubscriptionBucket, number>;
 
 export interface SubscriptionsListParams {
   page?: number;
   limit?: number;
+  /**
+   * Applied by the server before the page is cut, so the pager counts what
+   * the filter shows. `live` = ACTIVE with a term covering now; `expired` =
+   * EXPIRED or ACTIVE past its term; `paused` = INACTIVE.
+   */
+  status?: SubscriptionBucket;
+  /** Store name contains — lets the status filter and search combine. */
+  search?: string;
 }
 
 /**
@@ -130,6 +149,7 @@ export const systemSubscriptionsService = {
       total: response?.total ?? response?.data?.length ?? 0,
       page: response?.page,
       limit: response?.limit,
+      counts: response?.counts,
     };
   },
 

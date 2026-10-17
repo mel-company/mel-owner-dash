@@ -92,9 +92,21 @@ export interface SupportTicket {
 
 export interface TicketsListResponse {
   data: SupportTicket[];
+  /** Matches for the current filter — what the pager counts. */
   total: number;
   page?: number;
   limit?: number;
+  /**
+   * System list only: queue-wide counts over every non-deleted ticket,
+   * independent of the list filter, for the stat cards. "Open" counts OPEN,
+   * IN_PROGRESS and ON_HOLD.
+   */
+  allTickets?: number;
+  openTickets?: number;
+  resolvedTickets?: number;
+  cancelledTickets?: number;
+  closedTickets?: number;
+  unassignedTickets?: number;
 }
 
 export interface CreateTicketRequest {
@@ -176,6 +188,8 @@ export const supportTicketsService = {
     limit?: number;
     status?: string;
     search?: string;
+    priority?: string;
+    department?: string;
   }): Promise<TicketsListResponse> => {
     const response = await axiosInstance.get('/support-ticket/system', { params });
     if (Array.isArray(response)) {

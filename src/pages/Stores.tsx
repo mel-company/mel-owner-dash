@@ -30,18 +30,29 @@ import {
   systemStoresService,
   type CreateStoreRequest,
   type Store,
+  type StoresListResponse,
   type UpdateStoreRequest,
 } from '../services/systemStoresService';
 
-type StoreRating = 'ضعيف' | 'متوسط' | 'ممتاز';
+type StoreStatusKey = 'active' | 'expired' | 'inactive';
 
+/**
+ * Only the filters something backs.
+ *
+ * A «تقييم المتجر» filter matched a rating that cycled by row index (nothing on
+ * the server rates stores), and «مدة الاشتراك» / «نوع عملية الإضافة» were never
+ * read by the filter at all — no field on the store says either — so all three
+ * were removed rather than left as controls that do nothing.
+ */
 type FiltersState = {
-  status: 'all' | 'active' | 'inactive';
+  status: 'all' | StoreStatusKey;
   subscriptionType: 'all' | 'basic' | 'premium';
-  subscriptionDuration: 'all' | 'monthly' | 'yearly';
-  rating: 'all' | StoreRating;
-  addedBy: 'all' | 'owner' | 'manager';
 };
+
+type StoreListStats = Pick<
+  StoresListResponse,
+  'newThisMonth' | 'active' | 'expired' | 'noSubscription'
+>;
 
 /**
  * The drawer's own fields, declared here rather than extending
@@ -77,9 +88,8 @@ type StoreRow = {
   owner: string;
   planText: string;
   planKey: 'basic' | 'premium';
-  statusKey: 'active' | 'inactive';
+  statusKey: StoreStatusKey;
   endDate: string;
-  rating: StoreRating;
   logo: string | null;
   accent: string;
 };
@@ -87,11 +97,6 @@ type StoreRow = {
 const subscriptionOptions = [
   { value: 'basic', label: 'أساسي' },
   { value: 'premium', label: 'احترافي / أعلى' },
-];
-
-const durationOptions = [
-  { value: 'monthly', label: 'شهري' },
-  { value: 'yearly', label: 'سنوي' },
 ];
 
 const storeTypeOptions = [
@@ -114,9 +119,6 @@ const defaultFormData: StoreFormState = {
 const defaultFilters: FiltersState = {
   status: 'all',
   subscriptionType: 'all',
-  subscriptionDuration: 'all',
-  rating: 'all',
-  addedBy: 'all',
 };
 
 const accentClasses: Record<string, string> = {
@@ -135,9 +137,31 @@ const getPublicAssetUrl = (path?: string | null) => {
   return `${publicAssetBaseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
 };
 
-const getStoreStatusKey = (store: Store): 'active' | 'inactive' => (
-  store.subscription?.status === 'ACTIVE' ? 'active' : 'inactive'
-);
+/**
+ * ACTIVE is not enough: the server's auto-expire job is off by default, so a
+ * subscription past its `end_at` can still say ACTIVE. Such a store is shown as
+ * منتهي, the same rule the server's «الاشتراكات المنتهية» count uses.
+ */
+const getStoreStatusKey = (store: Store): StoreStatusKey => {
+  const subscription = store.subscription;
+  if (!subscription) return 'inactive';
+  const ended = new Date(subscription.end_at).getTime() < Date.now();
+  if (subscription.status === 'EXPIRED') return 'expired';
+  if (subscription.status === 'ACTIVE') return ended ? 'expired' : 'active';
+  return 'inactive';
+};
+
+const statusLabels: Record<StoreStatusKey, string> = {
+  active: 'نشط',
+  expired: 'منتهي',
+  inactive: 'غير نشط',
+};
+
+const statusTones: Record<StoreStatusKey, 'green' | 'red' | 'slate'> = {
+  active: 'green',
+  expired: 'red',
+  inactive: 'slate',
+};
 
 const getStoreTypeText = (storeType: string | null | undefined) => {
   if (!storeType) return storeTypeOptions[0];
@@ -154,7 +178,6 @@ const getStoreDisplay = (store: Store, index: number): StoreRow => {
     /احتراف|professional|premium|enterprise|بلس/i.test(planName)
       ? 'premium'
       : 'basic';
-  const ratings: StoreRating[] = ['ضعيف', 'متوسط', 'ممتاز', 'متوسط'];
 
   return {
     id: store.id,
@@ -165,8 +188,7 @@ const getStoreDisplay = (store: Store, index: number): StoreRow => {
     statusKey,
     endDate: store.subscription?.end_at
       ? new Date(store.subscription.end_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-      : 'Dec 17, 2026',
-    rating: ratings[index % ratings.length],
+      : store.subscription ? '—' : 'بدون اشتراك',
     logo: store.logo,
     accent: ['pink', 'gray', 'green', 'orange', 'blue'][index % 5],
   };
@@ -189,6 +211,7 @@ const Stores = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
+  const [listStats, setListStats] = useState<StoreListStats>({});
 
   const fetchStores = useCallback(async (nextPage: number, limit: number) => {
     try {
@@ -199,6 +222,12 @@ const Stores = () => {
       setPage(response.page ?? nextPage);
       setPageSize(response.limit ?? limit);
       setTotal(response.total ?? response.data?.length ?? 0);
+      setListStats({
+        newThisMonth: response.newThisMonth,
+        active: response.active,
+        expired: response.expired,
+        noSubscription: response.noSubscription,
+      });
     } catch (err) {
       setError('فشل في جلب المتاجر. يرجى المحاولة مرة أخرى.');
       console.error('Error fetching stores:', err);
@@ -363,20 +392,23 @@ const Stores = () => {
       .includes(searchTerm.trim().toLowerCase());
     const matchesStatus = filters.status === 'all' || row.statusKey === filters.status;
     const matchesPlan = filters.subscriptionType === 'all' || row.planKey === filters.subscriptionType;
-    const matchesRating = filters.rating === 'all' || row.rating === filters.rating;
-    return matchesSearch && matchesStatus && matchesPlan && matchesRating;
+    return matchesSearch && matchesStatus && matchesPlan;
   }), [stores, searchTerm, filters]);
 
+  /**
+   * Whole-table counts from the server. These used to be counted over the
+   * loaded page, and «المتاجر الجديدة» was 10% of the total — an invented
+   * number. A server that does not send a count yet shows «—», never a guess.
+   */
   const stats = useMemo(() => {
-    const active = stores.filter((store) => getStoreStatusKey(store) === 'active').length;
-    const inactive = stores.filter((store) => getStoreStatusKey(store) === 'inactive').length;
+    const shown = (value?: number) => (typeof value === 'number' ? value : '—');
     return [
       { title: 'أجمالي المتاجر', value: total || stores.length, icon: <StoreIcon />, tone: 'blue' as const },
-      { title: 'المتاجر الجديدة', value: Math.max(0, Math.round((total || stores.length) * 0.1)), icon: <CirclePlus />, tone: 'teal' as const },
-      { title: 'المتاجر النشطة', value: active, icon: <StoreIcon />, tone: 'amber' as const },
-      { title: 'الاشتراكات المنتهية', value: inactive, icon: <CalendarDays />, tone: 'rose' as const },
+      { title: 'المتاجر الجديدة هذا الشهر', value: shown(listStats.newThisMonth), icon: <CirclePlus />, tone: 'teal' as const },
+      { title: 'المتاجر النشطة', value: shown(listStats.active), icon: <StoreIcon />, tone: 'amber' as const },
+      { title: 'الاشتراكات المنتهية', value: shown(listStats.expired), icon: <CalendarDays />, tone: 'rose' as const },
     ];
-  }, [stores, total]);
+  }, [stores, total, listStats]);
 
   const filterCount = Object.values(filters).filter((value) => value !== 'all').length;
   const totalPages = Math.max(1, Math.ceil((total || visibleStores.length || 1) / pageSize));
@@ -484,18 +516,19 @@ const Stores = () => {
                 <th className="px-5 py-5 text-right">الحالة</th>
                 <th className="px-5 py-5 text-right">نوع الاشتراك</th>
                 <th className="px-5 py-5 text-right">تاريخ انتهاء الاشتراك</th>
-                <th className="px-5 py-5 text-right">تقييم المتجر</th>
                 <th className="px-5 py-5 text-right">العمليات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visibleStores.map((store, index) => {
                 const row = getStoreDisplay(store, index);
+                // Continues across pages: page 2 starts at pageSize + 1.
+                const rowNumber = (page - 1) * pageSize + index + 1;
                 return (
                   <tr key={store.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
                     <td className="px-5 py-4" data-card="media">
                       <div className="flex items-center gap-3">
-                        <span className="text-xs font-semibold text-slate-500">{String(index + 1).padStart(2, '0')}</span>
+                        <span className="text-xs font-semibold text-slate-500">{String(rowNumber).padStart(2, '0')}</span>
                         <BrandMark logo={row.logo} accent={row.accent} />
                       </div>
                     </td>
@@ -510,15 +543,14 @@ const Stores = () => {
                     </td>
                     <td className="px-5 py-4 font-semibold text-slate-600">{row.owner}</td>
                     <td className="px-5 py-4">
-                      <StatusPill tone={row.statusKey === 'active' ? 'green' : 'red'}>
-                        {row.statusKey === 'active' ? 'نشط' : 'غير نشط'}
+                      <StatusPill tone={statusTones[row.statusKey]}>
+                        {statusLabels[row.statusKey]}
                       </StatusPill>
                     </td>
                     <td className="px-5 py-4">
                       <StatusPill tone={row.planKey === 'premium' ? 'blue' : 'violet'}>{row.planText}</StatusPill>
                     </td>
                     <td className="px-5 py-4 text-slate-600">{row.endDate}</td>
-                    <td className="px-5 py-4"><RatingText rating={row.rating} /></td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <button type="button" onClick={() => setStoreToDelete(store)} className="text-red-400 transition hover:text-red-600" aria-label="حذف">
@@ -594,6 +626,7 @@ const Stores = () => {
               options={[
                 { value: 'all', label: 'الكل' },
                 { value: 'active', label: 'نشط' },
+                { value: 'expired', label: 'منتهي' },
                 { value: 'inactive', label: 'غير نشط' },
               ]}
               onChange={(value) => setFilters((current) => ({ ...current, status: value as FiltersState['status'] }))}
@@ -603,33 +636,6 @@ const Stores = () => {
               value={filters.subscriptionType}
               options={[{ value: 'all', label: 'الكل' }, ...subscriptionOptions]}
               onChange={(value) => setFilters((current) => ({ ...current, subscriptionType: value as FiltersState['subscriptionType'] }))}
-            />
-            <SelectField
-              label="مدة الاشتراك"
-              value={filters.subscriptionDuration}
-              options={[{ value: 'all', label: 'الكل' }, ...durationOptions]}
-              onChange={(value) => setFilters((current) => ({ ...current, subscriptionDuration: value as FiltersState['subscriptionDuration'] }))}
-            />
-            <SelectField
-              label="تقييم المتجر"
-              value={filters.rating}
-              options={[
-                { value: 'all', label: 'الكل' },
-                { value: 'ضعيف', label: 'ضعيف' },
-                { value: 'متوسط', label: 'متوسط' },
-                { value: 'ممتاز', label: 'ممتاز' },
-              ]}
-              onChange={(value) => setFilters((current) => ({ ...current, rating: value as FiltersState['rating'] }))}
-            />
-            <SelectField
-              label="نوع عملية الإضافة"
-              value={filters.addedBy}
-              options={[
-                { value: 'all', label: 'الكل' },
-                { value: 'owner', label: 'أضافه من قبل المسؤول' },
-                { value: 'manager', label: 'أضافه من قبل المدير' },
-              ]}
-              onChange={(value) => setFilters((current) => ({ ...current, addedBy: value as FiltersState['addedBy'] }))}
             />
           </div>
         </SideDrawer>
@@ -663,19 +669,6 @@ const BrandMark = ({ logo, accent = 'blue' }: { logo?: string | null; accent?: s
   );
 };
 
-const RatingText = ({ rating }: { rating: StoreRating }) => (
-  <span
-    className={cn(
-      'font-black',
-      rating === 'ممتاز' && 'text-emerald-500',
-      rating === 'متوسط' && 'text-amber-500',
-      rating === 'ضعيف' && 'text-red-500'
-    )}
-  >
-    {rating}
-  </span>
-);
-
 const StoreCard = ({
   row,
   onView,
@@ -700,8 +693,8 @@ const StoreCard = ({
             </button>
             <p className="mt-1 truncate text-[13px] font-semibold text-[#056494]">{row.planText}</p>
           </div>
-          <StatusPill tone={row.statusKey === 'active' ? 'green' : 'red'}>
-            {row.statusKey === 'active' ? 'نشط' : 'غير نشط'}
+          <StatusPill tone={statusTones[row.statusKey]}>
+            {statusLabels[row.statusKey]}
           </StatusPill>
         </div>
       </div>
@@ -716,11 +709,6 @@ const StoreCard = ({
         <span className="text-[rgba(47,58,76,0.66)]">تاريخ انتهاء الاشتراك </span>
         <span className="font-semibold tracking-tight text-[#2f3a4c]">{row.endDate}</span>
       </div>
-    </div>
-
-    <div className="flex h-[38px] items-center justify-center gap-2.5 rounded-xl bg-[#fef7f0] px-2">
-      <span className="text-xs text-[#b5aa9f]">تقييم المتجر</span>
-      <RatingText rating={row.rating} />
     </div>
 
     {(onEdit || onDelete) && (

@@ -82,12 +82,21 @@ export interface AccountingTransactionsParams {
 }
 
 export interface AccountingStats {
+  /** Settled payments net of refunds — money that actually arrived. */
   totalRevenue: number;
+  /** Unsettled checkouts opened in the last 72 hours. */
   pendingAmount: number;
   /** Counted over the whole table by the server, not over the current page. */
   pendingTransactions: number;
+  /** Settled payments since 00:00 Baghdad on the 1st. */
   monthlyTransactions: number;
   averageTransaction: number;
+  /**
+   * List-price value of active/expired subscriptions no payment backs. Not
+   * revenue; shown beside it. Optional for an older server.
+   */
+  unpaidSubscriptionsEstimate?: number;
+  unpaidSubscriptionsCount?: number;
 }
 
 export type AccountingExportFormat = 'xlsx' | 'pdf';

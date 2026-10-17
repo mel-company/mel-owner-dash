@@ -26,9 +26,18 @@ export interface FinancialAiSummary {
   range: { from: string | null; to: string | null };
   cost: Money;
   creditRevenue: Money;
+  /**
+   * Recognised from settled subscription payments (net of refunds) over the
+   * months each bought, plus a list-price estimate for subscriptions no
+   * payment backs — that part is `estimatedSubscriptionRevenue`.
+   */
   subscriptionRevenue: Money;
+  /** Part of `subscriptionRevenue` valued at list price. Optional for an older server. */
+  estimatedSubscriptionRevenue?: Money;
   revenue: Money;
+  /** At the server's rate. The page recomputes it at the rate on screen. */
   margin: Money;
+  /** At the server's rate. The page recomputes it at the rate on screen. */
   marginPercent: number | null;
   deferredLiability: Money;
   deferredCredits: { generations: number; editor: number };
@@ -136,8 +145,12 @@ export interface FinancialAiStoreDetail {
     createdAt: string;
     owner: FinancialAiStoreOwner | null;
   };
+  /** Totals over every run in the range, not only the 100 listed in `runs`. */
   cost: Money;
   subscriptionRevenue: Money;
+  /** The same credit allocation the table row uses. Optional for an older server. */
+  creditRevenue?: Money;
+  revenue?: Money;
   margin: Money;
   usage: FinancialAiStoreRow['usage'];
   fullyPriced: boolean;

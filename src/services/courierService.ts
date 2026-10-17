@@ -179,13 +179,17 @@ export interface CourierStats {
   cancelled: number;
   unknown: number;
   /**
-   * Delivered as a share of the parcels whose outcome is known.
+   * Delivered as a share of the parcels whose outcome is known:
+   * delivered ÷ (delivered + failed + returned). Cancelled (the merchant
+   * withdrew it) and unmapped statuses are outside the denominator. Both the
+   * companies table and the detail drawer show this figure, not their own.
    *
    * Null — not zero — when nothing has settled yet. A courier nobody has
    * results for is not a courier failing everything, and the table renders
    * the two differently on purpose.
    */
   deliveryRate: number | null;
+  /** Parcels in the preceding window of the same length (ends where this one starts). */
   previousTotal: number;
   /** Change against the preceding window. Null when there was nothing to compare. */
   trend: number | null;
@@ -205,7 +209,11 @@ export interface CourierRecentParcel {
   status: string;
   rawStatus: string | null;
   createdAt: string;
-  /** Days from registration to the last status held. Null while in flight. */
+  /**
+   * Days from registration to the last status held. Null while in flight.
+   * No courier reports a delivery timestamp, so for a finished parcel this is
+   * an upper bound (a later poll re-stamps the last status time).
+   */
   processingDays: number | null;
 }
 

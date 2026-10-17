@@ -553,7 +553,18 @@ const DeliveryCompanies = () => {
               <th className="px-5 py-4 text-right font-bold">نوع التكامل</th>
               <th className="px-5 py-4 text-right font-bold">الخدمات المفعلة</th>
               <th className="px-5 py-4 text-right font-bold">آخر مزامنة</th>
-              <th className="px-5 py-4 text-right font-bold">معدل التسليم</th>
+              {/* Same definition as the detail drawer (and the server):
+                  delivered ÷ (delivered + failed + returned). Cancelled and
+                  in-flight parcels are outside it. */}
+              <th
+                className="px-5 py-4 text-right font-bold"
+                title="المُسلَّم ÷ (المُسلَّم + الفاشل + المرتجع) خلال آخر 30 يوماً — الملغى وقيد التوصيل غير محسوبين"
+              >
+                معدل التسليم
+                <span className="block text-[10px] font-semibold text-slate-400">
+                  من الطرود المنتهية
+                </span>
+              </th>
               <th className="px-5 py-4 text-right font-bold">إجراءات</th>
             </tr>
           </thead>

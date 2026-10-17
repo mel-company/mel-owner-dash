@@ -75,21 +75,69 @@ const canRefundPurchase = (purchase: CreditPurchase) =>
   purchase.provider === 'QI_CARD' &&
   (purchase.status === 'PAID' || purchase.status === 'PARTIALLY_REFUNDED');
 
-/** Recalculate IQD from USD whenever the user edits the exchange rate. */
-const atRate = (money: Money | undefined, rate: number): Money => {
-  const usd = money?.usd ?? 0;
-  return { usd, iqd: usd * rate };
+/**
+ * The currency a figure was born in.
+ *
+ * The rate control used to recompute *every* IQD figure from its USD shadow —
+ * so changing the rate rewrote credit sales, subscriptions and purchases,
+ * which were charged in IQD and do not move with any rate. Only the model
+ * bill (USD) converts; IQD-native money keeps the server's IQD and only its
+ * USD shadow moves. `mixed` is a figure already resolved on the client (a
+ * margin of the two), shown as is.
+ */
+type Native = 'usd' | 'iqd' | 'mixed';
+
+const atRate = (money: Money | undefined, rate: number, native: Native): Money => {
+  if (native === 'mixed') return { usd: money?.usd ?? 0, iqd: money?.iqd ?? 0 };
+  if (native === 'usd') {
+    const usd = money?.usd ?? 0;
+    return { usd, iqd: usd * rate };
+  }
+  const iqd = money?.iqd ?? 0;
+  return { iqd, usd: rate > 0 ? iqd / rate : 0 };
 };
 
-const formatMoney = (money: Money | undefined, currency: CurrencyCode, rate: number): string => {
-  const value = atRate(money, rate);
+/** Revenue (IQD-native) minus cost (USD-native), at the rate on screen. */
+const marginAt = (revenue: Money | undefined, cost: Money | undefined, rate: number): Money => {
+  const r = atRate(revenue, rate, 'iqd');
+  const c = atRate(cost, rate, 'usd');
+  return { usd: r.usd - c.usd, iqd: r.iqd - c.iqd };
+};
+
+/**
+ * Margin as a share of revenue, from the same numbers the cards show. The
+ * server's `marginPercent` used its own rate, so it disagreed with the cards
+ * the moment the operator changed the rate.
+ */
+const marginPercentOf = (
+  revenue: Money | undefined,
+  cost: Money | undefined,
+  rate: number,
+): number | null => {
+  const r = atRate(revenue, rate, 'iqd').iqd;
+  if (r <= 0) return null;
+  return Math.round((marginAt(revenue, cost, rate).iqd / r) * 1000) / 10;
+};
+
+const formatMoney = (
+  money: Money | undefined,
+  currency: CurrencyCode,
+  rate: number,
+  native: Native,
+): string => {
+  const value = atRate(money, rate, native);
   return currency === 'IQD'
     ? `${Math.round(value.iqd).toLocaleString('en-US')} د.ع`
     : `$${value.usd.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
 };
 
-const amountOf = (money: Money | undefined, currency: CurrencyCode, rate: number): number => {
-  const value = atRate(money, rate);
+const amountOf = (
+  money: Money | undefined,
+  currency: CurrencyCode,
+  rate: number,
+  native: Native,
+): number => {
+  const value = atRate(money, rate, native);
   return currency === 'IQD' ? value.iqd : value.usd;
 };
 
@@ -369,7 +417,7 @@ const FinancialAi = () => {
           areaStyle: { color: 'rgba(16,185,129,0.12)' },
           lineStyle: { width: 3, color: '#10b981' },
           itemStyle: { color: '#10b981' },
-          data: points.map((point) => amountOf(point.revenue, currency, activeRate)),
+          data: points.map((point) => amountOf(point.revenue, currency, activeRate, 'iqd')),
         },
         {
           name: 'كلفة الذكاء الاصطناعي',
@@ -380,7 +428,7 @@ const FinancialAi = () => {
           areaStyle: { color: 'rgba(244,63,94,0.10)' },
           lineStyle: { width: 3, color: '#f43f5e' },
           itemStyle: { color: '#f43f5e' },
-          data: points.map((point) => amountOf(point.cost, currency, activeRate)),
+          data: points.map((point) => amountOf(point.cost, currency, activeRate, 'usd')),
         },
       ],
     };
@@ -409,7 +457,7 @@ const FinancialAi = () => {
           label: { show: false },
           data: models.map((model, index) => ({
             name: model.model,
-            value: amountOf(model.cost, currency, activeRate),
+            value: amountOf(model.cost, currency, activeRate, 'usd'),
             itemStyle: { color: colors[index % colors.length] },
           })),
         },
@@ -419,7 +467,18 @@ const FinancialAi = () => {
 
   const totalPages = Math.max(1, Math.ceil(storeTotal / pageSize));
   const purchaseTotalPages = Math.max(1, Math.ceil(purchaseTotal / purchasePageSize));
-  const marginPositive = amountOf(summary?.margin, 'IQD', activeRate) >= 0;
+  const summaryMargin = marginAt(summary?.revenue, summary?.cost, activeRate);
+  const summaryMarginPercent = marginPercentOf(summary?.revenue, summary?.cost, activeRate);
+  const marginPositive = summaryMargin.iqd >= 0;
+  const estimatedSubscriptionIqd = summary?.estimatedSubscriptionRevenue?.iqd ?? 0;
+  // `revenue` is absent on a server that predates credit revenue in the drawer.
+  const detailRevenue: Money | undefined = detail
+    ? detail.revenue ?? {
+        usd: (detail.subscriptionRevenue?.usd ?? 0) + (detail.creditRevenue?.usd ?? 0),
+        iqd: (detail.subscriptionRevenue?.iqd ?? 0) + (detail.creditRevenue?.iqd ?? 0),
+      }
+    : undefined;
+  const detailMargin = marginAt(detailRevenue, detail?.cost, activeRate);
 
   if (loading && !summary) return <LoadingState />;
 
@@ -473,33 +532,35 @@ const FinancialAi = () => {
       <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           title="كلفة الذكاء الاصطناعي"
-          value={formatMoney(summary?.cost, currency, activeRate)}
+          value={formatMoney(summary?.cost, currency, activeRate, 'usd')}
           hint="تكلفة النماذج"
         />
         <KpiCard
           title="إجمالي الإيرادات"
-          value={formatMoney(summary?.revenue, currency, activeRate)}
-          hint="رصيد + اشتراك"
+          value={formatMoney(summary?.revenue, currency, activeRate, 'iqd')}
+          hint={
+            estimatedSubscriptionIqd > 0
+              ? `رصيد + اشتراك · منها ${formatMoney(summary?.estimatedSubscriptionRevenue, currency, activeRate, 'iqd')} تقدير بسعر القائمة`
+              : 'رصيد + اشتراك'
+          }
           accent="emerald"
         />
         <KpiCard
           title="صافي الربح"
-          value={formatMoney(summary?.margin, currency, activeRate)}
+          value={formatMoney(summaryMargin, currency, activeRate, 'mixed')}
           hint={marginPositive ? 'موجب' : 'سالب'}
           accent={marginPositive ? 'emerald' : 'rose'}
         />
         <KpiCard
           title="نسبة الربح"
           value={
-            summary?.marginPercent === null || summary?.marginPercent === undefined
-              ? '—'
-              : `${summary.marginPercent}%`
+            summaryMarginPercent === null ? '—' : `${summaryMarginPercent}%`
           }
           hint="من الإيراد"
         />
         <KpiCard
           title="رصيد غير مستهلك"
-          value={formatMoney(summary?.deferredLiability, currency, activeRate)}
+          value={formatMoney(summary?.deferredLiability, currency, activeRate, 'iqd')}
           hint="التزام مؤجل"
         />
       </div>
@@ -612,7 +673,8 @@ const FinancialAi = () => {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {stores.map((row) => {
-              const margin = amountOf(row.margin, 'IQD', activeRate);
+              const rowMargin = marginAt(row.revenue, row.cost, activeRate);
+              const margin = rowMargin.iqd;
               return (
                 <tr
                   key={row.store.id ?? 'unattributed'}
@@ -638,7 +700,7 @@ const FinancialAi = () => {
                     {formatTokens(row.usage.promptTokens + row.usage.completionTokens)}
                   </td>
                   <td className="px-5 py-4 font-black text-rose-500">
-                    {formatMoney(row.cost, currency, activeRate)}
+                    {formatMoney(row.cost, currency, activeRate, 'usd')}
                     {!row.fullyPriced && (
                       <span className="mr-1 text-xs font-bold text-orange-500" title="نماذج بلا سعر منشور">
                         +
@@ -646,13 +708,13 @@ const FinancialAi = () => {
                     )}
                   </td>
                   <td className="px-5 py-4 font-bold text-emerald-600">
-                    {formatMoney(row.creditRevenue, currency, activeRate)}
+                    {formatMoney(row.creditRevenue, currency, activeRate, 'iqd')}
                   </td>
                   <td className="px-5 py-4 font-bold text-emerald-600">
-                    {formatMoney(row.subscriptionRevenue, currency, activeRate)}
+                    {formatMoney(row.subscriptionRevenue, currency, activeRate, 'iqd')}
                   </td>
                   <td className={cn('px-5 py-4 font-black', margin >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
-                    {formatMoney(row.margin, currency, activeRate)}
+                    {formatMoney(rowMargin, currency, activeRate, 'mixed')}
                   </td>
                 </tr>
               );
@@ -732,7 +794,7 @@ const FinancialAi = () => {
                     : '—'}
                 </td>
                 <td className="px-5 py-4 font-black text-slate-950">
-                  {formatMoney(purchase.amount, currency, activeRate)}
+                  {formatMoney(purchase.amount, currency, activeRate, 'iqd')}
                 </td>
                 <td className="px-5 py-4 font-semibold text-slate-500">{formatDate(purchase.paidAt)}</td>
                 <td className="px-5 py-4 font-semibold text-slate-500">
@@ -862,17 +924,25 @@ const FinancialAi = () => {
             <LoadingState />
           ) : (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-3">
-                <KpiCard title="الكلفة" value={formatMoney(detail.cost, currency, activeRate)} />
+              <div className="grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 gap-3 sm:grid-cols-2">
+                <KpiCard title="الكلفة" value={formatMoney(detail.cost, currency, activeRate, 'usd')} />
                 <KpiCard
                   title="إيراد الاشتراك"
-                  value={formatMoney(detail.subscriptionRevenue, currency, activeRate)}
+                  value={formatMoney(detail.subscriptionRevenue, currency, activeRate, 'iqd')}
+                  accent="emerald"
+                />
+                {/* Credit revenue is in the margin, as on the table row — the
+                    drawer used to subtract cost from subscriptions alone, so
+                    the same store had two different margins. */}
+                <KpiCard
+                  title="إيراد الرصيد"
+                  value={formatMoney(detail.creditRevenue, currency, activeRate, 'iqd')}
                   accent="emerald"
                 />
                 <KpiCard
                   title="الربح"
-                  value={formatMoney(detail.margin, currency, activeRate)}
-                  accent={amountOf(detail.margin, 'IQD', activeRate) >= 0 ? 'emerald' : 'rose'}
+                  value={formatMoney(detailMargin, currency, activeRate, 'mixed')}
+                  accent={detailMargin.iqd >= 0 ? 'emerald' : 'rose'}
                 />
               </div>
 
@@ -901,7 +971,7 @@ const FinancialAi = () => {
                           </td>
                           <td className="px-5 py-3 font-semibold text-slate-500">{run.calls}</td>
                           <td className="px-5 py-3 font-black text-rose-500">
-                            {formatMoney(run.cost, currency, activeRate)}
+                            {formatMoney(run.cost, currency, activeRate, 'usd')}
                           </td>
                           <td className="px-5 py-3 font-semibold text-slate-500">
                             {formatDate(run.createdAt)}
@@ -937,7 +1007,7 @@ const FinancialAi = () => {
                         <tr key={purchase.id} className="text-sm text-slate-700">
                           <td className="px-5 py-3 font-bold">{purchase.pack?.name || '—'}</td>
                           <td className="px-5 py-3 font-black text-slate-950">
-                            {formatMoney(purchase.amount, currency, activeRate)}
+                            {formatMoney(purchase.amount, currency, activeRate, 'iqd')}
                           </td>
                           <td className="px-5 py-3 font-semibold text-slate-500">
                             {formatDate(purchase.paidAt ?? purchase.createdAt)}
