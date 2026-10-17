@@ -19,6 +19,7 @@ import PaymentMethods from './pages/PaymentMethods';
 import Developer from './pages/Developer';
 import DomainHealth from './pages/DomainHealth';
 import UnlimitedAi from './pages/UnlimitedAi';
+import VisitorJourney from './pages/VisitorJourney';
 
 function App() {
   return (
@@ -74,6 +75,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['owner']}>
                   <FinancialAi />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="journey"
+              element={
+                <ProtectedRoute requiredRoles={['owner']}>
+                  <VisitorJourney />
                 </ProtectedRoute>
               }
             />
