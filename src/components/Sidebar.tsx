@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, LogOut } from 'lucide-react';
+import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useSupportUnread } from '../contexts/SupportUnreadContext';
 import BrandLogo from './BrandLogo';
@@ -21,6 +22,7 @@ type AppMenuItem = {
 /** Tabs: ادارة النظام + ادوات المستخدم (Figma) */
 const menuItems: AppMenuItem[] = [
   { path: '/dashboard', label: 'لوحة التحكم', icon: '/sidebar/icon-dashboard.svg', roles: ['owner', 'employee', 'support', 'developer'], section: 'system' },
+  { path: '/dashboard/journey', label: 'رحلة الزوار', icon: '/sidebar/icon-journey.svg', roles: ['owner'], section: 'system' },
   { path: '/dashboard/employees', label: 'ادارة الموظفين', icon: '/sidebar/icon-employees.svg', roles: ['owner'], section: 'system' },
   { path: '/dashboard/accounting', label: 'الحسابات المالية', icon: '/sidebar/icon-accounting.svg', roles: ['owner', 'employee'], section: 'system', flipIcon: true },
   { path: '/dashboard/financial-ai', label: 'مالية الذكاء الاصطناعي', icon: '/sidebar/icon-financial-ai.svg', roles: ['owner'], section: 'system' },
@@ -90,7 +92,6 @@ const AppSidebar = () => {
     developer: 'مطور النظام',
   } as Record<string, string>)[user?.role || 'owner'] || 'مدير النظام';
 
-  const initials = user?.name?.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'MA';
 
   const isActive = (path: string) =>
     path === '/dashboard' ? location.pathname === path : location.pathname.startsWith(path);
@@ -296,10 +297,10 @@ const AppSidebar = () => {
             style={{ backgroundImage: 'linear-gradient(199deg, rgb(182, 87, 255) 24%, rgb(0, 191, 255) 76%)' }}
           >
             {collapsed ? (
-              <UserThumb initials={initials} />
+              <UserThumb seed={user?.id} />
             ) : (
               <div className="flex w-full flex-1 items-center justify-between gap-[7px]">
-                <UserThumb initials={initials} />
+                <UserThumb seed={user?.id} />
                 <div className="flex min-w-0 flex-1 items-center justify-between">
                   <div className="flex flex-col items-end gap-0.5 text-right text-xs text-white">
                     <p className="font-bold">{user?.name || 'مستخدم'}</p>
@@ -347,12 +348,8 @@ const AppSidebar = () => {
   );
 };
 
-const UserThumb = ({ initials }: { initials: string }) => (
-  <span className="relative size-11 shrink-0 overflow-hidden">
-    <img src="/sidebar/avatar-ring.svg" alt="" className="absolute inset-[3%]" />
-    <img src="/sidebar/avatar-inner.svg" alt="" className="absolute inset-[18%_19%]" />
-    <span className="absolute inset-0 grid place-items-center text-xs font-black text-white">{initials}</span>
-  </span>
+const UserThumb = ({ seed }: { seed?: string }) => (
+  <UserAvatar seed={seed} className="size-11 ring-2 ring-white/60" />
 );
 
 export default AppSidebar;
