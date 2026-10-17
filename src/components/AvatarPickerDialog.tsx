@@ -3,7 +3,7 @@ import { Check, ImageUp, RotateCcw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_AVATARS, presetNumber } from '@/lib/defaultAvatars';
+import { ADMIN_AVATARS, presetNumber } from '@/lib/defaultAvatars';
 import { cn } from '@/lib/utils';
 import { systemAuthService } from '@/services/systemAuthService';
 
@@ -17,7 +17,7 @@ const errorMessage = (err: unknown, fallback: string) => {
 };
 
 /**
- * The signed-in member changes their own avatar: one of Mel's ten, or a photo.
+ * The signed-in member changes their own avatar: one of the team's ten, or a photo.
  * Each choice saves straight away; there is no separate save step.
  */
 export const AvatarPickerDialog = ({ onClose }: { onClose: () => void }) => {
@@ -81,7 +81,7 @@ export const AvatarPickerDialog = ({ onClose }: { onClose: () => void }) => {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <UserAvatar seed={user?.id} src={current} className="size-14 ring-4 ring-violet-50" />
+            <UserAvatar team seed={user?.id} src={current} className="size-14 ring-4 ring-violet-50" />
             <div>
               <h2 id="avatar-picker-title" className="text-lg font-black text-slate-950">
                 صورتك الشخصية
@@ -101,7 +101,7 @@ export const AvatarPickerDialog = ({ onClose }: { onClose: () => void }) => {
 
         <p className="mt-6 mb-3 text-sm font-black text-slate-700">اختر صورة</p>
         <div className="grid grid-cols-5 gap-2.5 sm:gap-3">
-          {DEFAULT_AVATARS.map((src, index) => {
+          {ADMIN_AVATARS.map((src, index) => {
             const preset = index + 1;
             const selected = currentPreset === preset;
             return (

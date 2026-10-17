@@ -363,7 +363,7 @@ const AppSidebar = () => {
 };
 
 const UserThumb = ({ seed, src }: { seed?: string; src?: string | null }) => (
-  <UserAvatar seed={seed} src={src} className="size-11 ring-2 ring-white/60" />
+  <UserAvatar team seed={seed} src={src} className="size-11 ring-2 ring-white/60" />
 );
 
 export default AppSidebar;
