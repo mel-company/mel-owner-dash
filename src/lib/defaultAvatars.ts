@@ -9,14 +9,9 @@ import avatar8 from '@/assets/avatars/user-8.webp?no-inline';
 import avatar9 from '@/assets/avatars/user-9.webp?no-inline';
 import avatar10 from '@/assets/avatars/user-10.webp?no-inline';
 import admin1 from '@/assets/avatars/admin/admin-1.webp?no-inline';
-import admin2 from '@/assets/avatars/admin/admin-2.webp?no-inline';
 import admin3 from '@/assets/avatars/admin/admin-3.webp?no-inline';
-import admin4 from '@/assets/avatars/admin/admin-4.webp?no-inline';
 import admin5 from '@/assets/avatars/admin/admin-5.webp?no-inline';
-import admin6 from '@/assets/avatars/admin/admin-6.webp?no-inline';
 import admin7 from '@/assets/avatars/admin/admin-7.webp?no-inline';
-import admin8 from '@/assets/avatars/admin/admin-8.webp?no-inline';
-import admin9 from '@/assets/avatars/admin/admin-9.webp?no-inline';
 import admin10 from '@/assets/avatars/admin/admin-10.webp?no-inline';
 
 /**
@@ -41,20 +36,10 @@ export const DEFAULT_AVATARS = [
 
 /**
  * Avatars for Mel's own team (admin dashboard members), a set of their own.
- * The backend stores a picked one as `preset:1` … `preset:10`.
+ * Only the men are offered for now; the others stay in the repo for later.
+ * The backend stores a picked one as `preset:1` … `preset:5`, in this order.
  */
-export const ADMIN_AVATARS = [
-  admin1,
-  admin2,
-  admin3,
-  admin4,
-  admin5,
-  admin6,
-  admin7,
-  admin8,
-  admin9,
-  admin10,
-];
+export const ADMIN_AVATARS = [admin1, admin3, admin5, admin7, admin10];
 
 /**
  * The avatar from a set for a seed (the person's user id where we have it).
