@@ -410,6 +410,7 @@ const Employees = () => {
                         <span className="text-xs font-semibold text-slate-500">
                           {String((currentPage - 1) * pageSize + index + 1).padStart(2, '0')}
                         </span>
+                        <UserAvatar team seed={employee.id} src={employee.avatar} className="size-9" />
                         <span className="font-black text-slate-950">{employee.name}</span>
                       </div>
                     </td>
@@ -699,7 +700,7 @@ const ConfirmNameModal = ({
         <div className={cn('mx-auto mb-6 flex min-h-36 max-w-sm items-center justify-center rounded-[1.5rem] p-4 sm:mb-8 sm:min-h-44 sm:rounded-[2rem] sm:p-6', previewBg)}>
           <div className="w-full rounded-3xl bg-white p-4 text-right shadow-sm sm:p-5">
             <div className="flex items-center gap-3">
-              <UserAvatar seed={employee.id} className="size-12" />
+              <UserAvatar team seed={employee.id} src={employee.avatar} className="size-12" />
               <div className="min-w-0">
                 <p className="truncate text-base font-black text-slate-950 sm:text-lg">{employee.name}</p>
                 <p className="mt-1 text-sm font-semibold text-violet-600">{getRoleMeta(employee.role).label}</p>

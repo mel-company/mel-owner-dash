@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, LogOut } from 'lucide-react';
+import { ChevronLeft, ImageUp, LogOut } from 'lucide-react';
 import { UserAvatar } from '@/components/UserAvatar';
+import { AvatarPickerDialog } from '@/components/AvatarPickerDialog';
 import { useAuth } from '../contexts/AuthContext';
 import { useSupportUnread } from '../contexts/SupportUnreadContext';
 import BrandLogo from './BrandLogo';
@@ -44,6 +45,7 @@ const AppSidebar = () => {
   const { state, toggleSidebar, isMobile, setOpenMobile, openMobile } = useShadcnSidebar();
   const { unreadTotal } = useSupportUnread();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -274,6 +276,17 @@ const AppSidebar = () => {
             >
               <button
                 type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setAvatarOpen(true);
+                }}
+                className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                <span>تغيير الصورة</span>
+                <ImageUp className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-red-500 transition hover:bg-red-50 disabled:opacity-60"
@@ -297,10 +310,10 @@ const AppSidebar = () => {
             style={{ backgroundImage: 'linear-gradient(199deg, rgb(182, 87, 255) 24%, rgb(0, 191, 255) 76%)' }}
           >
             {collapsed ? (
-              <UserThumb seed={user?.id} />
+              <UserThumb seed={user?.id} src={user?.avatar} />
             ) : (
               <div className="flex w-full flex-1 items-center justify-between gap-[7px]">
-                <UserThumb seed={user?.id} />
+                <UserThumb seed={user?.id} src={user?.avatar} />
                 <div className="flex min-w-0 flex-1 items-center justify-between">
                   <div className="flex flex-col items-end gap-0.5 text-right text-xs text-white">
                     <p className="font-bold">{user?.name || 'مستخدم'}</p>
@@ -324,6 +337,7 @@ const AppSidebar = () => {
 
   return (
     <>
+      {avatarOpen && <AvatarPickerDialog onClose={() => setAvatarOpen(false)} />}
       <div
         className={cn('hidden shrink-0 transition-[width] duration-200 md:block', collapsed ? 'w-[92px]' : 'w-[277px]')}
         aria-hidden
@@ -348,8 +362,8 @@ const AppSidebar = () => {
   );
 };
 
-const UserThumb = ({ seed }: { seed?: string }) => (
-  <UserAvatar seed={seed} className="size-11 ring-2 ring-white/60" />
+const UserThumb = ({ seed, src }: { seed?: string; src?: string | null }) => (
+  <UserAvatar team seed={seed} src={src} className="size-11 ring-2 ring-white/60" />
 );
 
 export default AppSidebar;

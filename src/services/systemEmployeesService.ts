@@ -18,6 +18,8 @@ export interface SystemEmployee {
   role?: string;
   status?: string;
   isActive?: boolean;
+  /** `preset:N` or an uploaded photo's url; null means the default avatar. */
+  avatar?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
