@@ -17,7 +17,7 @@ const errorMessage = (err: unknown, fallback: string) => {
 };
 
 /**
- * The signed-in member changes their own avatar: one of the team's ten, or a photo.
+ * The signed-in member changes their own avatar: one of the team's avatars, or a photo.
  * Each choice saves straight away; there is no separate save step.
  */
 export const AvatarPickerDialog = ({ onClose }: { onClose: () => void }) => {
