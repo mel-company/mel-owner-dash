@@ -32,3 +32,30 @@ export const journeyService = {
     return response as unknown as JourneyFunnel;
   },
 };
+
+export interface JourneyAccount {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  createdAt: string;
+  store: { id: string; name: string | null; subdomain: string | null } | null;
+  /** Keys of the account steps this account has reached. */
+  steps: string[];
+}
+
+export interface JourneyAccountsPage {
+  total: number;
+  page: number;
+  pageSize: number;
+  steps: Array<{ key: string; label: string }>;
+  data: JourneyAccount[];
+}
+
+export const journeyAccountsService = {
+  /** Accounts created in the range; `step` keeps only those that reached it. */
+  async list(params: { from?: string; to?: string; step?: string; page?: number; pageSize?: number }): Promise<JourneyAccountsPage> {
+    // The interceptor already unwraps `response.data`.
+    const response = await axiosInstance.get<JourneyAccountsPage>('/journey/accounts', { params });
+    return response as unknown as JourneyAccountsPage;
+  },
+};
