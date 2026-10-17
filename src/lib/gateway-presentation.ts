@@ -207,6 +207,9 @@ export function chartPoints(
   if (!series.some((point) => point.transactions > 0)) return [];
 
   return series.map((point) => {
+    // `point.date` is already the Baghdad calendar day. `new Date('YYYY-MM-DD')`
+    // is UTC midnight of it, so it is formatted in UTC — formatting in the
+    // browser's zone labelled every bar a day early anywhere west of UTC.
     const parsed = new Date(point.date);
     return {
       label: Number.isNaN(parsed.getTime())
@@ -214,6 +217,7 @@ export function chartPoints(
         : parsed.toLocaleDateString('ar-IQ-u-nu-latn', {
             day: 'numeric',
             month: 'short',
+            timeZone: 'UTC',
           }),
       transactions: point.transactions,
     };

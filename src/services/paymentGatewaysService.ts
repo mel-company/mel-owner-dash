@@ -42,7 +42,7 @@ export interface PaymentGatewayHealth {
 
 /** One day of the 30-day window, for the sparkline. */
 export interface GatewayDailyPoint {
-  /** `YYYY-MM-DD`, UTC. */
+  /** `YYYY-MM-DD`, the Baghdad calendar day (UTC+3). */
   date: string;
   transactions: number;
   /** Integer IQD, settled only. */
@@ -58,7 +58,11 @@ export interface GatewayDailyPoint {
  */
 export interface GatewayActivity {
   gateway: PaymentGatewayHealth['gateway'];
-  /** Every transaction ever opened through it, settled or not. */
+  /**
+   * Every transaction ever opened through it, settled or not. 0 IQD rows (the
+   * intro free month, which never reached the gateway) are not counted here,
+   * in the window, in the success rate or in `lastRequestAt`.
+   */
   transactions: number;
   /**
    * Which of the platform's two surfaces have actually sent it anything.
@@ -74,7 +78,7 @@ export interface GatewayActivity {
   lastRequestAt: string | null;
   window: {
     days: number;
-    /** Settled money only — a pending transaction is not revenue. */
+    /** Settled money only, net of refunds — a pending transaction is not revenue. */
     amount: number;
     transactions: number;
     /**

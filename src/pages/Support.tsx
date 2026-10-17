@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   ChevronDown,
@@ -96,12 +96,23 @@ const Support = () => {
   });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  /** Matches for the current filter, from the server — what the pager counts. */
+  const [total, setTotal] = useState(0);
+  /**
+   * Queue-wide counts from the server, independent of the filter. The cards
+   * used to count the first 100 loaded tickets, which went wrong past 100
+   * tickets and changed with every filter.
+   */
+  const [ticketStats, setTicketStats] = useState<{
+    all?: number;
+    open?: number;
+    closed?: number;
+  }>({});
   const [formData, setFormData] = useState<CreateTicketRequest>(defaultTicketForm);
   const selectedTicketIdRef = useRef<string | null>(null);
   const lastMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    fetchTickets();
     fetchTicketStores();
   }, []);
 
@@ -113,14 +124,32 @@ const Support = () => {
     try {
       if (!silent) setLoading(true);
       setError('');
+      // Paginated and filtered on the server: the page used to load the
+      // first 100 tickets and filter/paginate those, so anything older was
+      // unreachable.
       const response = await supportTicketsService.getAllSystemTickets({
-        page: 1,
-        limit: 100,
+        page,
+        limit: pageSize,
         status: filters.status || undefined,
-        search: filters.search || undefined,
+        search: filters.search.trim() || undefined,
+        priority: filters.priority || undefined,
+        department: filters.department || undefined,
       });
       const list = response.data || [];
       setTickets(list);
+      setTotal(response.total ?? list.length);
+      const sum = (...values: Array<number | undefined>) =>
+        values.every((value) => typeof value === 'number')
+          ? values.reduce<number>((acc, value) => acc + (value ?? 0), 0)
+          : undefined;
+      setTicketStats({
+        all: response.allTickets,
+        open: response.openTickets,
+        closed: sum(response.closedTickets, response.resolvedTickets, response.cancelledTickets),
+      });
+      // Deleting the last ticket on the last page leaves an empty page.
+      const lastPage = Math.max(1, Math.ceil((response.total ?? 0) / pageSize));
+      if (list.length === 0 && page > lastPage) setPage(lastPage);
 
       const nextMap: Record<string, number> = {};
       list.forEach((ticket) => {
@@ -136,7 +165,14 @@ const Support = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [filters.search, filters.status, setUnreadTotal]);
+  }, [page, pageSize, filters.search, filters.status, filters.priority, filters.department, setUnreadTotal]);
+
+  // Refetch whenever the page or a filter changes; typing in the search box
+  // is debounced so each keystroke is not a request.
+  useEffect(() => {
+    const timer = window.setTimeout(() => fetchTickets(), 300);
+    return () => window.clearTimeout(timer);
+  }, [fetchTickets]);
 
   const fetchTicketStores = useCallback(async () => {
     try {
@@ -404,35 +440,10 @@ const Support = () => {
     setFormData(defaultTicketForm);
   };
 
-  const sourceTickets = tickets;
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
-  const filteredTickets = useMemo(() => sourceTickets.filter(ticket => {
-    const searchable = [
-      ticket.id,
-      ticket.title,
-      ticket.description,
-      ticket.lastMessagePreview || '',
-      ticket.contactName || '',
-      ticket.contactEmail || '',
-      ticket.contactPhone || '',
-    ].join(' ').toLowerCase();
-    if (filters.status && ticket.status !== filters.status) return false;
-    if (filters.priority && ticket.priority !== filters.priority) return false;
-    if (filters.department && ticket.department !== filters.department) return false;
-    if (filters.search && !searchable.includes(filters.search.toLowerCase())) return false;
-    return true;
-  }), [filters, sourceTickets]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const paginatedTickets = filteredTickets.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const stats = useMemo(() => ({
-    total: sourceTickets.length,
-    open: sourceTickets.filter(t => t.status === TicketStatusEnum.OPEN).length,
-    closed: sourceTickets.filter(t => t.status === TicketStatusEnum.CLOSED || t.status === TicketStatusEnum.RESOLVED || t.status === TicketStatusEnum.CANCELLED).length,
-  }), [sourceTickets]);
 
   if (loading && tickets.length === 0) {
     return (
@@ -448,7 +459,7 @@ const Support = () => {
         title={pageTitle}
         description={
           <>
-            هناك <span className="font-black text-violet-600">{filteredTickets.length} بطاقة</span> في {pageDescriptionLabel}
+            هناك <span className="font-black text-violet-600">{total.toLocaleString('en-US')} بطاقة</span> في {pageDescriptionLabel}
           </>
         }
         icon={<PageTitleIcon className="h-5 w-5 sm:h-6 sm:w-6" />}
@@ -469,9 +480,9 @@ const Support = () => {
       )}
 
       <div className="grid grid-cols-2 max-md:[&>*:last-child:nth-child(odd)]:col-span-2 gap-4 md:grid-cols-3">
-        <StatCard title="إجمالي التذاكر" value={stats.total} tone="cyan" icon={<MessageCircle className="h-6 w-6" />} />
-        <StatCard title="عدد التذاكر المفتوح" value={stats.open} tone="amber" icon={<Headphones className="h-6 w-6" />} />
-        <StatCard title="عدد التذاكر المغلقة" value={stats.closed} tone="rose" icon={<X className="h-6 w-6" />} />
+        <StatCard title="إجمالي التذاكر" value={ticketStats.all} tone="cyan" icon={<MessageCircle className="h-6 w-6" />} />
+        <StatCard title="المفتوحة وقيد المعالجة" value={ticketStats.open} tone="amber" icon={<Headphones className="h-6 w-6" />} />
+        <StatCard title="المغلقة والمحلولة والملغاة" value={ticketStats.closed} tone="rose" icon={<X className="h-6 w-6" />} />
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -517,7 +528,7 @@ const Support = () => {
       </h2>
 
       <TicketTable
-        tickets={paginatedTickets}
+        tickets={tickets}
         unreadMap={ticketUnreadMap}
         page={currentPage}
         pageSize={pageSize}
@@ -540,7 +551,6 @@ const Support = () => {
             setFilters(draftFilters);
             setPage(1);
             setShowFilters(false);
-            fetchTickets();
           }}
           onReset={() => {
             const empty = { status: '', priority: '', department: '', search: '' };
@@ -732,7 +742,8 @@ const FiltersDrawer = ({
   </div>
 );
 
-const StatCard = ({ title, value, tone, icon }: { title: string; value: number; tone: 'cyan' | 'amber' | 'rose'; icon: React.ReactNode }) => {
+/** `value` is undefined when the server did not send the count: shown as «—». */
+const StatCard = ({ title, value, tone, icon }: { title: string; value?: number; tone: 'cyan' | 'amber' | 'rose'; icon: React.ReactNode }) => {
   const tones = {
     cyan: 'bg-cyan-50 text-cyan-500',
     amber: 'bg-amber-50 text-amber-500',
@@ -745,8 +756,7 @@ const StatCard = ({ title, value, tone, icon }: { title: string; value: number; 
       <div>
         <p className="text-sm font-black text-slate-700">{title}</p>
         <div className="mt-1 flex items-center gap-2" dir="ltr">
-          <span className="text-xs font-bold text-emerald-500">12.6% ↗</span>
-          <span className="text-2xl font-black text-slate-950">{value.toLocaleString('en-US')}</span>
+          <span className="text-2xl font-black text-slate-950">{typeof value === 'number' ? value.toLocaleString('en-US') : '—'}</span>
         </div>
       </div>
     </div>
@@ -799,7 +809,7 @@ const TicketTable = ({
               <tr key={ticket.id} className="text-sm text-slate-700 transition hover:bg-slate-50/70">
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-4">
-                    <span className="text-xs font-semibold text-slate-500">{String(index + 1).padStart(2, '0')}</span>
+                    <span className="text-xs font-semibold text-slate-500">{String((page - 1) * pageSize + index + 1).padStart(2, '0')}</span>
                     <span className="font-black text-indigo-900">#{ticket.id.slice(0, 7)}</span>
                     {ticket.source === TicketSourceEnum.LANDING_PAGE && (
                       <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-600">
@@ -1384,15 +1394,27 @@ const StatusBadge = ({ status }: { status?: TicketStatusEnum }) => (
   </span>
 );
 
+/**
+ * One bar per level, and the colour rises with it: LOW is calm teal, MEDIUM
+ * amber, HIGH and CRITICAL red. The colours used to be inverted (LOW red,
+ * HIGH teal).
+ */
 const PriorityMeter = ({ priority }: { priority?: TicketPriorityEnum }) => {
-  const active = priority === TicketPriorityEnum.HIGH || priority === TicketPriorityEnum.CRITICAL ? 4 : priority === TicketPriorityEnum.MEDIUM ? 3 : 1;
-  const color = priority === TicketPriorityEnum.LOW ? 'bg-red-500' : priority === TicketPriorityEnum.MEDIUM ? 'bg-orange-400' : 'bg-teal-500';
+  const active =
+    priority === TicketPriorityEnum.CRITICAL ? 4
+      : priority === TicketPriorityEnum.HIGH ? 3
+        : priority === TicketPriorityEnum.MEDIUM ? 2
+          : 1;
+  const color =
+    priority === TicketPriorityEnum.HIGH || priority === TicketPriorityEnum.CRITICAL ? 'bg-red-500'
+      : priority === TicketPriorityEnum.MEDIUM ? 'bg-orange-400'
+        : 'bg-teal-500';
   return (
     <div className="flex items-center justify-end gap-3">
       <span className="font-semibold text-slate-700">{getPriorityText(priority)}</span>
       <div className="flex gap-1" dir="ltr">
         {Array.from({ length: 4 }).map((_, index) => (
-          <span key={index} className={cn('h-1.5 w-8 rounded-full', index < active ? color : 'bg-red-50')} />
+          <span key={index} className={cn('h-1.5 w-8 rounded-full', index < active ? color : 'bg-slate-100')} />
         ))}
       </div>
     </div>

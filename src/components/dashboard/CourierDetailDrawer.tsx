@@ -150,9 +150,12 @@ export const CourierDetailDrawer = ({
       xAxis: {
         type: 'category',
         data: series.map((point) =>
+          // The key is a Baghdad calendar date; read it as UTC so a viewer in
+          // another timezone does not see it shifted a day.
           new Date(point.date).toLocaleDateString('ar-IQ-u-nu-latn', {
             day: 'numeric',
             month: 'short',
+            timeZone: 'UTC',
           }),
         ),
         boundaryGap: false,
@@ -302,7 +305,7 @@ export const CourierDetailDrawer = ({
                 الطرود خلال آخر 30 يوم
               </h3>
               <p className="text-xs font-semibold text-slate-400">
-                مقارنة مع الشهر السابق
+                مقارنة مع الـ30 يوماً السابقة
               </p>
             </div>
           </div>
@@ -343,7 +346,14 @@ export const CourierDetailDrawer = ({
           <StatTile
             label="تم التوصيل"
             value={(stats?.delivered ?? 0).toLocaleString('en-US')}
-            hint={share(stats?.delivered ?? 0, total)}
+            /* The same delivery rate as the companies table: delivered ÷
+               (delivered + failed + returned). It used to be delivered ÷ all
+               parcels, so the drawer and the table disagreed for one courier. */
+            hint={
+              stats?.deliveryRate === null || stats?.deliveryRate === undefined
+                ? 'نسبة التسليم —'
+                : `نسبة التسليم ${Math.round(stats.deliveryRate * 100)}%`
+            }
             tone="bg-emerald-50 text-emerald-600"
             icon={<PackageCheck className="h-4 w-4" />}
           />
@@ -355,9 +365,9 @@ export const CourierDetailDrawer = ({
             icon={<Clock className="h-4 w-4" />}
           />
           <StatTile
-            label="فشل التوصيل"
-            value={(stats?.failed ?? 0).toLocaleString('en-US')}
-            hint={share(stats?.failed ?? 0, total)}
+            label="فشل / مرتجع"
+            value={((stats?.failed ?? 0) + (stats?.returned ?? 0)).toLocaleString('en-US')}
+            hint={share((stats?.failed ?? 0) + (stats?.returned ?? 0), total)}
             tone="bg-red-50 text-red-600"
             icon={<PackageX className="h-4 w-4" />}
           />
@@ -384,7 +394,12 @@ export const CourierDetailDrawer = ({
                   <th className="pb-2 text-right font-bold">رقم الطلب</th>
                   <th className="pb-2 text-right font-bold">الحالة</th>
                   <th className="pb-2 text-right font-bold">التاريخ</th>
-                  <th className="pb-2 text-right font-bold">وقت المعالجة</th>
+                  <th
+                    className="pb-2 text-right font-bold"
+                    title="من التسجيل حتى آخر تحديث حالة وصل من الشركة — لا تُرسل أي شركة وقت التسليم نفسه، فهو حد أعلى تقريبي"
+                  >
+                    وقت المعالجة (تقريبي)
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">

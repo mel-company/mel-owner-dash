@@ -3,9 +3,21 @@ import axiosInstance from '../utils/AxiosInstance';
 export interface KeyKPIs {
   monthly_recurring_revenue?: number;
   annual_recurring_revenue?: number;
+  /** Subscriptions inside their term, on a paid plan, backed by a real payment. */
+  paying_subscriptions?: number;
+  /**
+   * Mel's own revenue: settled platform payments net of refunds. Before the
+   * server change these three were the merchants' delivered-order sales.
+   */
   total_revenue?: number;
   revenue_today?: number;
   revenue_this_month?: number;
+  /** Platform revenue per Baghdad day, last 30 days, oldest first. */
+  revenue_daily?: Array<{ date: string; amount: number }>;
+  /** What shoppers paid merchants for delivered orders, after coupons. */
+  store_sales_total?: number;
+  store_sales_today?: number;
+  store_sales_this_month?: number;
   average_revenue_per_store?: number;
   stores_active_after_30_days_percent?: number;
 }
@@ -17,17 +29,28 @@ export interface StoreMetrics {
   newStoresThisMonth?: number;
   storesWithoutProducts?: number;
   storesWithoutOrders?: number;
+  /** Neither products nor orders — lets the chart split stores without overlap. */
+  storesWithoutProductsOrOrders?: number;
 }
 
 export interface OrdersPlatformUsage {
   totalOrders?: number;
   ordersToday?: number;
   ordersLast7Days?: number;
+  ordersByStatus?: {
+    pending: number;
+    processing: number;
+    shipped: number;
+    delivered: number;
+    cancelled: number;
+  };
   averageOrderValue?: number;
   ordersPerStore?: number;
   orderSuccessRate?: number;
   cancelledOrders?: number;
+  /** Online payment attempts the gateway settled as paid. */
   paymentSuccessCount?: number;
+  /** Online payment attempts that failed or expired. */
   paymentFailureCount?: number;
   couponUsageRate?: number;
 }
@@ -141,9 +164,14 @@ export interface TicketDepartmentBreakdown {
 }
 
 export interface AdminProductivity {
+  ticketsTotal?: number;
+  /** Tickets waiting on someone now (open, in progress, on hold). */
+  ticketsOpen?: number;
+  /** Older servers sent every ticket ever opened here; newer ones mirror `ticketsOpen`. */
   ticketsOpened?: number;
   ticketsResolved?: number;
   ticketsResolvedPercent?: number;
+  /** Average hours from a ticket opening to the team's first reply. */
   avgResponseTimeHours?: number;
   mostTicketType?: {
     type: string;

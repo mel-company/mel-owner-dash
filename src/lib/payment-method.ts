@@ -67,8 +67,13 @@ export const asPaymentMethodFilter = (
 ): '' | PaymentMethodCategory =>
   value === 'bank' || value === 'card' || value === 'wallet' ? value : '';
 
+/**
+ * `bank` is the server's bucket for a row with no gateway — in practice a
+ * subscription no payment backs (an operator's row, seed data). It was
+ * labelled «تحويل بنكي», asserting a transfer nobody recorded.
+ */
 const CATEGORY_LABELS: Record<PaymentMethodCategory, string> = {
-  bank: 'تحويل بنكي',
+  bank: 'يدوي – بلا دفعة',
   card: 'بطاقة',
   wallet: 'محفظة إلكترونية',
 };

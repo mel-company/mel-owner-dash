@@ -26,6 +26,8 @@ import { SubscriptionActions } from '@/components/dashboard/SubscriptionActions'
 import {
   systemSubscriptionsService,
   type Subscription,
+  type SubscriptionBucket,
+  type SubscriptionCounts,
 } from '../services/systemSubscriptionsService';
 import { apiErrorMessage } from '../services/domainHealthService';
 import {
@@ -44,18 +46,22 @@ import {
  *
  * Paginated **server-side**, following `Stores.tsx`: the rows are per-store and
  * unbounded, so slicing in memory would mean fetching the platform to show ten
- * of it. The consequence is that the search box and the status filter narrow the
- * page that is loaded, not the whole table — the same trade `Stores` makes, and
- * the reason the search box is wired to the server's own `/system/search`
- * instead.
+ * of it. The search term and the status filter both go to the server's
+ * `/system/all`, so they narrow the whole table and the pager counts what they
+ * show — the status filter used to narrow only the page already loaded.
  */
-const STATUS_OPTIONS = [
+const STATUS_OPTIONS: Array<{ value: 'all' | SubscriptionBucket; label: string }> = [
   { value: 'all', label: 'كل الحالات' },
-  { value: 'ACTIVE', label: 'نشط' },
-  { value: 'INACTIVE', label: 'موقوف مؤقتاً' },
-  { value: 'EXPIRED', label: 'منتهي' },
-  { value: 'CANCELLED', label: 'ملغى' },
+  { value: 'live', label: 'نشط' },
+  { value: 'expired', label: 'منتهي المدة' },
+  { value: 'paused', label: 'موقوف مؤقتاً' },
+  { value: 'cancelled', label: 'ملغى' },
 ];
+
+const asBucket = (value: string): SubscriptionBucket | undefined =>
+  value === 'live' || value === 'expired' || value === 'paused' || value === 'cancelled'
+    ? value
+    : undefined;
 
 const Subscriptions = () => {
   const navigate = useNavigate();
@@ -76,26 +82,25 @@ const Subscriptions = () => {
    */
   const [queryTerm, setQueryTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  /** Platform-wide, from the server — not counted over the loaded page. */
+  const [counts, setCounts] = useState<SubscriptionCounts | null>(null);
   /** Which row has its action panel open. One at a time. */
   const [actingOn, setActingOn] = useState<string | null>(null);
 
   const fetchRows = useCallback(
-    async (nextPage: number, limit: number, term: string) => {
+    async (nextPage: number, limit: number, term: string, status: string) => {
       try {
         setLoading(true);
         setError('');
-        const response = term.trim()
-          ? await systemSubscriptionsService.searchSubscriptions({
-              query: term.trim(),
-              page: nextPage,
-              limit,
-            })
-          : await systemSubscriptionsService.getAllSubscriptions({
-              page: nextPage,
-              limit,
-            });
+        const response = await systemSubscriptionsService.getAllSubscriptions({
+          page: nextPage,
+          limit,
+          status: asBucket(status),
+          search: term.trim() || undefined,
+        });
         setRows(response.data || []);
         setTotal(response.total ?? response.data?.length ?? 0);
+        if (response.counts) setCounts(response.counts);
       } catch (err) {
         setError(apiErrorMessage(err, 'فشل في جلب الاشتراكات.'));
         console.error('Error loading subscriptions:', err);
@@ -114,32 +119,28 @@ const Subscriptions = () => {
   }, [search]);
 
   useEffect(() => {
-    void fetchRows(page, pageSize, queryTerm);
-  }, [fetchRows, page, pageSize, queryTerm]);
+    void fetchRows(page, pageSize, queryTerm, statusFilter);
+  }, [fetchRows, page, pageSize, queryTerm, statusFilter]);
 
-  const visibleRows = useMemo(
-    () =>
-      statusFilter === 'all'
-        ? rows
-        : rows.filter((row) => row.status === statusFilter),
-    [rows, statusFilter],
-  );
+  /** The server already filtered; nothing is narrowed here. */
+  const visibleRows = rows;
 
   /**
-   * Counted over the page, and labelled as such. The server returns no status
-   * breakdown, so claiming these were platform totals would be a number that
-   * silently changes with the page size.
+   * The server's platform-wide buckets. They are disjoint: an ACTIVE row past
+   * its term counts as expired only, where the page-counted cards used to put
+   * it under both «نشطة» and «منتهية المدة».
    */
-  const stats = useMemo(() => {
-    const live = rows.filter((row) => row.status === 'ACTIVE').length;
-    const paused = rows.filter((row) => row.status === 'INACTIVE').length;
-    const over = rows.filter(
-      (row) =>
-        row.status === 'EXPIRED' ||
-        (row.status === 'ACTIVE' && new Date(row.end_at).getTime() <= Date.now()),
-    ).length;
-    return { live, paused, over };
-  }, [rows]);
+  const stats = useMemo(
+    () => ({
+      live: counts?.live ?? 0,
+      paused: counts?.paused ?? 0,
+      over: counts?.expired ?? 0,
+      all: counts
+        ? counts.live + counts.expired + counts.paused + counts.cancelled
+        : total,
+    }),
+    [counts, total],
+  );
 
   const totalPages = Math.max(1, Math.ceil((total || 1) / pageSize));
 
@@ -152,7 +153,7 @@ const Subscriptions = () => {
         description={
           <>
             هناك{' '}
-            <span className="font-black text-violet-600">{total} اشتراك</span>{' '}
+            <span className="font-black text-violet-600">{stats.all} اشتراك</span>{' '}
             على المنصة
           </>
         }
@@ -164,26 +165,23 @@ const Subscriptions = () => {
       <div className="grid grid-cols-2 max-md:[&>*:last-child:nth-child(odd)]:col-span-2 gap-4 md:grid-cols-4">
         <StatCard
           title="إجمالي الاشتراكات"
-          value={total}
+          value={stats.all}
           icon={<ReceiptText />}
           tone="violet"
         />
-        {/* The qualifier goes in `sub`, not the title: `StatCard` truncates its
-            title on one line, so "(في هذه الصفحة)" was being cut off — which
-            turned a page-scoped count into one that reads as a platform total. */}
+        {/* Platform totals from the server, so no "في هذه الصفحة" qualifier. */}
         <StatCard
           title="نشطة"
           value={stats.live}
           icon={<CheckCircle />}
           tone="teal"
-          sub="في هذه الصفحة"
+          sub="مدتها سارية"
         />
         <StatCard
           title="موقوفة مؤقتاً"
           value={stats.paused}
           icon={<PauseCircle />}
           tone="amber"
-          sub="في هذه الصفحة"
         />
         {/* Includes terms that have run out but still say ACTIVE, which is the
             normal state while SUBSCRIPTION_AUTO_EXPIRE is off. */}
@@ -192,7 +190,6 @@ const Subscriptions = () => {
           value={stats.over}
           icon={<TriangleAlert />}
           tone="rose"
-          sub="في هذه الصفحة"
         />
       </div>
 
@@ -217,7 +214,11 @@ const Subscriptions = () => {
             label="الحالة"
             value={statusFilter}
             options={STATUS_OPTIONS}
-            onChange={setStatusFilter}
+            onChange={(value) => {
+              setStatusFilter(value);
+              // The result set changed, so page 4 may no longer exist.
+              setPage(1);
+            }}
           />
         </div>
       </SearchFiltersBar>
@@ -312,7 +313,9 @@ const Subscriptions = () => {
                         <div className="w-full max-w-md text-right">
                           <SubscriptionActions
                             subscription={row}
-                            onDone={() => fetchRows(page, pageSize, queryTerm)}
+                            onDone={() =>
+                              fetchRows(page, pageSize, queryTerm, statusFilter)
+                            }
                           />
                         </div>
                       )}
@@ -327,9 +330,9 @@ const Subscriptions = () => {
                 <td colSpan={5} className="px-5 py-10">
                   <EmptyState
                     title={
-                      rows.length === 0
+                      statusFilter === 'all' && !queryTerm.trim()
                         ? 'لا توجد اشتراكات'
-                        : 'لا توجد اشتراكات بهذه الحالة في هذه الصفحة'
+                        : 'لا توجد اشتراكات تطابق البحث أو الحالة'
                     }
                   />
                 </td>

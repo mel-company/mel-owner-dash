@@ -65,9 +65,15 @@ const typeOptions = [
 const statusOptions = [
   { value: '', label: 'الكل' },
   { value: 'COMPLETED', label: 'مكتملة' },
-  { value: 'PENDING', label: 'قيد المراجعة' },
+  // `PENDING` is a checkout opened in the last 72 hours, as on the card above;
+  // older ones were abandoned and have their own filter.
+  { value: 'PENDING', label: 'بانتظار الدفع (72 ساعة)' },
+  { value: 'ABANDONED', label: 'دفع متروك' },
   { value: 'CANCELLED', label: 'غير مدفوع' },
 ];
+
+/** Matches the server's `PENDING_WINDOW_MS`. */
+const PENDING_WINDOW_MS = 72 * 60 * 60 * 1000;
 
 const Accounting = () => {
   const [transactions, setTransactions] = useState<AccountingTransaction[]>([]);
@@ -77,6 +83,8 @@ const Accounting = () => {
     pendingTransactions: 0,
     monthlyTransactions: 0,
     averageTransaction: 0,
+    unpaidSubscriptionsEstimate: 0,
+    unpaidSubscriptionsCount: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -357,8 +365,14 @@ const Accounting = () => {
            */
           hint={null}
         />
+        {/*
+          Checkouts opened in the last 72 hours that have not settled. It used
+          to be titled «قيد المراجعة» and to add every paused subscription at
+          list price plus every checkout ever abandoned — nothing here is under
+          review; it is waiting for the merchant to pay.
+        */}
         <StatCard
-          title="قيد المراجعة"
+          title="بانتظار الدفع"
           value={(
             <>
               {stats.pendingAmount.toLocaleString()} <span className="text-sm font-bold text-slate-500">د.ع</span>
@@ -367,9 +381,29 @@ const Accounting = () => {
           icon={<ReceiptText />}
           tone="amber"
           hint={null}
-          sub={`موزّعة على ${stats.pendingTransactions.toLocaleString()} معاملة`}
+          sub={`${stats.pendingTransactions.toLocaleString()} عملية دفع مفتوحة خلال آخر 72 ساعة`}
         />
       </div>
+
+      {/*
+        Not revenue, and so not inside the card above: subscriptions created by
+        hand or by seed data that no payment backs. Shown beside it as what it
+        is — a list-price estimate — because they are still real customers.
+      */}
+      {(stats.unpaidSubscriptionsCount ?? 0) > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm">
+          <span className="font-bold text-slate-600">
+            اشتراكات بلا دفعة (تقدير بسعر القائمة)
+            <span className="mr-2 text-xs font-semibold text-slate-400">
+              {stats.unpaidSubscriptionsCount?.toLocaleString()} اشتراك — غير محسوبة في الإيرادات
+            </span>
+          </span>
+          <span className="font-black tabular-nums text-slate-700">
+            {(stats.unpaidSubscriptionsEstimate ?? 0).toLocaleString()}{' '}
+            <span className="text-xs font-bold text-slate-400">د.ع</span>
+          </span>
+        </div>
+      )}
 
       <div className="toolbar-row">
         <h2 className="text-lg font-black text-slate-900 sm:text-xl">{listTitle}</h2>
@@ -498,12 +532,20 @@ const Accounting = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {transactions.map((transaction) => {
-                const isComplimentary = (transaction.amount ?? 0) === 0;
-                const status = getStatusMeta(
-                  transaction.status,
-                  isComplimentary,
-                );
-                const method = isComplimentary
+                const isManual = transaction.type === 'SUBSCRIPTION';
+                const isComplimentary =
+                  !isManual && (transaction.amount ?? 0) === 0;
+                const status = getStatusMeta(transaction, isComplimentary);
+                const method = isManual
+                  ? {
+                      // A subscription no payment backs. It was labelled
+                      // «تحويل بنكي» as though money had arrived by transfer.
+                      ...describePaymentMethod(transaction),
+                      label: 'يدوي – بلا دفعة',
+                      network: null as string | null,
+                      maskedPan: null as string | null,
+                    }
+                  : isComplimentary
                   ? {
                       ...describePaymentMethod(transaction),
                       label: 'شهر مجاني',
@@ -853,7 +895,29 @@ const getTransactionLabel = (transaction: AccountingTransaction) => {
   return `${kind}${planName}`;
 };
 
-const getStatusMeta = (status: string, complimentary = false) => {
+const getStatusMeta = (
+  transaction: Pick<AccountingTransaction, 'type' | 'status' | 'date'>,
+  complimentary = false,
+) => {
+  const { status } = transaction;
+  /**
+   * A manual subscription row has no payment, so payment words do not fit it.
+   * Its status is the subscription's own: an `EXPIRED` term is «منتهي» (it
+   * was not an unpaid checkout), and `INACTIVE` is paused, not under review.
+   */
+  if (transaction.type === 'SUBSCRIPTION') {
+    if (status === 'ACTIVE') return { label: 'نشط', tone: 'blue' as const };
+    if (status === 'EXPIRED') return { label: 'منتهي', tone: 'slate' as const };
+    if (status === 'INACTIVE') return { label: 'موقوف', tone: 'amber' as const };
+    if (status === 'CANCELLED') return { label: 'ملغى', tone: 'slate' as const };
+  }
+  if (status === 'PENDING') {
+    // Older than 72 hours, no gateway is still going to settle it.
+    const age = Date.now() - new Date(transaction.date).getTime();
+    return age > PENDING_WINDOW_MS
+      ? { label: 'دفع متروك', tone: 'slate' as const }
+      : { label: 'بانتظار الدفع', tone: 'amber' as const };
+  }
   if (
     complimentary &&
     (status === 'COMPLETED' || status === 'PAID' || status === 'ACTIVE')
@@ -869,8 +933,8 @@ const getStatusMeta = (status: string, complimentary = false) => {
   if (status === 'REFUNDED') {
     return { label: 'مسترجع', tone: 'slate' as const };
   }
-  if (status === 'PENDING' || status === 'INACTIVE') {
-    return { label: 'قيد المراجعة', tone: 'amber' as const };
+  if (status === 'INACTIVE') {
+    return { label: 'موقوف', tone: 'amber' as const };
   }
   if (status === 'CANCELLED' || status === 'FAILED' || status === 'EXPIRED') {
     return { label: 'غير مدفوع', tone: 'red' as const };
