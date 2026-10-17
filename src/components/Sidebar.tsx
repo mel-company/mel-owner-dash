@@ -21,6 +21,7 @@ type AppMenuItem = {
 /** Tabs: ادارة النظام + ادوات المستخدم (Figma) */
 const menuItems: AppMenuItem[] = [
   { path: '/dashboard', label: 'لوحة التحكم', icon: '/sidebar/icon-dashboard.svg', roles: ['owner', 'employee', 'support', 'developer'], section: 'system', badge: '+1' },
+  { path: '/dashboard/journey', label: 'رحلة الزوار', icon: '/sidebar/icon-journey.svg', roles: ['owner'], section: 'system' },
   { path: '/dashboard/employees', label: 'ادارة الموظفين', icon: '/sidebar/icon-employees.svg', roles: ['owner'], section: 'system' },
   { path: '/dashboard/accounting', label: 'الحسابات المالية', icon: '/sidebar/icon-accounting.svg', roles: ['owner', 'employee'], section: 'system', flipIcon: true },
   { path: '/dashboard/financial-ai', label: 'مالية الذكاء الاصطناعي', icon: '/sidebar/icon-financial-ai.svg', roles: ['owner'], section: 'system' },
