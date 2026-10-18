@@ -491,8 +491,8 @@ const StepTable = ({
         const base = group.offset === FIRST_ACCOUNT_STEP ? group.rows[0] : undefined;
         return (
           <div key={group.title}>
-            <div className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-100 bg-white px-4 pt-4 pb-2 sm:px-5">
-              <span className="text-sm font-black text-slate-800">{group.title}</span>
+            <div className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-100 bg-slate-50/40 px-4 py-2 sm:px-5">
+              <span className="text-xs font-black text-slate-700">{group.title}</span>
               <span className="text-[11px] font-semibold text-slate-400">{group.hint}</span>
             </div>
             <ul>
@@ -508,29 +508,28 @@ const StepTable = ({
                 const isSelected = selected === step.key;
                 const Tag = clickable ? 'button' : 'div';
                 return (
-                  <li key={step.key} className="border-b border-slate-50 last:border-b-0">
+                  <li key={step.key} className="border-b border-slate-100/70 last:border-b-0">
                     <Tag
                       {...(clickable
                         ? { type: 'button' as const, onClick: () => onSelect(step.key), 'aria-pressed': isSelected }
                         : {})}
                       className={cn(
-                        'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 text-right transition sm:px-5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_5rem_6.5rem_6rem] md:gap-x-4',
+                        'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-4 py-2.5 text-right transition sm:px-5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_5rem_6.5rem_6rem] md:gap-x-4',
                         clickable && 'cursor-pointer hover:bg-violet-50/50',
                         isSelected && 'bg-violet-50 ring-2 ring-violet-300 ring-inset',
                       )}
                     >
                       <span className="flex min-w-0 items-center gap-3">
                         <span className="w-4 shrink-0 text-center text-[10px] font-black text-slate-300">{index + 1}</span>
-                        <GlossyTile icon={look.icon} tone={look.tone} className="size-9 rounded-xl sm:size-9 [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-4 sm:[&_svg]:w-4" />
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-black text-slate-800">{step.label}</span>
-                          <span className="block truncate text-[11px] font-semibold text-slate-400">{step.note}</span>
+                        <span className="shrink-0 text-violet-500 [&_svg]:h-4 [&_svg]:w-4">{look.icon}</span>
+                        <span className="min-w-0 truncate text-sm font-bold text-slate-800" title={step.note}>
+                          {step.label}
                         </span>
                       </span>
-                      <span className="text-left text-lg font-black text-slate-950 md:order-3" dir="ltr">
+                      <span className="text-left text-base font-black text-slate-950 md:order-3" dir="ltr">
                         {fmt(step.count)}
                       </span>
-                      <span className="col-span-2 h-2 overflow-hidden rounded-full bg-slate-100 md:order-2 md:col-span-1">
+                      <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-100 md:order-2 md:col-span-1">
                         <span
                           className="block h-full rounded-full bg-linear-to-l from-violet-600 to-fuchsia-400 transition-[width] duration-700"
                           style={{ width: `${Math.max(step.count ? 2 : 0, (step.count / max) * 100)}%` }}
