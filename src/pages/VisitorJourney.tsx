@@ -521,7 +521,7 @@ const StepTable = ({
                     >
                       <span className="flex min-w-0 items-center gap-3">
                         <span className="w-4 shrink-0 text-center text-[10px] font-black text-slate-300">{index + 1}</span>
-                        <span className="shrink-0 text-violet-500 [&_svg]:h-4 [&_svg]:w-4">{look.icon}</span>
+                        <span className="shrink-0 text-blue-500 [&_svg]:h-4 [&_svg]:w-4">{look.icon}</span>
                         <span className="min-w-0 truncate text-sm font-bold text-slate-800" title={step.note}>
                           {step.label}
                         </span>
