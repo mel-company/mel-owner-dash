@@ -249,7 +249,7 @@ const BreakdownTable = ({ tabs }: { tabs: Array<{ key: string; label: string; ro
                       <div
                         className={cn(
                           'h-full rounded-full transition-[width] duration-700',
-                          unknown ? 'bg-slate-300' : 'bg-violet-500',
+                          unknown ? 'bg-slate-300' : 'bg-blue-500',
                         )}
                         style={{ width: `${(row.value / max) * 100}%` }}
                       />

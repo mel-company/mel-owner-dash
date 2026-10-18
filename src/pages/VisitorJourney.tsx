@@ -531,7 +531,7 @@ const StepTable = ({
                       </span>
                       <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-100 md:order-2 md:col-span-1">
                         <span
-                          className="block h-full rounded-full bg-violet-500 transition-[width] duration-700"
+                          className="block h-full rounded-full bg-blue-500 transition-[width] duration-700"
                           style={{ width: `${Math.max(step.count ? 2 : 0, (step.count / max) * 100)}%` }}
                         />
                       </span>
@@ -583,7 +583,7 @@ const ProgressDots = ({
       <span
         key={key}
         title={labels.get(key)?.label}
-        className={cn('h-2 w-5 rounded-full', reached.has(key) ? 'bg-violet-500' : 'bg-slate-200')}
+        className={cn('h-2 w-5 rounded-full', reached.has(key) ? 'bg-blue-500' : 'bg-slate-200')}
       />
     ))}
   </div>
