@@ -244,7 +244,9 @@ const VisitorJourney = () => {
 
   const visitors = count('visitors');
   const newAccounts = count('accounts');
-  const signupRate = percent(newAccounts, visitors);
+  // More new accounts than visitors means the range starts before visitors
+  // were counted; a rate above 100% would be meaningless.
+  const signupRate = newAccounts <= visitors ? percent(newAccounts, visitors) : null;
   const accountStepKeys = accounts?.steps.map((s) => s.key) ?? steps.slice(FIRST_ACCOUNT_STEP).map((s) => s.key);
   const filterLabel = stepFilter ? stepByKey.get(stepFilter)?.label : null;
   const totalPages = Math.max(1, Math.ceil((accounts?.total ?? 0) / pageSize));
@@ -780,15 +782,18 @@ const curveThrough = (points: Array<[number, number]>) =>
 
 /**
  * The funnel as a picture: one glowing glass ribbon that narrows with each
- * milestone. Its height follows the square root of each count, so a step
- * with a hundredth of the visitors still reads as a shape, not a hairline.
+ * milestone. Its height follows each count to the power 0.7: close to
+ * proportional, yet a step with a hundredth of the largest still reads as a
+ * shape, not a hairline.
  */
 const FunnelRibbon = ({ values }: { values: number[] }) => {
   const W = 1000;
   const H = 200;
   const mid = H / 2;
-  const first = Math.max(1, values[0] ?? 0);
-  const half = values.map((v) => (Math.max(0.16, Math.sqrt(Math.min(v, first) / first)) * (H - 24)) / 2);
+  // Scaled to the largest figure, not the first: visitors are only counted
+  // since tracking began, so account steps can outnumber them.
+  const top = Math.max(1, ...values);
+  const half = values.map((v) => (Math.max(0.1, (v / top) ** 0.7) * (H - 24)) / 2);
   const step = W / values.length;
   // Right to left: the first milestone sits on the right, as the page reads.
   const xs = values.map((_, i) => W - step * (i + 0.5));
@@ -862,7 +867,9 @@ const JourneyBanner = ({
   const visitors = count('visitors');
   const accounts = count('accounts');
   const headline = visitors
-    ? accounts
+    ? accounts > visitors
+      ? `${fmt(visitors)} زائر و${fmt(accounts)} حساب جديد في هذه الفترة`
+      : accounts
       ? `${fmt(visitors)} زائر في هذه الفترة، و${fmt(accounts)} منهم بدأوا رحلتهم بحساب`
       : `${fmt(visitors)} زائر في هذه الفترة، ولم يُنشئ أحد منهم حساباً بعد`
     : accounts
