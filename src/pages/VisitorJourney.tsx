@@ -13,6 +13,7 @@ import {
   Package,
   PenTool,
   Route as RouteIcon,
+  SearchX,
   ShoppingBag,
   Smartphone,
   Sparkles,
@@ -374,7 +375,7 @@ const VisitorJourney = () => {
             </div>
           ) : !accounts?.data.length ? (
             <Illustrated
-              art="searching"
+              icon={<SearchX />}
               title={filterLabel ? 'لا توجد حسابات وصلت إلى هذه المرحلة' : 'لا توجد حسابات جديدة في هذه الفترة'}
               hint={filterLabel ? 'جرّب مرحلة أبكر أو فترة أطول' : 'ستظهر هنا الحسابات فور تسجيلها، مع المراحل التي وصلت إليها'}
             />
@@ -463,7 +464,7 @@ const VisitorJourney = () => {
             <CardContent className="px-5">
               <SectionTitle icon={<Link2 />} title="من أين يأتي الزوار" hint="utm_source أو الموقع السابق" />
               <ShareList
-                art="world"
+                icon={<Globe />}
                 rows={(data?.sources ?? []).map((s) => ({ key: s.source, label: sourceLabels[s.source] ?? s.source, value: s.visits }))}
               />
             </CardContent>
@@ -472,7 +473,7 @@ const VisitorJourney = () => {
             <CardContent className="px-5">
               <SectionTitle icon={<Smartphone />} title="الأجهزة" hint="زيارات حسب نوع الجهاز" />
               <ShareList
-                art="mobile"
+                icon={<Smartphone />}
                 rows={(data?.devices ?? []).map((d) => ({ key: d.device, label: deviceLabels[d.device] ?? d.device, value: d.visits }))}
               />
             </CardContent>
@@ -681,16 +682,16 @@ const DailyChart = ({ data }: { data: JourneyFunnel | null }) => {
   if (empty) {
     return (
       <div className="grid h-[300px] place-items-center">
-        <Illustrated art="growth" title="لا شيء ينمو هنا بعد" hint="سيظهر الرسم عند أول زيارة أو حساب جديد في هذه الفترة" />
+        <Illustrated icon={<BarChart3 />} title="لا شيء ينمو هنا بعد" hint="سيظهر الرسم عند أول زيارة أو حساب جديد في هذه الفترة" />
       </div>
     );
   }
   return <ReactECharts option={option} style={{ height: 300 }} notMerge />;
 };
 
-const ShareList = ({ rows, art }: { rows: Array<{ key: string; label: string; value: number }>; art: string }) => {
+const ShareList = ({ rows, icon }: { rows: Array<{ key: string; label: string; value: number }>; icon: ReactNode }) => {
   const total = rows.reduce((sum, row) => sum + row.value, 0);
-  if (!rows.length) return <Illustrated art={art} title="لا توجد زيارات بعد" compact />;
+  if (!rows.length) return <Illustrated icon={icon} title="لا توجد زيارات بعد" compact />;
   return (
     <ul className="space-y-3">
       {rows.map((row) => (
@@ -716,37 +717,136 @@ const ShareList = ({ rows, art }: { rows: Array<{ key: string; label: string; va
   );
 };
 
-/** An unDraw illustration from `public/journey` (see LICENSE.txt there). */
-const Art = ({ name, className }: { name: string; className?: string }) => (
-  <img src={`/journey/${name}.svg`} alt="" draggable={false} className={cn('select-none', className)} />
-);
-
-/** A raised gradient tile with a white icon and a glossy top highlight. */
+/** A gradient tile with a white icon, lit by a soft glow in its own colour. */
 const GlossyTile = ({ icon, tone, className }: { icon: ReactNode; tone: StatTone; className?: string }) => (
   <span
     className={cn(
-      'relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-linear-to-br text-white shadow-lg ring-1 ring-white/40 sm:size-14',
-      '[&_svg]:relative [&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.3] [&_svg]:drop-shadow-[0_2px_2px_rgba(0,0,0,0.18)] sm:[&_svg]:h-6 sm:[&_svg]:w-6',
+      'grid size-12 shrink-0 place-items-center rounded-2xl bg-linear-to-br text-white shadow-lg ring-1 ring-white/30 ring-inset sm:size-14',
+      '[&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.2] sm:[&_svg]:h-6 sm:[&_svg]:w-6',
       toneTile[tone].tile,
       className,
     )}
   >
-    <span aria-hidden className="absolute inset-x-1 top-0.5 h-1/2 rounded-t-[0.9rem] rounded-b-[50%] bg-linear-to-b from-white/45 to-white/0" />
     {icon}
   </span>
 );
 
-const Illustrated = ({ art, title, hint, compact }: { art: string; title: string; hint?: string; compact?: boolean }) => (
+/**
+ * Empty state drawn in code: a glass tile floating in rings of light, the
+ * same language as the banner, instead of a stock picture.
+ */
+const Illustrated = ({
+  icon,
+  title,
+  hint,
+  compact,
+}: {
+  icon: ReactNode;
+  title: string;
+  hint?: string;
+  compact?: boolean;
+}) => (
   <div className={cn('flex flex-col items-center text-center', compact ? 'py-4' : 'px-6 py-10')}>
-    <Art name={art} className={cn('w-auto', compact ? 'h-20' : 'h-32 sm:h-36')} />
+    <span aria-hidden className={cn('relative grid place-items-center', compact ? 'size-24' : 'size-36')}>
+      <span className="absolute inset-0 rounded-full border border-violet-200/60" />
+      <span className="absolute inset-[14%] rounded-full border border-dashed border-violet-300/70" />
+      <span className="absolute inset-[26%] rounded-full bg-linear-to-br from-violet-400/40 via-fuchsia-300/30 to-cyan-300/30 blur-xl" />
+      <span className="absolute top-[12%] right-[18%] size-2 rounded-full bg-fuchsia-400 shadow-[0_0_12px_rgba(232,121,249,0.9)]" />
+      <span className="absolute bottom-[16%] left-[14%] size-1.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.9)]" />
+      <span
+        className={cn(
+          'relative grid place-items-center rounded-2xl bg-white/70 text-violet-600 shadow-[0_12px_30px_rgba(124,58,237,0.25)] ring-1 ring-white backdrop-blur-md',
+          compact ? 'size-11 [&_svg]:h-5 [&_svg]:w-5' : 'size-16 [&_svg]:h-7 [&_svg]:w-7',
+        )}
+      >
+        {icon}
+      </span>
+    </span>
     <p className={cn('mt-4 font-black text-slate-600', compact ? 'text-sm' : 'text-base sm:text-lg')}>{title}</p>
     {hint && <p className="mt-1 max-w-xs text-xs font-semibold text-slate-400">{hint}</p>}
   </div>
 );
 
+/** Smooth curve through `points`, as path commands after the first point. */
+const curveThrough = (points: Array<[number, number]>) =>
+  points
+    .slice(1)
+    .map(([x1, y1], i) => {
+      const [x0, y0] = points[i];
+      const cx = (x0 + x1) / 2;
+      return `C ${cx} ${y0}, ${cx} ${y1}, ${x1} ${y1}`;
+    })
+    .join(' ');
+
 /**
- * The page's opening picture: the road from a visit to a payment, with each
- * milestone's figure for the range under its illustration.
+ * The funnel as a picture: one glowing glass ribbon that narrows with each
+ * milestone. Its height follows the square root of each count, so a step
+ * with a hundredth of the visitors still reads as a shape, not a hairline.
+ */
+const FunnelRibbon = ({ values }: { values: number[] }) => {
+  const W = 1000;
+  const H = 200;
+  const mid = H / 2;
+  const first = Math.max(1, values[0] ?? 0);
+  const half = values.map((v) => (Math.max(0.16, Math.sqrt(Math.min(v, first) / first)) * (H - 24)) / 2);
+  const step = W / values.length;
+  // Right to left: the first milestone sits on the right, as the page reads.
+  const xs = values.map((_, i) => W - step * (i + 0.5));
+  const upper = xs.map((x, i): [number, number] => [x, mid - half[i]]);
+  const lower = xs.map((x, i): [number, number] => [x, mid + half[i]]).reverse();
+  const last = values.length - 1;
+  const path = [
+    `M ${W} ${upper[0][1]}`,
+    `L ${upper[0][0]} ${upper[0][1]}`,
+    curveThrough(upper),
+    `L 0 ${upper[last][1]}`,
+    `L 0 ${lower[0][1]}`,
+    `L ${lower[0][0]} ${lower[0][1]}`,
+    curveThrough(lower),
+    `L ${W} ${lower[last][1]}`,
+    'Z',
+  ].join(' ');
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+      <defs>
+        <linearGradient id="journey-ribbon" x1="1" x2="0" y1="0" y2="0">
+          <stop offset="0" stopColor="#a78bfa" />
+          <stop offset="0.5" stopColor="#d946ef" />
+          <stop offset="1" stopColor="#22d3ee" />
+        </linearGradient>
+        <linearGradient id="journey-sheen" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.45" />
+          <stop offset="0.45" stopColor="#fff" stopOpacity="0.06" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <filter id="journey-glow" x="-10%" y="-40%" width="120%" height="180%">
+          <feGaussianBlur stdDeviation="18" />
+        </filter>
+      </defs>
+      <path d={path} fill="url(#journey-ribbon)" opacity="0.55" filter="url(#journey-glow)" />
+      <path d={path} fill="url(#journey-ribbon)" opacity="0.85" />
+      <path d={path} fill="url(#journey-sheen)" />
+      <path d={path} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+      {xs.slice(0, -1).map((x) => (
+        <line
+          key={x}
+          x1={x - step / 2}
+          x2={x - step / 2}
+          y1={0}
+          y2={H}
+          stroke="rgba(255,255,255,0.14)"
+          strokeDasharray="4 6"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
+  );
+};
+
+/**
+ * The page's opening picture: a dark glass panel with the funnel from a visit
+ * to a payment drawn as a glowing ribbon, each milestone's figure on it.
  */
 const JourneyBanner = ({
   count,
@@ -772,53 +872,65 @@ const JourneyBanner = ({
   return (
     <section
       className={cn(
-        'relative isolate overflow-hidden rounded-[1.5rem] border border-violet-100 bg-linear-to-bl from-white via-violet-50/70 to-fuchsia-50 p-5 shadow-[0_12px_35px_rgba(124,58,237,0.08)] sm:rounded-[2rem] sm:p-7',
+        'relative isolate overflow-hidden rounded-[1.5rem] bg-[#0c0a1f] p-5 text-white shadow-[0_20px_50px_rgba(15,10,40,0.22)] sm:rounded-[2rem] sm:p-7',
         className,
       )}
     >
-      <span aria-hidden className="absolute -top-24 -right-16 -z-10 size-72 rounded-full bg-violet-200/30 blur-3xl" />
+      {/* Mesh light and a faint grid that fades toward the edges. */}
+      <span aria-hidden className="absolute -top-32 -right-20 -z-10 size-96 rounded-full bg-violet-600/40 blur-3xl" />
+      <span aria-hidden className="absolute -bottom-40 left-1/4 -z-10 size-96 rounded-full bg-fuchsia-500/25 blur-3xl" />
+      <span aria-hidden className="absolute -top-20 -left-24 -z-10 size-72 rounded-full bg-cyan-400/20 blur-3xl" />
+      <span
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] mask-[radial-gradient(ellipse_at_center,black_35%,transparent_80%)] bg-size-[32px_32px]"
+      />
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-violet-500">من أول زيارة إلى أول دفعة</p>
-              <h2 className="mt-1 text-lg leading-snug font-black text-slate-950 sm:text-2xl">{headline}</h2>
-            </div>
-            <div className="rounded-2xl bg-white px-3.5 py-2 text-center shadow-sm ring-1 ring-violet-100">
-              <p className="text-xl leading-none font-black text-violet-600" dir="ltr">
-                {signupRate == null ? '—' : `${signupRate}%`}
-              </p>
-              <p className="mt-1 text-[10px] font-bold text-slate-400">نسبة التسجيل</p>
-            </div>
-          </div>
-
-          <div className="relative mt-6">
-            {/* The road: a dashed line through the milestones. */}
-            <span
-              aria-hidden
-              className="absolute inset-x-[10%] top-6 -z-10 border-t-2 border-dashed border-violet-200 sm:top-7"
-            />
-            <ol className="grid grid-cols-5 gap-1 sm:gap-3">
-              {HERO_STEPS.map((key) => {
-                const look = lookOf(key);
-                return (
-                  <li key={key} className="flex min-w-0 flex-col items-center text-center">
-                    <GlossyTile icon={look.icon} tone={look.tone} />
-                    <p className="mt-2 text-lg leading-none font-black text-slate-950 sm:text-2xl" dir="ltr">
-                      {fmt(count(key))}
-                    </p>
-                    <p className="mt-1 line-clamp-2 text-[10px] leading-tight font-bold text-slate-500 sm:text-xs">
-                      {labels.get(key)?.label ?? ''}
-                    </p>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-violet-200 ring-1 ring-white/15">
+            <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
+            من أول زيارة إلى أول دفعة
+          </p>
+          <h2 className="mt-3 text-lg leading-snug font-black sm:text-2xl">{headline}</h2>
         </div>
-        <Art name="road" className="hidden h-44 w-auto shrink-0 lg:block xl:h-48" />
+        <div className="rounded-2xl bg-white/10 px-4 py-2.5 text-center ring-1 ring-white/15 backdrop-blur-md">
+          <p
+            className="bg-linear-to-l from-fuchsia-300 to-cyan-300 bg-clip-text text-2xl leading-none font-black text-transparent"
+            dir="ltr"
+          >
+            {signupRate == null ? '—' : `${signupRate}%`}
+          </p>
+          <p className="mt-1 text-[10px] font-bold text-white/60">نسبة التسجيل</p>
+        </div>
       </div>
+
+      <div className="relative mt-6 h-32 sm:mt-8 sm:h-44">
+        <FunnelRibbon values={HERO_STEPS.map((key) => count(key))} />
+        <ol className="relative grid h-full grid-cols-5">
+          {HERO_STEPS.map((key) => (
+            <li key={key} className="grid min-w-0 place-items-center">
+              <span
+                className="text-lg leading-none font-black drop-shadow-[0_2px_6px_rgba(12,10,31,0.6)] sm:text-3xl"
+                dir="ltr"
+              >
+                {fmt(count(key))}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <ol className="mt-4 grid grid-cols-5 gap-1">
+        {HERO_STEPS.map((key) => (
+          <li key={key} className="flex min-w-0 flex-col items-center gap-1.5 text-center">
+            <span className="grid size-7 place-items-center rounded-lg bg-white/10 text-white/90 ring-1 ring-white/15 [&_svg]:h-3.5 [&_svg]:w-3.5">
+              {lookOf(key).icon}
+            </span>
+            <span className="line-clamp-2 text-[10px] leading-tight font-bold text-white/70 sm:text-xs">
+              {labels.get(key)?.label ?? ''}
+            </span>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 };
