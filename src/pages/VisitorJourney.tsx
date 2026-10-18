@@ -8,14 +8,12 @@ import {
   Eye,
   Globe,
   Info,
-  Link2,
   MousePointerClick,
   Package,
   PenTool,
   Route as RouteIcon,
   SearchX,
   ShoppingBag,
-  Smartphone,
   Sparkles,
   Store as StoreIcon,
   TrendingDown,
@@ -32,6 +30,7 @@ import {
   type StatTone,
 } from '@/components/dashboard';
 import { UserAvatar } from '@/components/UserAvatar';
+import { VisitorInsights } from '@/components/journey/VisitorInsights';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
@@ -127,21 +126,6 @@ const formatPhone = (phone: string | null) => {
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Baghdad' });
-
-const sourceLabels: Record<string, string> = {
-  direct: 'مباشر / بدون مصدر',
-  'google.com': 'Google',
-  'facebook.com': 'Facebook',
-  'm.facebook.com': 'Facebook',
-  'l.facebook.com': 'Facebook',
-  'lm.facebook.com': 'Facebook',
-  'instagram.com': 'Instagram',
-  'l.instagram.com': 'Instagram',
-  'tiktok.com': 'TikTok',
-  't.co': 'X (Twitter)',
-};
-
-const deviceLabels: Record<string, string> = { mobile: 'هاتف', desktop: 'حاسوب', unknown: 'غير معروف' };
 
 const readStoredDays = () => {
   try {
@@ -454,34 +438,14 @@ const VisitorJourney = () => {
         </TableShell>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="gap-0 rounded-[1.5rem] py-5 shadow-sm xl:col-span-2 sm:rounded-[2rem]">
-          <CardContent className="px-3 sm:px-5">
-            <SectionTitle icon={<BarChart3 />} title="الزوار والحسابات يومياً" hint="بتوقيت بغداد" />
-            <DailyChart data={data} />
-          </CardContent>
-        </Card>
-        <div className="grid gap-4">
-          <Card className="gap-0 rounded-[1.5rem] py-5 shadow-sm sm:rounded-[2rem]">
-            <CardContent className="px-5">
-              <SectionTitle icon={<Link2 />} title="من أين يأتي الزوار" hint="utm_source أو الموقع السابق" />
-              <ShareList
-                icon={<Globe />}
-                rows={(data?.sources ?? []).map((s) => ({ key: s.source, label: sourceLabels[s.source] ?? s.source, value: s.visits }))}
-              />
-            </CardContent>
-          </Card>
-          <Card className="gap-0 rounded-[1.5rem] py-5 shadow-sm sm:rounded-[2rem]">
-            <CardContent className="px-5">
-              <SectionTitle icon={<Smartphone />} title="الأجهزة" hint="زيارات حسب نوع الجهاز" />
-              <ShareList
-                icon={<Smartphone />}
-                rows={(data?.devices ?? []).map((d) => ({ key: d.device, label: deviceLabels[d.device] ?? d.device, value: d.visits }))}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card className="gap-0 rounded-[1.5rem] py-5 shadow-sm sm:rounded-[2rem]">
+        <CardContent className="px-3 sm:px-5">
+          <SectionTitle icon={<BarChart3 />} title="الزوار والحسابات يومياً" hint="بتوقيت بغداد" />
+          <DailyChart data={data} />
+        </CardContent>
+      </Card>
+
+      <VisitorInsights data={data} range={range} />
     </div>
   );
 };
@@ -691,34 +655,6 @@ const DailyChart = ({ data }: { data: JourneyFunnel | null }) => {
   return <ReactECharts option={option} style={{ height: 300 }} notMerge />;
 };
 
-const ShareList = ({ rows, icon }: { rows: Array<{ key: string; label: string; value: number }>; icon: ReactNode }) => {
-  const total = rows.reduce((sum, row) => sum + row.value, 0);
-  if (!rows.length) return <Illustrated icon={icon} title="لا توجد زيارات بعد" compact />;
-  return (
-    <ul className="space-y-3">
-      {rows.map((row) => (
-        <li key={row.key}>
-          <div className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="min-w-0 truncate font-bold text-slate-700" dir="auto">
-              {row.label}
-            </span>
-            <span className="shrink-0 font-black text-slate-950" dir="ltr">
-              {fmt(row.value)}{' '}
-              <span className="text-[11px] font-bold text-slate-400">{percent(row.value, total) ?? 0}%</span>
-            </span>
-          </div>
-          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-linear-to-l from-violet-600 to-fuchsia-400"
-              style={{ width: `${(row.value / Math.max(1, total)) * 100}%` }}
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
 /** A gradient tile with a white icon, lit by a soft glow in its own colour. */
 const GlossyTile = ({ icon, tone, className }: { icon: ReactNode; tone: StatTone; className?: string }) => (
   <span
@@ -768,6 +704,40 @@ const Illustrated = ({
     {hint && <p className="mt-1 max-w-xs text-xs font-semibold text-slate-400">{hint}</p>}
   </div>
 );
+
+/** Where each spark starts and how fast it runs; fixed so renders stay stable. */
+const PARTICLES = [
+  { y: -4, duration: 4.2, delay: 0 },
+  { y: 3, duration: 5.1, delay: 1.1 },
+  { y: 0, duration: 3.7, delay: 2.3 },
+  { y: -2, duration: 4.8, delay: 3.2 },
+  { y: 5, duration: 5.6, delay: 0.6 },
+  { y: -6, duration: 4.4, delay: 2.8 },
+];
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/** A figure that counts up from zero once it appears. */
+const CountUp = ({ value, delay = 0, duration = 1100 }: { value: number; delay?: number; duration?: number }) => {
+  const [shown, setShown] = useState(() => (prefersReducedMotion() ? value : 0));
+
+  useEffect(() => {
+    const still = prefersReducedMotion();
+    let frame = 0;
+    const startAt = performance.now() + delay;
+    const tick = (now: number) => {
+      const t = still ? 1 : Math.min(1, Math.max(0, (now - startAt) / duration));
+      // Ease out: quick at first, settling on the real figure.
+      setShown(Math.round(value * (1 - (1 - t) ** 3)));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value, delay, duration]);
+
+  return <>{fmt(shown)}</>;
+};
 
 /** Smooth curve through `points`, as path commands after the first point. */
 const curveThrough = (points: Array<[number, number]>) =>
@@ -828,10 +798,28 @@ const FunnelRibbon = ({ values }: { values: number[] }) => {
         <filter id="journey-glow" x="-10%" y="-40%" width="120%" height="180%">
           <feGaussianBlur stdDeviation="18" />
         </filter>
+        {/* A band of light that keeps flowing through the ribbon, right to left. */}
+        <linearGradient id="journey-flow" gradientUnits="userSpaceOnUse" x1="0" x2="260" y1="0" y2="0">
+          <stop offset="0" stopColor="#fff" stopOpacity="0" />
+          <stop offset="0.5" stopColor="#fff" stopOpacity="0.38" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+          <animateTransform
+            attributeName="gradientTransform"
+            type="translate"
+            from={`${W} 0`}
+            to="-260 0"
+            dur="3.6s"
+            repeatCount="indefinite"
+          />
+        </linearGradient>
+        <clipPath id="journey-clip">
+          <path d={path} />
+        </clipPath>
       </defs>
-      <path d={path} fill="url(#journey-ribbon)" opacity="0.55" filter="url(#journey-glow)" />
+      <path d={path} fill="url(#journey-ribbon)" opacity="0.55" filter="url(#journey-glow)" className="journey-breathe" />
       <path d={path} fill="url(#journey-ribbon)" opacity="0.85" />
       <path d={path} fill="url(#journey-sheen)" />
+      <rect width={W} height={H} fill="url(#journey-flow)" clipPath="url(#journey-clip)" className="journey-motion" />
       <path d={path} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
       {xs.slice(0, -1).map((x) => (
         <line
@@ -866,6 +854,7 @@ const JourneyBanner = ({
 }) => {
   const visitors = count('visitors');
   const accounts = count('accounts');
+  const values = HERO_STEPS.map((key) => count(key));
   const headline = visitors
     ? accounts > visitors
       ? `${fmt(visitors)} زائر و${fmt(accounts)} حساب جديد في هذه الفترة`
@@ -911,16 +900,29 @@ const JourneyBanner = ({
         </div>
       </div>
 
-      <div className="relative mt-6 h-32 sm:mt-8 sm:h-44">
-        <FunnelRibbon values={HERO_STEPS.map((key) => count(key))} />
+      {/* Keyed on the figures so the ribbon draws itself again for a new range. */}
+      <div key={values.join('-')} className="relative mt-6 h-32 sm:mt-8 sm:h-44">
+        <div className="journey-reveal absolute inset-0">
+          <FunnelRibbon values={values} />
+          {/* Sparks travelling along the ribbon, from the first step to the last. */}
+          {PARTICLES.map((p, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="journey-particle absolute top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-white shadow-[0_0_10px_3px_rgba(255,255,255,0.7)]"
+              style={{ marginTop: p.y, animationDuration: `${p.duration}s`, animationDelay: `${p.delay}s` }}
+            />
+          ))}
+        </div>
         <ol className="relative grid h-full grid-cols-5">
-          {HERO_STEPS.map((key) => (
+          {HERO_STEPS.map((key, i) => (
             <li key={key} className="grid min-w-0 place-items-center">
               <span
-                className="text-lg leading-none font-black drop-shadow-[0_2px_6px_rgba(12,10,31,0.6)] sm:text-3xl"
+                className="journey-pop text-lg leading-none font-black drop-shadow-[0_2px_6px_rgba(12,10,31,0.6)] sm:text-3xl"
+                style={{ animationDelay: `${0.15 + i * 0.18}s` }}
                 dir="ltr"
               >
-                {fmt(count(key))}
+                <CountUp value={values[i]} delay={150 + i * 180} />
               </span>
             </li>
           ))}
