@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
-import { Clock3, Compass, Laptop, MapPin, MonitorSmartphone, Repeat, Smartphone, UserPlus, Users } from 'lucide-react';
+import { Clock3, Laptop, Repeat, Smartphone, UserPlus, Users } from 'lucide-react';
 import { LoadingState, Pagination, TableShell } from '@/components/dashboard';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -151,10 +151,17 @@ export const VisitorInsights = ({ data, range }: { data: JourneyFunnel | null; r
     () => mergeRows((data?.languages ?? []).map((l) => ({ key: l.language ?? 'none', label: languageName(l.language), value: l.visits }))),
     [data],
   );
-  const devices = useMemo(() => {
-    const byDevice = new Map((data?.devices ?? []).map((d) => [d.device, d.visits]));
-    return { mobile: byDevice.get('mobile') ?? 0, desktop: byDevice.get('desktop') ?? 0 };
-  }, [data]);
+  const devices = useMemo(
+    () =>
+      mergeRows(
+        (data?.devices ?? []).map((d) => ({
+          key: d.device,
+          label: d.device === 'mobile' ? 'هاتف' : d.device === 'desktop' ? 'حاسوب' : UNKNOWN,
+          value: d.visits,
+        })),
+      ),
+    [data],
+  );
 
   return (
     <section className="space-y-4">
@@ -165,41 +172,17 @@ export const VisitorInsights = ({ data, range }: { data: JourneyFunnel | null; r
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <InsightCard icon={<MapPin />} title="المدن" hint="من أين يزورون">
-          <ShareRows rows={cities} />
-          {countries.length > 1 && (
-            <div className="mt-4 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
-              {countries.map((c) => (
-                <span key={c.key} className="rounded-lg bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-500">
-                  {c.label} <span dir="ltr">{fmt(c.value)}</span>
-                </span>
-              ))}
-            </div>
-          )}
-        </InsightCard>
-        <InsightCard icon={<Compass />} title="المصادر" hint="utm_source أو الموقع السابق">
-          <ShareRows rows={sources} />
-        </InsightCard>
-        <InsightCard icon={<MonitorSmartphone />} title="الأجهزة والأنظمة" hint="هاتف أم حاسوب، وأي نظام">
-          <DeviceSplit mobile={devices.mobile} desktop={devices.desktop} />
-          <div className="mt-4">
-            <ShareRows rows={systems} />
-          </div>
-        </InsightCard>
-        <InsightCard icon={<Laptop />} title="المتصفحات واللغة" hint="بما فيها متصفح إنستغرام وفيسبوك">
-          <ShareRows rows={browsers} />
-          {languages.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
-              {languages.map((l) => (
-                <span key={l.key} className="rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-600">
-                  {l.label} <span dir="ltr">{fmt(l.value)}</span>
-                </span>
-              ))}
-            </div>
-          )}
-        </InsightCard>
-      </div>
+      <BreakdownTable
+        tabs={[
+          { key: 'cities', label: 'المدن', rows: cities },
+          { key: 'countries', label: 'الدول', rows: countries },
+          { key: 'sources', label: 'المصادر', rows: sources },
+          { key: 'devices', label: 'الأجهزة', rows: devices },
+          { key: 'systems', label: 'الأنظمة', rows: systems },
+          { key: 'browsers', label: 'المتصفحات', rows: browsers },
+          { key: 'languages', label: 'اللغات', rows: languages },
+        ]}
+      />
 
       <Card className="gap-0 rounded-[1.5rem] py-5 shadow-sm sm:rounded-[2rem]">
         <CardContent className="px-3 sm:px-5">
@@ -213,76 +196,80 @@ export const VisitorInsights = ({ data, range }: { data: JourneyFunnel | null; r
   );
 };
 
-const InsightCard = ({ icon, title, hint, children }: { icon: ReactNode; title: string; hint: string; children: ReactNode }) => (
-  <Card className="gap-0 rounded-[1.5rem] py-5 shadow-sm sm:rounded-[2rem]">
-    <CardContent className="px-5">
-      <div className="mb-4 flex items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-500 [&_svg]:h-4.5 [&_svg]:w-4.5">
-          {icon}
-        </span>
-        <div className="min-w-0">
-          <p className="font-black text-slate-950">{title}</p>
-          <p className="truncate text-[11px] font-semibold text-slate-400">{hint}</p>
-        </div>
-      </div>
-      {children}
-    </CardContent>
-  </Card>
-);
+/**
+ * One panel for every breakdown: a tab per dimension and a ranked table under
+ * it, so the page holds a single box instead of a card per dimension.
+ */
+const BreakdownTable = ({ tabs }: { tabs: Array<{ key: string; label: string; rows: Row[] }> }) => {
+  const [active, setActive] = useState(tabs[0].key);
+  const tab = tabs.find((t) => t.key === active) ?? tabs[0];
+  const total = tab.rows.reduce((sum, row) => sum + row.value, 0);
+  const max = Math.max(1, ...tab.rows.map((r) => r.value));
 
-const ShareRows = ({ rows }: { rows: Row[] }) => {
-  const total = rows.reduce((sum, row) => sum + row.value, 0);
-  if (!rows.length) return <p className="py-4 text-center text-sm font-semibold text-slate-400">لا توجد زيارات بعد</p>;
   return (
-    <ul className="space-y-3">
-      {rows.slice(0, 6).map((row) => {
-        const share = total ? Math.round((row.value / total) * 100) : 0;
-        return (
-          <li key={row.key}>
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className={cn('min-w-0 truncate font-bold', row.label === UNKNOWN ? 'text-slate-400' : 'text-slate-700')} dir="auto">
-                {row.label}
-                {row.hint && <span className="ms-1 text-[11px] font-semibold text-slate-400">{row.hint}</span>}
-              </span>
-              <span className="shrink-0 font-black text-slate-950" dir="ltr">
-                {fmt(row.value)} <span className="text-[11px] font-bold text-slate-400">{share}%</span>
-              </span>
-            </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className={cn(
-                  'h-full rounded-full transition-[width] duration-700',
-                  row.label === UNKNOWN ? 'bg-slate-300' : 'bg-linear-to-l from-violet-600 to-fuchsia-400',
-                )}
-                style={{ width: `${share}%` }}
-              />
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
-};
-
-/** Phone vs computer as one split bar, the share people ask about first. */
-const DeviceSplit = ({ mobile, desktop }: { mobile: number; desktop: number }) => {
-  const total = mobile + desktop;
-  const mobileShare = total ? Math.round((mobile / total) * 100) : 0;
-  return (
-    <div>
-      <div className="flex items-center justify-between text-xs font-black">
-        <span className="inline-flex items-center gap-1.5 text-violet-600">
-          <Smartphone className="h-4 w-4" /> هاتف <span dir="ltr">{total ? `${mobileShare}%` : '—'}</span>
-        </span>
-        <span className="inline-flex items-center gap-1.5 text-cyan-600">
-          <span dir="ltr">{total ? `${100 - mobileShare}%` : '—'}</span> حاسوب <Laptop className="h-4 w-4" />
-        </span>
+    <Card className="gap-0 overflow-hidden rounded-[1.5rem] py-0 shadow-sm sm:rounded-[2rem]">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-3 pt-3 sm:px-5">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setActive(t.key)}
+            className={cn(
+              'shrink-0 border-b-2 px-3 pb-2.5 text-sm font-black transition',
+              t.key === tab.key ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-400 hover:text-slate-600',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
-      <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full bg-linear-to-l from-violet-600 to-fuchsia-400" style={{ width: `${total ? mobileShare : 0}%` }} />
-        <div className="h-full flex-1 bg-linear-to-l from-cyan-300 to-cyan-500" style={{ opacity: total ? 1 : 0 }} />
-      </div>
-    </div>
+      {tab.rows.length ? (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[11px] font-black text-slate-400">
+              <th className="w-10 py-2.5 ps-4 text-right font-black sm:ps-5">#</th>
+              <th className="py-2.5 text-right font-black">{tab.label}</th>
+              <th className="hidden w-[40%] py-2.5 sm:table-cell" />
+              <th className="w-20 py-2.5 text-left font-black">الزيارات</th>
+              <th className="w-16 py-2.5 pe-4 text-left font-black sm:pe-5">النسبة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tab.rows.slice(0, 10).map((row, i) => {
+              const unknown = row.label === UNKNOWN;
+              return (
+                <tr key={row.key} className="border-t border-slate-50">
+                  <td className="py-2.5 ps-4 text-[11px] font-black text-slate-300 sm:ps-5">{i + 1}</td>
+                  <td className={cn('py-2.5 font-bold', unknown ? 'text-slate-400' : 'text-slate-700')} dir="auto">
+                    {row.label}
+                    {row.hint && <span className="ms-1 text-[11px] font-semibold text-slate-400">{row.hint}</span>}
+                  </td>
+                  <td className="hidden py-2.5 pe-4 sm:table-cell">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-[width] duration-700',
+                          unknown ? 'bg-slate-300' : 'bg-blue-500',
+                        )}
+                        style={{ width: `${(row.value / max) * 100}%` }}
+                      />
+                    </div>
+                  </td>
+                  <td className="py-2.5 text-left font-black text-slate-950" dir="ltr">
+                    {fmt(row.value)}
+                  </td>
+                  <td className="py-2.5 pl-4 text-left text-xs font-bold text-slate-400 sm:pl-5" dir="ltr">
+                    {total ? Math.round((row.value / total) * 100) : 0}%
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <p className="py-8 text-center text-sm font-semibold text-slate-400">لا توجد زيارات بعد</p>
+      )}
+    </Card>
   );
 };
 

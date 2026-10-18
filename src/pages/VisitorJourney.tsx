@@ -279,28 +279,11 @@ const VisitorJourney = () => {
           </div>
         </div>
 
-        <StepGroup title="الزوار" hint="مجهولو الهوية، يحسبهم موقع mel.iq" className="md:grid-cols-2">
-          {steps.slice(0, FIRST_ACCOUNT_STEP).map((step, index) => (
-            <StepCard key={step.key} step={step} index={index} prev={steps[index - 1]} />
-          ))}
-        </StepGroup>
-
-        <StepGroup title="الحسابات" hint="الحسابات التي أُنشئت في الفترة، وإلى أين وصلت حتى الآن">
-          {steps.slice(FIRST_ACCOUNT_STEP).map((step, i) => {
-            const index = i + FIRST_ACCOUNT_STEP;
-            return (
-              <StepCard
-                key={step.key}
-                step={step}
-                index={index}
-                prev={steps[index - 1]}
-                base={steps[FIRST_ACCOUNT_STEP]}
-                selected={stepFilter === step.key}
-                onSelect={() => chooseStep(step.key)}
-              />
-            );
-          })}
-        </StepGroup>
+        <StepTable
+          steps={steps}
+          selected={stepFilter}
+          onSelect={chooseStep}
+        />
 
         {biggestDrop && (
           <div className="flex items-start gap-3 rounded-[1.25rem] border border-red-100 bg-red-50/70 px-4 py-3">
@@ -470,82 +453,119 @@ const RangeToggle = ({ value, onChange }: { value: number; onChange: (days: numb
   </div>
 );
 
-const StepGroup = ({
-  title,
-  hint,
-  children,
-  className,
-}: {
-  title: string;
-  hint: string;
-  children: ReactNode;
-  className?: string;
-}) => (
-  <div className="rounded-[1.5rem] border border-slate-100 bg-white/60 p-3 sm:rounded-[2rem] sm:p-4">
-    <div className="mb-3 flex flex-wrap items-baseline gap-x-2 px-1">
-      <span className="text-sm font-black text-slate-800">{title}</span>
-      <span className="text-[11px] font-semibold text-slate-400">{hint}</span>
-    </div>
-    <div className={cn('grid grid-cols-2 gap-3 md:grid-cols-4', className)}>{children}</div>
-  </div>
-);
-
-const StepCard = ({
-  step,
-  index,
-  prev,
-  base,
+/**
+ * Every milestone as one row of a single panel: its count, a bar against the
+ * largest step of its group, and how many of the step before carried on.
+ * Rows read top to bottom like the journey; account rows filter the table.
+ */
+const StepTable = ({
+  steps,
   selected,
   onSelect,
 }: {
-  step: JourneyStep;
-  index: number;
-  prev?: JourneyStep;
-  /** The first account step: the bar shows how much of it is left. */
-  base?: JourneyStep;
-  selected?: boolean;
-  onSelect?: () => void;
+  steps: JourneyStep[];
+  selected: string | null;
+  onSelect: (key: string | null) => void;
 }) => {
-  const look = lookOf(step.key);
-  const tone = toneTile[look.tone];
-  const kept = prev ? percent(step.count, prev.count) : null;
-  const share = base && base.count ? Math.min(100, (step.count / base.count) * 100) : null;
-  const Tag = onSelect ? 'button' : 'div';
+  const groups = [
+    { title: 'الزوار', hint: 'مجهولو الهوية، يحسبهم موقع mel.iq', rows: steps.slice(0, FIRST_ACCOUNT_STEP), offset: 0 },
+    {
+      title: 'الحسابات',
+      hint: 'الحسابات التي أُنشئت في الفترة، وإلى أين وصلت حتى الآن',
+      rows: steps.slice(FIRST_ACCOUNT_STEP),
+      offset: FIRST_ACCOUNT_STEP,
+    },
+  ];
 
   return (
-    <Tag
-      {...(onSelect ? { type: 'button' as const, onClick: onSelect, 'aria-pressed': selected } : {})}
-      className={cn(
-        'relative isolate flex h-full flex-col overflow-hidden rounded-[1.25rem] border bg-white p-3.5 text-right shadow-[0_12px_35px_rgba(15,23,42,0.04)] transition sm:p-4',
-        onSelect && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(124,58,237,0.10)]',
-        selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-100',
-      )}
-    >
-      <span aria-hidden className={cn('absolute -top-10 -left-10 -z-10 size-32 rounded-full blur-2xl', tone.glow)} />
-      <div className="flex items-start justify-between gap-2">
-        <GlossyTile icon={look.icon} tone={look.tone} />
-        <span className="rounded-lg bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-400">{index + 1}</span>
+    <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:rounded-[2rem]">
+      <div className="hidden grid-cols-[minmax(0,15rem)_minmax(0,1fr)_5rem_6.5rem_6rem] items-center gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-2.5 text-[11px] font-black text-slate-400 md:grid">
+        <span>المرحلة</span>
+        <span />
+        <span className="text-left">العدد</span>
+        <span className="text-center">من المرحلة السابقة</span>
+        <span className="text-center">من الحسابات</span>
       </div>
-      <p className="mt-3 line-clamp-2 text-xs leading-snug font-black text-slate-700 sm:text-sm">{step.label}</p>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        <span className="text-2xl leading-none font-black text-slate-950" dir="ltr">
-          {fmt(step.count)}
-        </span>
-        {kept != null && (
-          <span className={cn('rounded-lg px-1.5 py-0.5 text-[10px] font-black', keptTone(kept))} dir="ltr">
-            {kept}%
-          </span>
-        )}
-      </div>
-      <p className="mt-1 text-[11px] font-semibold text-slate-400">{step.note}</p>
-      {share != null && (
-        <div className="mt-auto pt-3">
-          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-linear-to-l from-violet-600 to-fuchsia-400" style={{ width: `${share}%` }} />
+      {groups.map((group) => {
+        const max = Math.max(1, ...group.rows.map((r) => r.count));
+        const base = group.offset === FIRST_ACCOUNT_STEP ? group.rows[0] : undefined;
+        return (
+          <div key={group.title}>
+            <div className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-100 bg-slate-50/40 px-4 py-2 sm:px-5">
+              <span className="text-xs font-black text-slate-700">{group.title}</span>
+              <span className="text-[11px] font-semibold text-slate-400">{group.hint}</span>
+            </div>
+            <ul>
+              {group.rows.map((step, i) => {
+                const index = i + group.offset;
+                const prev = steps[index - 1];
+                const rawKept = prev ? percent(step.count, prev.count) : null;
+                // Steps counted on different groups of people can outnumber the one before.
+                const kept = rawKept != null && rawKept <= 100 ? rawKept : null;
+                const share = base && base.count && step !== base ? percent(step.count, base.count) : null;
+                const look = lookOf(step.key);
+                const clickable = group.offset === FIRST_ACCOUNT_STEP;
+                const isSelected = selected === step.key;
+                const Tag = clickable ? 'button' : 'div';
+                return (
+                  <li key={step.key} className="border-b border-slate-100/70 last:border-b-0">
+                    <Tag
+                      {...(clickable
+                        ? { type: 'button' as const, onClick: () => onSelect(step.key), 'aria-pressed': isSelected }
+                        : {})}
+                      className={cn(
+                        'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-4 py-2.5 text-right transition sm:px-5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_5rem_6.5rem_6rem] md:gap-x-4',
+                        clickable && 'cursor-pointer hover:bg-violet-50/50',
+                        isSelected && 'bg-violet-50 ring-2 ring-violet-300 ring-inset',
+                      )}
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="w-4 shrink-0 text-center text-[10px] font-black text-slate-300">{index + 1}</span>
+                        <span className="shrink-0 text-blue-500 [&_svg]:h-4 [&_svg]:w-4">{look.icon}</span>
+                        <span className="min-w-0 truncate text-sm font-bold text-slate-800" title={step.note}>
+                          {step.label}
+                        </span>
+                      </span>
+                      <span className="text-left text-base font-black text-slate-950 md:order-3" dir="ltr">
+                        {fmt(step.count)}
+                      </span>
+                      <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-100 md:order-2 md:col-span-1">
+                        <span
+                          className="block h-full rounded-full bg-blue-500 transition-[width] duration-700"
+                          style={{ width: `${Math.max(step.count ? 2 : 0, (step.count / max) * 100)}%` }}
+                        />
+                      </span>
+                      <span
+                        className={cn(
+                          'col-span-2 flex items-center gap-2 text-[11px] font-bold text-slate-400 md:order-4 md:col-span-1 md:justify-center',
+                          kept == null && share == null && 'max-md:hidden',
+                        )}
+                      >
+                        <span className="md:hidden">من السابقة</span>
+                        <span className={cn('rounded-lg px-1.5 py-0.5 text-[11px] font-black', keptTone(kept))} dir="ltr">
+                          {kept == null ? '—' : `${kept}%`}
+                        </span>
+                        {share != null && (
+                          <>
+                            <span className="ms-2 md:hidden">من الحسابات</span>
+                            <span className="text-[11px] font-black text-slate-500 md:hidden" dir="ltr">
+                              {share}%
+                            </span>
+                          </>
+                        )}
+                      </span>
+                      <span className="hidden text-center text-xs font-black text-slate-500 md:order-5 md:block" dir="ltr">
+                        {share == null ? '' : `${share}%`}
+                      </span>
+                    </Tag>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-        </div>
-      )}
-    </Tag>
+        );
+      })}
+    </div>
   );
 };
 
@@ -563,7 +583,7 @@ const ProgressDots = ({
       <span
         key={key}
         title={labels.get(key)?.label}
-        className={cn('h-2 w-5 rounded-full', reached.has(key) ? 'bg-linear-to-l from-violet-600 to-fuchsia-400' : 'bg-slate-200')}
+        className={cn('h-2 w-5 rounded-full', reached.has(key) ? 'bg-blue-500' : 'bg-slate-200')}
       />
     ))}
   </div>
