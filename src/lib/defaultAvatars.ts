@@ -1,13 +1,6 @@
 import avatar1 from '@/assets/avatars/user-1.webp?no-inline';
 import avatar2 from '@/assets/avatars/user-2.webp?no-inline';
 import avatar3 from '@/assets/avatars/user-3.webp?no-inline';
-import avatar4 from '@/assets/avatars/user-4.webp?no-inline';
-import avatar5 from '@/assets/avatars/user-5.webp?no-inline';
-import avatar6 from '@/assets/avatars/user-6.webp?no-inline';
-import avatar7 from '@/assets/avatars/user-7.webp?no-inline';
-import avatar8 from '@/assets/avatars/user-8.webp?no-inline';
-import avatar9 from '@/assets/avatars/user-9.webp?no-inline';
-import avatar10 from '@/assets/avatars/user-10.webp?no-inline';
 import admin1 from '@/assets/avatars/admin/admin-1.webp?no-inline';
 import admin3 from '@/assets/avatars/admin/admin-3.webp?no-inline';
 import admin5 from '@/assets/avatars/admin/admin-5.webp?no-inline';
@@ -17,22 +10,11 @@ import admin10 from '@/assets/avatars/admin/admin-10.webp?no-inline';
 /**
  * Mel's default avatars, for anyone without a photo of their own.
  *
- * The same pictures, in the same order, ship with the merchant dashboard, the
+ * The same three pictures, in the same order, ship with the merchant dashboard, the
  * admin dashboard and the editor, so a person looks the same everywhere.
  * `?no-inline` keeps them as small files: each page shows only a few.
  */
-export const DEFAULT_AVATARS = [
-  avatar1,
-  avatar2,
-  avatar3,
-  avatar4,
-  avatar5,
-  avatar6,
-  avatar7,
-  avatar8,
-  avatar9,
-  avatar10,
-];
+export const DEFAULT_AVATARS = [avatar1, avatar2, avatar3];
 
 /**
  * Avatars for Mel's own team (admin dashboard members), a set of their own.
