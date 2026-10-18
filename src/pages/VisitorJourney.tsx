@@ -2,33 +2,12 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { Link } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
-import {
-  BarChart3,
-  Crown,
-  Eye,
-  Globe,
-  Info,
-  Link2,
-  MousePointerClick,
-  Package,
-  PenTool,
-  Percent,
-  Route as RouteIcon,
-  ShoppingBag,
-  Smartphone,
-  Sparkles,
-  Store as StoreIcon,
-  TriangleAlert,
-  UserPlus,
-  X,
-} from 'lucide-react';
+import { BarChart3, Link2, Route as RouteIcon, Smartphone, X } from 'lucide-react';
 import {
   AlertMessage,
-  EmptyState,
   LoadingState,
   PageHeader,
   Pagination,
-  StatCard,
   StatusPill,
   TableShell,
   type StatTone,
@@ -64,29 +43,34 @@ const RANGE_STORAGE_KEY = 'visitor-journey:days';
 /** Steps before this index are anonymous visitors; from it on, accounts. */
 const FIRST_ACCOUNT_STEP = 2;
 
-const stepLook: Record<string, { icon: ReactNode; tone: StatTone }> = {
-  visitors: { icon: <Eye />, tone: 'violet' },
-  signup_open: { icon: <MousePointerClick />, tone: 'cyan' },
-  accounts: { icon: <UserPlus />, tone: 'blue' },
-  stores: { icon: <StoreIcon />, tone: 'teal' },
-  ai_design: { icon: <Sparkles />, tone: 'violet' },
-  editor: { icon: <PenTool />, tone: 'amber' },
-  published: { icon: <Globe />, tone: 'emerald' },
-  products: { icon: <Package />, tone: 'blue' },
-  orders: { icon: <ShoppingBag />, tone: 'rose' },
-  paid: { icon: <Crown />, tone: 'amber' },
+/** Each step's illustration is `/journey/<key>.webp` (Fluent Emoji 3D, see public/journey/LICENSE.txt). */
+const stepTone: Record<string, StatTone> = {
+  visitors: 'violet',
+  signup_open: 'cyan',
+  accounts: 'blue',
+  stores: 'teal',
+  ai_design: 'violet',
+  editor: 'amber',
+  published: 'emerald',
+  products: 'blue',
+  orders: 'rose',
+  paid: 'amber',
 };
 
-const toneChip: Record<StatTone, string> = {
-  blue: 'bg-blue-50 text-blue-500 shadow-blue-100',
-  cyan: 'bg-cyan-50 text-cyan-500 shadow-cyan-100',
-  teal: 'bg-teal-50 text-teal-500 shadow-teal-100',
-  amber: 'bg-orange-50 text-orange-500 shadow-orange-100',
-  rose: 'bg-red-50 text-red-500 shadow-red-100',
-  violet: 'bg-violet-50 text-violet-500 shadow-violet-100',
-  emerald: 'bg-emerald-50 text-emerald-500 shadow-emerald-100',
-  slate: 'bg-slate-100 text-slate-500 shadow-slate-200',
+/** Soft backdrop behind a step's illustration, and the glow in the card corner. */
+const toneBackdrop: Record<StatTone, { chip: string; glow: string }> = {
+  blue: { chip: 'from-blue-50 to-blue-100/70', glow: 'bg-blue-100/60' },
+  cyan: { chip: 'from-cyan-50 to-cyan-100/70', glow: 'bg-cyan-100/60' },
+  teal: { chip: 'from-teal-50 to-teal-100/70', glow: 'bg-teal-100/60' },
+  amber: { chip: 'from-orange-50 to-amber-100/70', glow: 'bg-amber-100/60' },
+  rose: { chip: 'from-rose-50 to-rose-100/70', glow: 'bg-rose-100/60' },
+  violet: { chip: 'from-violet-50 to-fuchsia-100/70', glow: 'bg-violet-100/60' },
+  emerald: { chip: 'from-emerald-50 to-emerald-100/70', glow: 'bg-emerald-100/60' },
+  slate: { chip: 'from-slate-50 to-slate-100', glow: 'bg-slate-100' },
 };
+
+/** The milestones drawn along the road in the banner. */
+const HERO_STEPS = ['visitors', 'accounts', 'stores', 'published', 'paid'] as const;
 
 /** Baghdad calendar day `offset` days from today, `YYYY-MM-DD`. */
 const baghdadDay = (offset = 0) =>
@@ -266,24 +250,18 @@ const VisitorJourney = () => {
       {error && <AlertMessage>{error}</AlertMessage>}
 
       {trackingNote && (
-        <div className="flex items-start gap-2 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="flex items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">
+          <Art name="compass" className="size-9 shrink-0" />
           {trackingNote}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 xl:grid-cols-4">
-        <StatCard title="الزوار" value={fmt(visitors)} icon={<Eye />} tone="violet" sub="زوار بدون تكرار" />
-        <StatCard title="حسابات جديدة" value={fmt(newAccounts)} icon={<UserPlus />} tone="blue" sub="أُنشئت في الفترة" />
-        <StatCard
-          title="نسبة التسجيل"
-          value={signupRate == null ? '—' : `${signupRate}%`}
-          icon={<Percent />}
-          tone="emerald"
-          sub="من الزوار أنشأوا حساباً"
-        />
-        <StatCard title="اشتراكات مدفوعة" value={fmt(count('paid'))} icon={<Crown />} tone="amber" sub="من الحسابات الجديدة" />
-      </div>
+      <JourneyBanner
+        count={count}
+        labels={stepByKey}
+        signupRate={signupRate}
+        className={cn('transition-opacity', loading && 'opacity-60')}
+      />
 
       <section className={cn('space-y-3 transition-opacity', loading && 'opacity-60')}>
         <div className="flex flex-wrap items-end justify-between gap-2">
@@ -320,8 +298,8 @@ const VisitorJourney = () => {
 
         {biggestDrop && (
           <div className="flex items-start gap-3 rounded-[1.25rem] border border-red-100 bg-red-50/70 px-4 py-3">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-red-500 shadow-sm">
-              <TriangleAlert className="h-5 w-5" />
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white shadow-sm">
+              <Art name="drop" className="size-9" />
             </span>
             <div className="min-w-0 text-sm">
               <p className="font-black text-red-600">أكبر نقطة تسرّب</p>
@@ -378,7 +356,11 @@ const VisitorJourney = () => {
               <LoadingState />
             </div>
           ) : !accounts?.data.length ? (
-            <EmptyState title={filterLabel ? 'لا توجد حسابات وصلت إلى هذه المرحلة' : 'لا توجد حسابات جديدة في هذه الفترة'} />
+            <Illustrated
+              art="telescope"
+              title={filterLabel ? 'لا توجد حسابات وصلت إلى هذه المرحلة' : 'لا توجد حسابات جديدة في هذه الفترة'}
+              hint={filterLabel ? 'جرّب مرحلة أبكر أو فترة أطول' : 'ستظهر هنا الحسابات فور تسجيلها، مع المراحل التي وصلت إليها'}
+            />
           ) : (
             <table className={cn('w-full min-w-[760px] text-sm transition-opacity', accountsLoading && 'opacity-60')}>
               <thead>
@@ -464,6 +446,7 @@ const VisitorJourney = () => {
             <CardContent className="px-5">
               <SectionTitle icon={<Link2 />} title="من أين يأتي الزوار" hint="utm_source أو الموقع السابق" />
               <ShareList
+                art="globe"
                 rows={(data?.sources ?? []).map((s) => ({ key: s.source, label: sourceLabels[s.source] ?? s.source, value: s.visits }))}
               />
             </CardContent>
@@ -472,6 +455,7 @@ const VisitorJourney = () => {
             <CardContent className="px-5">
               <SectionTitle icon={<Smartphone />} title="الأجهزة" hint="زيارات حسب نوع الجهاز" />
               <ShareList
+                art="phone"
                 rows={(data?.devices ?? []).map((d) => ({ key: d.device, label: deviceLabels[d.device] ?? d.device, value: d.visits }))}
               />
             </CardContent>
@@ -538,7 +522,7 @@ const StepCard = ({
   selected?: boolean;
   onSelect?: () => void;
 }) => {
-  const look = stepLook[step.key] ?? { icon: <RouteIcon />, tone: 'slate' as StatTone };
+  const tone = toneBackdrop[stepTone[step.key] ?? 'slate'];
   const kept = prev ? percent(step.count, prev.count) : null;
   const share = base && base.count ? Math.min(100, (step.count / base.count) * 100) : null;
   const Tag = onSelect ? 'button' : 'div';
@@ -547,19 +531,15 @@ const StepCard = ({
     <Tag
       {...(onSelect ? { type: 'button' as const, onClick: onSelect, 'aria-pressed': selected } : {})}
       className={cn(
-        'flex h-full flex-col rounded-[1.25rem] border bg-white p-3.5 text-right shadow-[0_12px_35px_rgba(15,23,42,0.04)] transition sm:p-4',
+        'relative isolate flex h-full flex-col overflow-hidden rounded-[1.25rem] border bg-white p-3.5 text-right shadow-[0_12px_35px_rgba(15,23,42,0.04)] transition sm:p-4',
         onSelect && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(124,58,237,0.10)]',
         selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-100',
       )}
     >
+      <span aria-hidden className={cn('absolute -top-10 -left-10 -z-10 size-32 rounded-full blur-2xl', tone.glow)} />
       <div className="flex items-start justify-between gap-2">
-        <span
-          className={cn(
-            'grid size-10 shrink-0 place-items-center rounded-2xl shadow-lg [&_svg]:h-5 [&_svg]:w-5 [&_svg]:stroke-[2.3]',
-            toneChip[look.tone],
-          )}
-        >
-          {look.icon}
+        <span className={cn('grid size-14 shrink-0 place-items-center rounded-2xl bg-linear-to-br sm:size-16', tone.chip)}>
+          <Art name={step.key} className="size-10 drop-shadow-[0_6px_8px_rgba(15,23,42,0.18)] sm:size-12" />
         </span>
         <span className="rounded-lg bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-400">{index + 1}</span>
       </div>
@@ -681,12 +661,20 @@ const DailyChart = ({ data }: { data: JourneyFunnel | null }) => {
     };
   }, [data]);
 
+  const empty = !data?.daily.some((p) => p.visitors || p.accounts);
+  if (empty) {
+    return (
+      <div className="grid h-[300px] place-items-center">
+        <Illustrated art="seedling" title="لا شيء ينمو هنا بعد" hint="سيظهر الرسم عند أول زيارة أو حساب جديد في هذه الفترة" />
+      </div>
+    );
+  }
   return <ReactECharts option={option} style={{ height: 300 }} notMerge />;
 };
 
-const ShareList = ({ rows }: { rows: Array<{ key: string; label: string; value: number }> }) => {
+const ShareList = ({ rows, art }: { rows: Array<{ key: string; label: string; value: number }>; art: string }) => {
   const total = rows.reduce((sum, row) => sum + row.value, 0);
-  if (!rows.length) return <p className="py-6 text-center text-sm font-semibold text-slate-400">لا توجد زيارات بعد</p>;
+  if (!rows.length) return <Illustrated art={art} title="لا توجد زيارات بعد" compact />;
   return (
     <ul className="space-y-3">
       {rows.map((row) => (
@@ -709,6 +697,107 @@ const ShareList = ({ rows }: { rows: Array<{ key: string; label: string; value: 
         </li>
       ))}
     </ul>
+  );
+};
+
+const Art = ({ name, className }: { name: string; className?: string }) => (
+  <img src={`/journey/${name}.webp`} alt="" draggable={false} className={cn('select-none', className)} />
+);
+
+const Illustrated = ({ art, title, hint, compact }: { art: string; title: string; hint?: string; compact?: boolean }) => (
+  <div className={cn('flex flex-col items-center text-center', compact ? 'py-4' : 'px-6 py-10')}>
+    <span className={cn('relative grid place-items-center', compact ? 'size-20' : 'size-28')}>
+      <span aria-hidden className="absolute inset-2 rounded-full bg-linear-to-br from-violet-100 to-fuchsia-50 blur-md" />
+      <Art name={art} className={cn('relative drop-shadow-[0_10px_14px_rgba(76,29,149,0.18)]', compact ? 'size-14' : 'size-20')} />
+    </span>
+    <p className={cn('mt-2 font-black text-slate-600', compact ? 'text-sm' : 'text-base sm:text-lg')}>{title}</p>
+    {hint && <p className="mt-1 max-w-xs text-xs font-semibold text-slate-400">{hint}</p>}
+  </div>
+);
+
+/**
+ * The page's opening picture: the road from a visit to a payment, with each
+ * milestone's figure for the range under its illustration.
+ */
+const JourneyBanner = ({
+  count,
+  labels,
+  signupRate,
+  className,
+}: {
+  count: (key: string) => number;
+  labels: Map<string, JourneyStep>;
+  signupRate: number | null;
+  className?: string;
+}) => {
+  const visitors = count('visitors');
+  const accounts = count('accounts');
+  const headline = visitors
+    ? accounts
+      ? `${fmt(visitors)} زائر في هذه الفترة، و${fmt(accounts)} منهم بدأوا رحلتهم بحساب`
+      : `${fmt(visitors)} زائر في هذه الفترة، ولم يُنشئ أحد منهم حساباً بعد`
+    : accounts
+      ? `${fmt(accounts)} حساب جديد في هذه الفترة`
+      : 'الطريق جاهز، بانتظار أول زائر';
+
+  return (
+    <section
+      className={cn(
+        'relative isolate overflow-hidden rounded-[1.5rem] bg-linear-to-bl from-violet-700 via-violet-600 to-fuchsia-500 p-5 text-white shadow-[0_14px_32px_rgba(124,58,237,0.22)] sm:rounded-[2rem] sm:p-7',
+        className,
+      )}
+    >
+      <span aria-hidden className="absolute -top-24 -right-16 -z-10 size-72 rounded-full bg-white/10 blur-2xl" />
+      <span aria-hidden className="absolute -bottom-28 left-10 -z-10 size-72 rounded-full bg-fuchsia-300/25 blur-3xl" />
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-white/70">من أول زيارة إلى أول دفعة</p>
+          <h2 className="mt-1 text-lg leading-snug font-black sm:text-2xl">{headline}</h2>
+        </div>
+        <div className="rounded-2xl bg-white/15 px-3.5 py-2 text-center ring-1 ring-white/25 backdrop-blur-sm">
+          <p className="text-xl leading-none font-black" dir="ltr">
+            {signupRate == null ? '—' : `${signupRate}%`}
+          </p>
+          <p className="mt-1 text-[10px] font-bold text-white/75">نسبة التسجيل</p>
+        </div>
+      </div>
+
+      <div className="relative mt-6 sm:mt-8">
+        {/* The road: a dashed wave behind the milestones. */}
+        <svg
+          aria-hidden
+          viewBox="0 0 1000 80"
+          preserveAspectRatio="none"
+          className="absolute inset-x-[10%] top-5 -z-10 h-12 w-[80%] sm:top-7 sm:h-14"
+        >
+          <path
+            d="M0 40 C 125 0, 125 80, 250 40 S 375 0, 500 40 S 625 80, 750 40 S 875 0, 1000 40"
+            fill="none"
+            stroke="rgba(255,255,255,0.55)"
+            strokeWidth="3"
+            strokeDasharray="10 12"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+        <ol className="grid grid-cols-5 gap-1 sm:gap-3">
+          {HERO_STEPS.map((key) => (
+            <li key={key} className="flex min-w-0 flex-col items-center text-center">
+              <span className="grid size-14 place-items-center rounded-full bg-white/20 shadow-[0_10px_25px_rgba(46,16,101,0.25)] ring-1 ring-white/35 backdrop-blur-sm sm:size-20">
+                <Art name={key} className="size-10 drop-shadow-[0_6px_8px_rgba(46,16,101,0.35)] sm:size-14" />
+              </span>
+              <p className="mt-2 text-lg leading-none font-black sm:text-2xl" dir="ltr">
+                {fmt(count(key))}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[10px] leading-tight font-bold text-white/80 sm:text-xs">
+                {labels.get(key)?.label ?? ''}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
   );
 };
 
