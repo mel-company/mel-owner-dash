@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Crown, Layers3, Pencil, Plus, ReceiptText, Sparkles, Trash2 } from 'lucide-react';
 import {
   AlertMessage,
-  CheckboxListField,
   ConfirmDeleteModal,
   SwitchField,
   DrawerFooter,
@@ -20,9 +19,7 @@ import {
 } from '@/components/dashboard';
 import {
   plansService,
-  type FeatureOption,
   type EditorPricing,
-  type ModuleOption,
   type Plan,
   type PlanFeature,
   type PlanPayload,
@@ -82,7 +79,6 @@ const PLAN_FORM_TABS = [
   { key: 'pricing', label: 'السعر والعروض' },
   { key: 'limits', label: 'الحدود' },
   { key: 'features', label: 'الذكاء والمزايا' },
-  { key: 'advanced', label: 'متقدم' },
 ] as const;
 
 type PlanFormTab = (typeof PLAN_FORM_TABS)[number]['key'];
@@ -126,8 +122,6 @@ const SubscriptionPlans = () => {
   const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
   const [formData, setFormData] = useState<PlanPayload>(defaultPlanForm);
   const [formTab, setFormTab] = useState<PlanFormTab>('basics');
-  const [featureOptions, setFeatureOptions] = useState<FeatureOption[]>([]);
-  const [moduleOptions, setModuleOptions] = useState<ModuleOption[]>([]);
 
   useEffect(() => {
     loadData();
@@ -136,34 +130,29 @@ const SubscriptionPlans = () => {
   /**
    * Each request settles on its own. With `Promise.all`, one failing endpoint
    * (the plans query, when the server is ahead of its database) blanked the
-   * subscriptions, features and modules that had loaded fine.
+   * subscriptions that had loaded fine.
    */
   const loadData = async () => {
     try {
       setLoading(true);
       setError('');
-      const [plansRes, subsRes, features, modules] = await Promise.allSettled([
+      const [plansRes, subsRes] = await Promise.allSettled([
         plansService.getAllPlans(),
         systemSubscriptionsService.getAllSubscriptions({ page: 1, limit: 10 }),
-        plansService.getFeatureOptions(),
-        plansService.getModuleOptions(),
       ]);
       if (plansRes.status === 'fulfilled') setPlans(plansRes.value.data || []);
       if (subsRes.status === 'fulfilled') {
         setSubscriptions(subsRes.value?.data || []);
         setSubscriptionTotal(subsRes.value?.total || 0);
       }
-      if (features.status === 'fulfilled') setFeatureOptions(features.value);
-      if (modules.status === 'fulfilled') setModuleOptions(modules.value);
 
       const failed = [
         plansRes.status === 'rejected' && 'الباقات',
         subsRes.status === 'rejected' && 'الاشتراكات',
-        (features.status === 'rejected' || modules.status === 'rejected') && 'الميزات',
       ].filter(Boolean);
       if (failed.length) {
         setError(`فشل في جلب ${failed.join(' و')}. حاول مرة أخرى بعد قليل.`);
-        [plansRes, subsRes, features, modules].forEach((result) => {
+        [plansRes, subsRes].forEach((result) => {
           if (result.status === 'rejected') console.error('Error loading plans page:', result.reason);
         });
       }
@@ -420,6 +409,20 @@ const SubscriptionPlans = () => {
                   checked={formData.most_popular}
                   onChange={(checked) => setFormData((current) => ({ ...current, most_popular: checked }))}
                 />
+                <SwitchField
+                  label="باقة مجانية (بدون دفع)"
+                  checked={formData.is_free}
+                  onChange={(checked) => setFormData((current) => ({ ...current, is_free: checked }))}
+                />
+                <FormField
+                  label="ترتيب الظهور في صفحة الباقات"
+                  type="number"
+                  value={formData.order_number ?? ''}
+                  onChange={(value) => setFormData((current) => ({ ...current, order_number: value === '' ? null : Number(value) }))}
+                />
+                {/* The machine code (BASIC / PLUS / GO) and the legacy feature
+                    and module rows are not on the form: they confused more than
+                    they set. Editing keeps whatever the plan already has. */}
                 <div className="md:col-span-2">
                   <TextAreaField label="الوصف" value={formData.description} rows={3} onChange={(value) => setFormData((current) => ({ ...current, description: value }))} />
                 </div>
@@ -553,51 +556,6 @@ const SubscriptionPlans = () => {
               </div>
             )}
 
-            {/* Rarely touched: the machine key entitlement checks read
-                (`upgradeAvailable` reads `code !== 'PLUS'`), list order, the
-                free flag, and the feature and module rows picked by id. */}
-            {formTab === 'advanced' && (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <FormField
-                  label="الرمز (BASIC / PLUS / GO)"
-                  value={formData.code ?? ''}
-                  placeholder="اتركه فارغاً"
-                  onChange={(value) => setFormData((current) => ({ ...current, code: value }))}
-                />
-                <FormField
-                  label="ترتيب العرض"
-                  type="number"
-                  value={formData.order_number ?? ''}
-                  onChange={(value) => setFormData((current) => ({ ...current, order_number: value === '' ? null : Number(value) }))}
-                />
-                <SwitchField
-                  label="باقة مجانية"
-                  checked={formData.is_free}
-                  onChange={(checked) => setFormData((current) => ({ ...current, is_free: checked }))}
-                />
-                <div className="hidden md:block" />
-                <div className="md:col-span-2">
-                  <CheckboxListField
-                    label="الميزات"
-                    hint={`${formData.featureIds.length} مختارة`}
-                    options={featureOptions}
-                    selected={formData.featureIds}
-                    onChange={(featureIds) => setFormData((current) => ({ ...current, featureIds }))}
-                    empty="لا توجد ميزات معرّفة"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <CheckboxListField
-                    label="الموديولات"
-                    hint={`${formData.moduleIds.length} مختارة`}
-                    options={moduleOptions}
-                    selected={formData.moduleIds}
-                    onChange={(moduleIds) => setFormData((current) => ({ ...current, moduleIds }))}
-                    empty="لا توجد موديولات معرّفة"
-                  />
-                </div>
-              </div>
-            )}
           </SideDrawer>
         </form>
       )}
