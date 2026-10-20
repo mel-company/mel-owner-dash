@@ -53,6 +53,20 @@ export interface Plan {
   promo_free_months?: number;
   promo_discount_months?: number;
   promo_discount_percent?: number;
+  /** Percent off a 3-month / 12-month purchase. Never stacked with the intro offer. */
+  quarterly_discount_percent?: number;
+  yearly_discount_percent?: number;
+  /** Caps; `null` is unlimited. Orders are per month and never block checkout. */
+  max_products?: number | null;
+  max_categories?: number | null;
+  max_category_groups?: number | null;
+  max_coupons?: number | null;
+  max_monthly_orders?: number | null;
+  /** One-time trials: AI store builds, and editor-agent messages. */
+  ai_store_trial?: number;
+  ai_editor_trial?: number;
+  has_social_pixels?: boolean;
+  has_custom_domain?: boolean;
   features: PlanFeature[];
   modules: PlanModule[];
   _count?: {
@@ -95,7 +109,8 @@ export interface PlanPayload {
   name: string;
   description: string;
   monthly_price: number;
-  yearly_price: number;
+  /** Not sent: the server derives it from `monthly_price` and `yearly_discount_percent`. */
+  yearly_price?: number;
   enabled: boolean;
   most_popular: boolean;
   code?: string | null;
@@ -118,8 +133,33 @@ export interface PlanPayload {
   promo_free_months: number;
   promo_discount_months: number;
   promo_discount_percent: number;
+  quarterly_discount_percent: number;
+  yearly_discount_percent: number;
+  max_products: number | null;
+  max_categories: number | null;
+  max_category_groups: number | null;
+  max_coupons: number | null;
+  max_monthly_orders: number | null;
+  ai_store_trial: number;
+  ai_editor_trial: number;
+  has_social_pixels: boolean;
+  has_custom_domain: boolean;
   featureIds: string[];
   moduleIds: string[];
+}
+
+/** What one editor-agent credit is worth, and what turns have cost lately. */
+export interface EditorPricing {
+  /** USD of real model cost one credit stands for. */
+  usdPerCredit: number;
+  defaultUsdPerCredit: number;
+  last30Days: {
+    turns: number;
+    totalCostUsd: number;
+    avgCostUsd: number;
+    /** What the average turn is charged at the current value. */
+    avgCredits: number;
+  };
 }
 
 export interface PlansListResponse {
@@ -186,5 +226,22 @@ export const plansService = {
 
   deletePlan: async (id: string): Promise<void> => {
     await axiosInstance.delete<void>(`/plan/${id}`);
+  },
+
+  /** GET /api/v1/credits/system/editor-pricing */
+  getEditorPricing: async (): Promise<EditorPricing> => {
+    const response = await axiosInstance.get<EditorPricing>(
+      '/credits/system/editor-pricing',
+    );
+    return response as unknown as EditorPricing;
+  },
+
+  /** PUT /api/v1/credits/system/editor-pricing */
+  updateEditorPricing: async (usdPerCredit: number): Promise<EditorPricing> => {
+    const response = await axiosInstance.put<EditorPricing>(
+      '/credits/system/editor-pricing',
+      { usdPerCredit },
+    );
+    return response as unknown as EditorPricing;
   },
 };

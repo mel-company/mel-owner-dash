@@ -868,6 +868,22 @@ export const StatusSwitch = ({
   </button>
 );
 
+/** An on/off form field: the label and a `StatusSwitch` on one row, the height of the other inputs. */
+export const SwitchField = ({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) => (
+  <div className="flex h-12 items-center justify-between gap-3 self-end rounded-2xl border border-slate-200 bg-white px-4">
+    <span className="text-sm font-bold text-slate-700">{label}</span>
+    <StatusSwitch active={checked} label={label} onClick={() => onChange(!checked)} />
+  </div>
+);
+
 /**
  * Row actions, with names a screen reader can tell apart.
  *
