@@ -543,12 +543,21 @@ const SubscriptionPlans = () => {
                 options={YES_NO}
                 onChange={(value) => setFormData((current) => ({ ...current, promo_enabled: value === 'true' }))}
               />
-              <FormField
-                label="الأشهر المجانية"
-                type="number"
-                value={formData.promo_free_months}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, promo_free_months: Number(value) }))}
+              {/* The free first month as a plain switch. Turning it on also
+                  switches the offer on, since the server grants nothing while
+                  the offer is off. A plan saved with more free months keeps
+                  that number as its own option. */}
+              <SelectField
+                label="أول شهر مجاناً"
+                value={String(formData.promo_enabled ? formData.promo_free_months : 0)}
+                options={freeMonthOptions(formData.promo_free_months)}
+                onChange={(value) =>
+                  setFormData((current) => ({
+                    ...current,
+                    promo_free_months: Number(value),
+                    promo_enabled: Number(value) > 0 ? true : current.promo_enabled,
+                  }))
+                }
               />
               <FormField
                 label="أشهر الخصم بعد المجانية"
@@ -806,6 +815,13 @@ const periodPrice = (monthly: number, months: number, percent: number) =>
 
 const limitText = (limit: number | null | undefined, unit: string) =>
   typeof limit === 'number' ? `${limit.toLocaleString('en-US')} ${unit}` : `${unit} بلا حدود`;
+
+/** «لا» / «نعم», plus the plan's own count when it was saved with more than one free month. */
+const freeMonthOptions = (current: number) => [
+  { value: '0', label: 'لا' },
+  { value: '1', label: 'نعم' },
+  ...(current > 1 ? [{ value: String(current), label: `أول ${current} أشهر مجاناً` }] : []),
+];
 
 /** The intro offer in words, or '' when it gives nothing. */
 const promoText = (plan: Plan) => {
