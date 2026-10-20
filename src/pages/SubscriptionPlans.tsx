@@ -5,13 +5,13 @@ import {
   AlertMessage,
   CheckboxListField,
   ConfirmDeleteModal,
+  SwitchField,
   DrawerFooter,
   FormField,
   LoadingState,
   PageHeader,
   PrimaryActionButton,
   SearchFiltersBar,
-  SelectField,
   SideDrawer,
   StatCard,
   StatusPill,
@@ -77,10 +77,23 @@ const defaultPlanForm: PlanPayload = {
   moduleIds: [],
 };
 
-const YES_NO = [
-  { value: 'false', label: 'لا' },
-  { value: 'true', label: 'نعم' },
-];
+const PLAN_FORM_TABS = [
+  { key: 'basics', label: 'الأساسيات' },
+  { key: 'pricing', label: 'السعر والعروض' },
+  { key: 'limits', label: 'الحدود' },
+  { key: 'features', label: 'الذكاء والمزايا' },
+  { key: 'advanced', label: 'متقدم' },
+] as const;
+
+type PlanFormTab = (typeof PLAN_FORM_TABS)[number]['key'];
+
+/** The intro offer is on exactly when it gives something: a free month or a discount. */
+const withPromo = (form: PlanPayload): PlanPayload => ({
+  ...form,
+  promo_enabled:
+    (form.promo_free_months ?? 0) > 0 ||
+    ((form.promo_discount_months ?? 0) > 0 && (form.promo_discount_percent ?? 0) > 0),
+});
 
 /** The capped resources, in the order the form and the card list them. Empty is unlimited. */
 const LIMIT_FIELDS = [
@@ -112,6 +125,7 @@ const SubscriptionPlans = () => {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
   const [formData, setFormData] = useState<PlanPayload>(defaultPlanForm);
+  const [formTab, setFormTab] = useState<PlanFormTab>('basics');
   const [featureOptions, setFeatureOptions] = useState<FeatureOption[]>([]);
   const [moduleOptions, setModuleOptions] = useState<ModuleOption[]>([]);
 
@@ -166,6 +180,7 @@ const SubscriptionPlans = () => {
   const openCreateDrawer = () => {
     setEditingPlan(null);
     setFormData(defaultPlanForm);
+    setFormTab('basics');
     setShowDrawer(true);
   };
 
@@ -210,6 +225,7 @@ const SubscriptionPlans = () => {
       // saved again.
       moduleIds: plan.modules?.map((item) => item.module.id) || [],
     });
+    setFormTab('basics');
     setShowDrawer(true);
   };
 
@@ -370,235 +386,218 @@ const SubscriptionPlans = () => {
             onClose={closeDrawer}
             footer={<DrawerFooter onCancel={closeDrawer} submitLabel={editingPlan ? 'حفظ التغييرات' : 'إضافة الباقة'} />}
           >
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              <FormField label="اسم الباقة" value={formData.name} required onChange={(value) => setFormData((current) => ({ ...current, name: value }))} />
-              <FormField label="السعر الشهري" type="number" value={formData.monthly_price} required onChange={(value) => setFormData((current) => ({ ...current, monthly_price: Number(value) }))} />
-              <FormField
-                label="خصم الاشتراك لـ 3 أشهر %"
-                type="number"
-                value={formData.quarterly_discount_percent}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, quarterly_discount_percent: Number(value) }))}
-              />
-              <FormField
-                label="خصم الاشتراك السنوي %"
-                type="number"
-                value={formData.yearly_discount_percent}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, yearly_discount_percent: Number(value) }))}
-              />
-              <p className="md:col-span-2 -mt-2 text-xs font-semibold text-slate-500">
-                {`3 أشهر: ${periodPrice(formData.monthly_price, 3, formData.quarterly_discount_percent).toLocaleString('en-US')} د.ع · سنة: ${periodPrice(formData.monthly_price, 12, formData.yearly_discount_percent).toLocaleString('en-US')} د.ع. لا يجتمع هذا الخصم مع عرض المشتركين الجدد، ويدفع العميل الأرخص منهما.`}
-              </p>
-              <SelectField
-                label="الحالة"
-                value={formData.enabled ? 'true' : 'false'}
-                options={[{ value: 'true', label: 'مفعلة' }, { value: 'false', label: 'معطلة' }]}
-                onChange={(value) => setFormData((current) => ({ ...current, enabled: value === 'true' }))}
-              />
-              <SelectField
-                label="الأكثر شيوعاً"
-                value={formData.most_popular ? 'true' : 'false'}
-                options={[{ value: 'false', label: 'لا' }, { value: 'true', label: 'نعم' }]}
-                onChange={(value) => setFormData((current) => ({ ...current, most_popular: value === 'true' }))}
-              />
-              <div className="md:col-span-2">
-                <TextAreaField label="الوصف" value={formData.description} rows={4} onChange={(value) => setFormData((current) => ({ ...current, description: value }))} />
-              </div>
-              {/* What the plan actually grants. None of these were on the form,
-                  so every one fell to its schema default: a plan created here got
-                  `code: null`, one seat, no AI editor and no mobile app, whatever
-                  the operator had in mind. Entitlement checks read these columns,
-                  and `upgradeAvailable` reads `code !== 'PLUS'`. */}
-              <FormField
-                label="الرمز (GO / PLUS) — يُستخدم للتحقق من المزايا"
-                value={formData.code ?? ''}
-                placeholder="اتركه فارغاً إن لم يكن باقة أساسية"
-                onChange={(value) => setFormData((current) => ({ ...current, code: value }))}
-              />
-              <FormField
-                label="ترتيب العرض"
-                type="number"
-                value={formData.order_number ?? ''}
-                onChange={(value) =>
-                  setFormData((current) => ({
-                    ...current,
-                    order_number: value === '' ? null : Number(value),
-                  }))
-                }
-              />
-              <FormField
-                label="عدد المستخدمين (يشمل المالك)"
-                type="number"
-                value={formData.max_users}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, max_users: Number(value) }))}
-              />
-              <FormField
-                label="رصيد توليد المتاجر شهرياً"
-                type="number"
-                value={formData.ai_store_credits}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, ai_store_credits: Number(value) }))}
-              />
-              <FormField
-                label="رصيد مساعد المحرر شهرياً (يُحسب بالتكلفة الفعلية)"
-                type="number"
-                value={formData.ai_editor_credits}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, ai_editor_credits: Number(value) }))}
-              />
-              <SelectField
-                label="محرر الذكاء الاصطناعي"
-                value={formData.has_ai_editor ? 'true' : 'false'}
-                options={YES_NO}
-                onChange={(value) => setFormData((current) => ({ ...current, has_ai_editor: value === 'true' }))}
-              />
-              <SelectField
-                label="تطبيق الهاتف"
-                value={formData.has_mobile_app ? 'true' : 'false'}
-                options={YES_NO}
-                onChange={(value) => setFormData((current) => ({ ...current, has_mobile_app: value === 'true' }))}
-              />
-              <SelectField
-                label="نقطة البيع POS"
-                value={formData.has_pos ? 'true' : 'false'}
-                options={YES_NO}
-                onChange={(value) => setFormData((current) => ({ ...current, has_pos: value === 'true' }))}
-              />
-              <SelectField
-                label="باقة مجانية"
-                value={formData.is_free ? 'true' : 'false'}
-                options={YES_NO}
-                onChange={(value) => setFormData((current) => ({ ...current, is_free: value === 'true' }))}
-              />
+            {/* One tab at a time: the form had some forty inputs and four help
+                boxes in one column. Only name and price are required, and both
+                sit on the first tab, so a hidden tab never blocks saving. */}
+            <div role="tablist" className="mb-5 flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1">
+              {PLAN_FORM_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={formTab === tab.key}
+                  onClick={() => setFormTab(tab.key)}
+                  className={`shrink-0 rounded-xl px-4 py-2 text-sm font-black transition ${
+                    formTab === tab.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-              {/* Caps. A store over one keeps what it has; only adding more is
-                  refused. Orders never block checkout: past the cap the merchant
-                  only sees an upgrade prompt. */}
-              <div className="md:col-span-2 rounded-2xl bg-slate-50 p-4 text-right">
-                <p className="text-sm font-black text-slate-800">حدود الباقة</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  اترك الحقل فارغاً ليكون بلا حدود. المتجر الذي تجاوز الحد يحتفظ بكل بياناته لكن لا يضيف المزيد، وتجاوز حد الطلبات لا يوقف الطلبات بل يظهر للتاجر دعوة للترقية.
-                </p>
+            {formTab === 'basics' && (
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <FormField label="اسم الباقة" value={formData.name} required onChange={(value) => setFormData((current) => ({ ...current, name: value }))} />
+                <FormField label="السعر الشهري (د.ع)" type="number" value={formData.monthly_price} required onChange={(value) => setFormData((current) => ({ ...current, monthly_price: Number(value) }))} />
+                <SwitchField
+                  label="الباقة مفعلة"
+                  checked={formData.enabled}
+                  onChange={(checked) => setFormData((current) => ({ ...current, enabled: checked }))}
+                />
+                <SwitchField
+                  label="الأكثر شيوعاً"
+                  checked={formData.most_popular}
+                  onChange={(checked) => setFormData((current) => ({ ...current, most_popular: checked }))}
+                />
+                <div className="md:col-span-2">
+                  <TextAreaField label="الوصف" value={formData.description} rows={3} onChange={(value) => setFormData((current) => ({ ...current, description: value }))} />
+                </div>
               </div>
-              {LIMIT_FIELDS.map((field) => (
-                <FormField
-                  key={field.key}
-                  label={field.label}
-                  type="number"
-                  value={formData[field.key] ?? ''}
-                  placeholder="بلا حدود"
-                  onChange={(value) =>
-                    setFormData((current) => ({ ...current, [field.key]: parseLimit(value) }))
+            )}
+
+            {formTab === 'pricing' && (
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {/* Picking a free month or a discount switches the offer on;
+                    clearing both switches it off. The server grants nothing
+                    while it is off. A plan saved with more free months keeps
+                    that number as its own option. */}
+                <SwitchField
+                  label="أول شهر مجاناً"
+                  checked={formData.promo_enabled && formData.promo_free_months > 0}
+                  onChange={(checked) =>
+                    setFormData((current) =>
+                      withPromo({
+                        ...current,
+                        // Keeps a count above one that was saved before.
+                        promo_free_months: checked ? Math.max(1, current.promo_free_months) : 0,
+                      }),
+                    )
                   }
                 />
-              ))}
-
-              <div className="md:col-span-2 rounded-2xl bg-slate-50 p-4 text-right">
-                <p className="text-sm font-black text-slate-800">التجربة المجانية والمزايا</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  التجربة مرة واحدة لكل حساب ولا تتجدد. تُستخدم فقط عندما لا تشمل الباقة الخدمة نفسها.
+                <div className="hidden md:block" />
+                <FormField
+                  label="خصم للمشتركين الجدد %"
+                  type="number"
+                  value={formData.promo_discount_percent}
+                  onChange={(value) => setFormData((current) => withPromo({ ...current, promo_discount_percent: Number(value) }))}
+                />
+                <FormField
+                  label="مدة الخصم (أشهر)"
+                  type="number"
+                  value={formData.promo_discount_months}
+                  onChange={(value) => setFormData((current) => withPromo({ ...current, promo_discount_months: Number(value) }))}
+                />
+                <FormField
+                  label="خصم 3 أشهر %"
+                  type="number"
+                  value={formData.quarterly_discount_percent}
+                  onChange={(value) => setFormData((current) => ({ ...current, quarterly_discount_percent: Number(value) }))}
+                />
+                <FormField
+                  label="خصم السنة %"
+                  type="number"
+                  value={formData.yearly_discount_percent}
+                  onChange={(value) => setFormData((current) => ({ ...current, yearly_discount_percent: Number(value) }))}
+                />
+                <p className="md:col-span-2 text-xs font-semibold text-slate-500">
+                  {`3 أشهر: ${periodPrice(formData.monthly_price, 3, formData.quarterly_discount_percent).toLocaleString('en-US')} د.ع · سنة: ${periodPrice(formData.monthly_price, 12, formData.yearly_discount_percent).toLocaleString('en-US')} د.ع`}
                 </p>
               </div>
-              <FormField
-                label="تجربة توليد متجر بالذكاء الاصطناعي (مرة واحدة)"
-                type="number"
-                value={formData.ai_store_trial}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, ai_store_trial: Number(value) }))}
-              />
-              <FormField
-                label="رسائل تجربة مساعد المحرر (مرة واحدة)"
-                type="number"
-                value={formData.ai_editor_trial}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, ai_editor_trial: Number(value) }))}
-              />
-              <SelectField
-                label="بكسلات الإعلانات (ميتا، تيك توك، سناب)"
-                value={formData.has_social_pixels ? 'true' : 'false'}
-                options={YES_NO}
-                onChange={(value) => setFormData((current) => ({ ...current, has_social_pixels: value === 'true' }))}
-              />
-              <SelectField
-                label="ربط نطاق خاص"
-                value={formData.has_custom_domain ? 'true' : 'false'}
-                options={YES_NO}
-                onChange={(value) => setFormData((current) => ({ ...current, has_custom_domain: value === 'true' }))}
-              />
+            )}
 
-              {/* The intro offer new customers get on monthly billing. The
-                  server bills from these columns, and the landing page shows
-                  them, so editing them changes both. */}
-              <div className="md:col-span-2 rounded-2xl bg-violet-50 p-4 text-right">
-                <p className="text-sm font-black text-violet-700">عرض المشتركين الجدد (الدفع الشهري)</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  أشهر مجانية للعميل الجديد، ثم أشهر بخصم، ثم السعر الكامل. يُمنح مرة واحدة لكل مالك مهما كان عدد متاجره. إيقاف العرض يحاسب الجميع بالسعر الكامل من دفعتهم القادمة.
-                </p>
-              </div>
-              <SelectField
-                label="تفعيل العرض"
-                value={formData.promo_enabled ? 'true' : 'false'}
-                options={YES_NO}
-                onChange={(value) => setFormData((current) => ({ ...current, promo_enabled: value === 'true' }))}
-              />
-              {/* The free first month as a plain switch. Turning it on also
-                  switches the offer on, since the server grants nothing while
-                  the offer is off. A plan saved with more free months keeps
-                  that number as its own option. */}
-              <SelectField
-                label="أول شهر مجاناً"
-                value={String(formData.promo_enabled ? formData.promo_free_months : 0)}
-                options={freeMonthOptions(formData.promo_free_months)}
-                onChange={(value) =>
-                  setFormData((current) => ({
-                    ...current,
-                    promo_free_months: Number(value),
-                    promo_enabled: Number(value) > 0 ? true : current.promo_enabled,
-                  }))
-                }
-              />
-              <FormField
-                label="أشهر الخصم بعد المجانية"
-                type="number"
-                value={formData.promo_discount_months}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, promo_discount_months: Number(value) }))}
-              />
-              <FormField
-                label="نسبة الخصم %"
-                type="number"
-                value={formData.promo_discount_percent}
-                required
-                onChange={(value) => setFormData((current) => ({ ...current, promo_discount_percent: Number(value) }))}
-              />
-
-              {/* Picked by id from the real rows. These were two comma-separated
-                  text boxes, and the server validates what it is sent as uuids —
-                  so creating a plan with any feature typed in failed, and editing
-                  one ignored the box because `featureIds` won. */}
-              <div className="md:col-span-2">
-                <CheckboxListField
-                  label="الميزات"
-                  hint={`${formData.featureIds.length} مختارة`}
-                  options={featureOptions}
-                  selected={formData.featureIds}
-                  onChange={(featureIds) => setFormData((current) => ({ ...current, featureIds }))}
-                  empty="لا توجد ميزات معرّفة — أضفها من قاعدة البيانات أولاً"
+            {formTab === 'limits' && (
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <p className="md:col-span-2 text-xs font-semibold text-slate-500">اترك الحقل فارغاً ليكون بلا حدود.</p>
+                {LIMIT_FIELDS.map((field) => (
+                  <FormField
+                    key={field.key}
+                    label={field.label}
+                    type="number"
+                    value={formData[field.key] ?? ''}
+                    placeholder="بلا حدود"
+                    onChange={(value) => setFormData((current) => ({ ...current, [field.key]: parseLimit(value) }))}
+                  />
+                ))}
+                <FormField
+                  label="عدد المستخدمين"
+                  type="number"
+                  value={formData.max_users}
+                  onChange={(value) => setFormData((current) => ({ ...current, max_users: Number(value) }))}
                 />
               </div>
-              <div className="md:col-span-2">
-                <CheckboxListField
-                  label="الموديولات"
-                  hint={`${formData.moduleIds.length} مختارة`}
-                  options={moduleOptions}
-                  selected={formData.moduleIds}
-                  onChange={(moduleIds) => setFormData((current) => ({ ...current, moduleIds }))}
-                  empty="لا توجد موديولات معرّفة"
+            )}
+
+            {formTab === 'features' && (
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <FormField
+                  label="متاجر بالذكاء الاصطناعي شهرياً"
+                  type="number"
+                  value={formData.ai_store_credits}
+                  onChange={(value) => setFormData((current) => ({ ...current, ai_store_credits: Number(value) }))}
+                />
+                <FormField
+                  label="تجربة مجانية (متاجر، مرة واحدة)"
+                  type="number"
+                  value={formData.ai_store_trial}
+                  onChange={(value) => setFormData((current) => ({ ...current, ai_store_trial: Number(value) }))}
+                />
+                <SwitchField
+                  label="مساعد المحرر الذكي"
+                  checked={formData.has_ai_editor}
+                  onChange={(checked) => setFormData((current) => ({ ...current, has_ai_editor: checked }))}
+                />
+                <FormField
+                  label="رصيد المساعد شهرياً"
+                  type="number"
+                  value={formData.ai_editor_credits}
+                  onChange={(value) => setFormData((current) => ({ ...current, ai_editor_credits: Number(value) }))}
+                />
+                <FormField
+                  label="تجربة مجانية (رسائل، مرة واحدة)"
+                  type="number"
+                  value={formData.ai_editor_trial}
+                  onChange={(value) => setFormData((current) => ({ ...current, ai_editor_trial: Number(value) }))}
+                />
+                <div className="hidden md:block" />
+                <SwitchField
+                  label="بكسلات الإعلانات"
+                  checked={formData.has_social_pixels}
+                  onChange={(checked) => setFormData((current) => ({ ...current, has_social_pixels: checked }))}
+                />
+                <SwitchField
+                  label="ربط نطاق خاص"
+                  checked={formData.has_custom_domain}
+                  onChange={(checked) => setFormData((current) => ({ ...current, has_custom_domain: checked }))}
+                />
+                <SwitchField
+                  label="تطبيق الهاتف"
+                  checked={formData.has_mobile_app}
+                  onChange={(checked) => setFormData((current) => ({ ...current, has_mobile_app: checked }))}
+                />
+                <SwitchField
+                  label="نقطة البيع POS"
+                  checked={formData.has_pos}
+                  onChange={(checked) => setFormData((current) => ({ ...current, has_pos: checked }))}
                 />
               </div>
-            </div>
+            )}
+
+            {/* Rarely touched: the machine key entitlement checks read
+                (`upgradeAvailable` reads `code !== 'PLUS'`), list order, the
+                free flag, and the feature and module rows picked by id. */}
+            {formTab === 'advanced' && (
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <FormField
+                  label="الرمز (BASIC / PLUS / GO)"
+                  value={formData.code ?? ''}
+                  placeholder="اتركه فارغاً"
+                  onChange={(value) => setFormData((current) => ({ ...current, code: value }))}
+                />
+                <FormField
+                  label="ترتيب العرض"
+                  type="number"
+                  value={formData.order_number ?? ''}
+                  onChange={(value) => setFormData((current) => ({ ...current, order_number: value === '' ? null : Number(value) }))}
+                />
+                <SwitchField
+                  label="باقة مجانية"
+                  checked={formData.is_free}
+                  onChange={(checked) => setFormData((current) => ({ ...current, is_free: checked }))}
+                />
+                <div className="hidden md:block" />
+                <div className="md:col-span-2">
+                  <CheckboxListField
+                    label="الميزات"
+                    hint={`${formData.featureIds.length} مختارة`}
+                    options={featureOptions}
+                    selected={formData.featureIds}
+                    onChange={(featureIds) => setFormData((current) => ({ ...current, featureIds }))}
+                    empty="لا توجد ميزات معرّفة"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <CheckboxListField
+                    label="الموديولات"
+                    hint={`${formData.moduleIds.length} مختارة`}
+                    options={moduleOptions}
+                    selected={formData.moduleIds}
+                    onChange={(moduleIds) => setFormData((current) => ({ ...current, moduleIds }))}
+                    empty="لا توجد موديولات معرّفة"
+                  />
+                </div>
+              </div>
+            )}
           </SideDrawer>
         </form>
       )}
@@ -815,13 +814,6 @@ const periodPrice = (monthly: number, months: number, percent: number) =>
 
 const limitText = (limit: number | null | undefined, unit: string) =>
   typeof limit === 'number' ? `${limit.toLocaleString('en-US')} ${unit}` : `${unit} بلا حدود`;
-
-/** «لا» / «نعم», plus the plan's own count when it was saved with more than one free month. */
-const freeMonthOptions = (current: number) => [
-  { value: '0', label: 'لا' },
-  { value: '1', label: 'نعم' },
-  ...(current > 1 ? [{ value: String(current), label: `أول ${current} أشهر مجاناً` }] : []),
-];
 
 /** The intro offer in words, or '' when it gives nothing. */
 const promoText = (plan: Plan) => {
