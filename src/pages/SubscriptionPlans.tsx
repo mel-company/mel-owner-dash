@@ -69,6 +69,9 @@ const defaultPlanForm: PlanPayload = {
   ai_editor_trial: 5,
   has_social_pixels: false,
   has_custom_domain: false,
+  has_online_payment: true,
+  has_courier_integrations: true,
+  has_advanced_stats: true,
   featureIds: [],
   moduleIds: [],
 };
@@ -121,8 +124,6 @@ const SubscriptionPlans = () => {
   const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
   const [formData, setFormData] = useState<PlanPayload>(defaultPlanForm);
   const [formTab, setFormTab] = useState<PlanFormTab>('basics');
-  const [featureLines, setFeatureLines] = useState<string[]>([]);
-  const [linesTouched, setLinesTouched] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -170,8 +171,6 @@ const SubscriptionPlans = () => {
   const openCreateDrawer = () => {
     setEditingPlan(null);
     setFormData(defaultPlanForm);
-    setFeatureLines([]);
-    setLinesTouched(false);
     setFormTab('basics');
     setShowDrawer(true);
   };
@@ -210,6 +209,10 @@ const SubscriptionPlans = () => {
       ai_editor_trial: plan.ai_editor_trial ?? 0,
       has_social_pixels: plan.has_social_pixels ?? false,
       has_custom_domain: plan.has_custom_domain ?? false,
+      // Absent on a server older than the columns, whose default is on.
+      has_online_payment: plan.has_online_payment ?? true,
+      has_courier_integrations: plan.has_courier_integrations ?? true,
+      has_advanced_stats: plan.has_advanced_stats ?? true,
       featureIds: plan.features?.map((item) => item.feature.id) || [],
       // `item.module.id`, not `item.id`: the server wraps each module in a join
       // row, exactly as it does features one line above. Reading the wrapper
@@ -217,8 +220,6 @@ const SubscriptionPlans = () => {
       // saved again.
       moduleIds: plan.modules?.map((item) => item.module.id) || [],
     });
-    setFeatureLines(extraFeatureLines(plan));
-    setLinesTouched(false);
     setFormTab('basics');
     setShowDrawer(true);
   };
@@ -243,9 +244,6 @@ const SubscriptionPlans = () => {
         formData.order_number === null || Number.isNaN(formData.order_number)
           ? null
           : Number(formData.order_number),
-      ...(linesTouched
-        ? { feature_lines: featureLines.map((line) => line.trim()).filter(Boolean) }
-        : {}),
     };
 
     try {
@@ -561,15 +559,23 @@ const SubscriptionPlans = () => {
                   checked={formData.has_pos}
                   onChange={(checked) => setFormData((current) => ({ ...current, has_pos: checked }))}
                 />
+                <SwitchField
+                  label="الدفع الإلكتروني"
+                  checked={formData.has_online_payment}
+                  onChange={(checked) => setFormData((current) => ({ ...current, has_online_payment: checked }))}
+                />
+                <SwitchField
+                  label="ربط شركات الشحن"
+                  checked={formData.has_courier_integrations}
+                  onChange={(checked) => setFormData((current) => ({ ...current, has_courier_integrations: checked }))}
+                />
+                <SwitchField
+                  label="الإحصائيات المتقدمة"
+                  checked={formData.has_advanced_stats}
+                  onChange={(checked) => setFormData((current) => ({ ...current, has_advanced_stats: checked }))}
+                />
                 <div className="md:col-span-2">
-                  <FeatureLinesEditor
-                    automatic={automaticFeatureLines(formData)}
-                    lines={featureLines}
-                    onChange={(lines) => {
-                      setFeatureLines(lines);
-                      setLinesTouched(true);
-                    }}
-                  />
+                  <FeatureLinesPreview lines={automaticFeatureLines(formData)} />
                 </div>
               </div>
             )}
@@ -610,6 +616,11 @@ type FeatureLineSource = Pick<
   | 'ai_editor_trial'
   | 'has_social_pixels'
   | 'has_custom_domain'
+  | 'has_online_payment'
+  | 'has_courier_integrations'
+  | 'has_advanced_stats'
+  | 'has_mobile_app'
+  | 'has_pos'
 >;
 
 const automaticFeatureLines = (plan: Partial<FeatureLineSource>): string[] => {
@@ -636,83 +647,38 @@ const automaticFeatureLines = (plan: Partial<FeatureLineSource>): string[] => {
       ? `${plan.ai_editor_credits ?? 20} رصيد شهرياً لمساعد المحرر الذكي`
       : `تجربة مساعد المحرر الذكي (${plan.ai_editor_trial ?? 5} رسائل)`,
   );
+  // `!== false`: these three default to on, and a server older than the
+  // columns leaves them out.
+  if (plan.has_online_payment !== false) lines.push('الدفع الإلكتروني: زين كاش وكي كارد');
+  if (plan.has_courier_integrations !== false) lines.push('ربط شركات الشحن وإرسال الطلبات تلقائياً');
+  if (plan.has_advanced_stats !== false) lines.push('إحصائيات وتقارير متقدمة');
   if (plan.has_social_pixels) lines.push('بكسلات الإعلانات: ميتا، تيك توك، سناب');
   if (plan.has_custom_domain) lines.push('ربط نطاقك الخاص (yourstore.com)');
-  lines.push('محرر المتجر وربط شركات الشحن');
+  if (plan.has_mobile_app) lines.push('تطبيق التاجر على الهاتف');
+  if (plan.has_pos) lines.push('نقطة البيع POS');
+  lines.push('محرر المتجر والدفع عند الاستلام');
   return lines;
 };
 
 /**
- * The written lines: extras listed after the automatic ones. A line that only
- * repeats an automatic one is dropped — lists saved before the split carried
- * the whole list, limits included.
+ * What the pricing page will list for the plan, read-only. Every line is a
+ * limit or a switch the backend enforces, so it changes only by changing the
+ * plan itself.
  */
-const extraFeatureLines = (plan: Partial<FeatureLineSource> & { feature_lines?: string[] }) => {
-  const automatic = new Set(automaticFeatureLines(plan));
-  return (plan.feature_lines ?? []).filter((line) => line.trim() && !automatic.has(line.trim()));
-};
-
-/** Everything the plan lists on the pricing page and its card. */
-const planFeatureLines = (plan: Plan) => [...automaticFeatureLines(plan), ...extraFeatureLines(plan)];
-
-/**
- * The plan's list on the pricing page. Lines that state a limit or a switch are
- * built from the plan's real values, so they cannot drift from what the store
- * is held to; only extra lines are free text.
- */
-const FeatureLinesEditor = ({
-  automatic,
-  lines,
-  onChange,
-}: {
-  automatic: string[];
-  lines: string[];
-  onChange: (lines: string[]) => void;
-}) => (
+const FeatureLinesPreview = ({ lines }: { lines: string[] }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-    <p className="text-sm font-black text-slate-800">المزايا في صفحة الباقات</p>
+    <p className="text-sm font-black text-slate-800">يظهر في صفحة الباقات</p>
     <p className="mt-0.5 mb-3 text-xs font-semibold text-slate-400">
-      هذه الأسطر تُكتب تلقائياً من الحدود والمزايا، وتتغير معها.
+      تُكتب من الحدود والمزايا أعلاه، ويطبّقها النظام على المتاجر.
     </p>
-    <ul className="mb-4 space-y-2">
-      {automatic.map((line) => (
+    <ul className="space-y-2">
+      {lines.map((line) => (
         <li key={line} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-600">
           <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
           {line}
         </li>
       ))}
     </ul>
-    <p className="mb-2 text-sm font-black text-slate-800">مزايا إضافية</p>
-    <div className="space-y-2">
-      {lines.map((line, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <input
-            value={line}
-            maxLength={120}
-            onChange={(event) => onChange(lines.map((item, i) => (i === index ? event.target.value : item)))}
-            className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500"
-          />
-          <button
-            type="button"
-            aria-label="حذف"
-            onClick={() => onChange(lines.filter((_, i) => i !== index))}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-red-50 text-red-500"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      ))}
-    </div>
-    {lines.length < 20 && (
-      <button
-        type="button"
-        onClick={() => onChange([...lines, ''])}
-        className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-blue-50 px-4 text-sm font-bold text-blue-700"
-      >
-        <Plus className="h-4 w-4" />
-        إضافة ميزة
-      </button>
-    )}
   </div>
 );
 
@@ -782,7 +748,7 @@ const PlanCard = ({ plan, onEdit, onDelete }: { plan: Plan; onEdit: (plan: Plan)
       {plan.has_custom_domain ? <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">نطاق خاص</span> : null}
     </div>
     <ul className="space-y-3">
-      {planFeatureLines(plan).slice(0, 6).map((line, index) => (
+      {automaticFeatureLines(plan).slice(0, 6).map((line, index) => (
         <li key={index} className="flex items-center gap-2 text-sm font-semibold text-slate-600">
           <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
           <span className="min-w-0">{line}</span>
