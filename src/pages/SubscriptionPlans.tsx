@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Crown, Layers3, Pencil, Plus, ReceiptText, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle, Crown, Eye, EyeOff, Layers3, Pencil, Plus, ReceiptText, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import {
+  cardLineItems,
+  cardLines,
+  configFromItems,
+  missingPlaceholders,
+  type CardLineItem,
+  type PlanCardLinesConfig,
+} from '@/lib/planCardLines';
 import {
   AlertMessage,
   ConfirmDeleteModal,
@@ -81,6 +89,7 @@ const PLAN_FORM_TABS = [
   { key: 'pricing', label: 'السعر والعروض' },
   { key: 'limits', label: 'الحدود' },
   { key: 'features', label: 'الذكاء والمزايا' },
+  { key: 'lines', label: 'سطور البطاقة' },
 ] as const;
 
 type PlanFormTab = (typeof PLAN_FORM_TABS)[number]['key'];
@@ -219,6 +228,7 @@ const SubscriptionPlans = () => {
       // produced `[undefined]`, so a plan with any module attached could not be
       // saved again.
       moduleIds: plan.modules?.map((item) => item.module.id) || [],
+      card_lines_config: configFromItems(plan.card_line_items),
     });
     setFormTab('basics');
     setShowDrawer(true);
@@ -232,6 +242,14 @@ const SubscriptionPlans = () => {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    const brokenLine = cardLineItems(formData, formData.card_lines_config).find(
+      (item) => missingPlaceholders(item).length,
+    );
+    if (brokenLine) {
+      setError(`سطر «${brokenLine.title}» يجب أن يحتوي ${missingPlaceholders(brokenLine).join(' و')} حتى يبقى الرقم مطابقاً للباقة`);
+      setFormTab('lines');
+      return;
+    }
     // The yearly price is the server's to work out from the monthly price and
     // the yearly discount; sending a stale one would only be ignored.
     const payload: PlanPayload = {
@@ -507,6 +525,14 @@ const SubscriptionPlans = () => {
               </div>
             )}
 
+            {formTab === 'lines' && (
+              <CardLinesEditor
+                plan={formData}
+                config={formData.card_lines_config ?? {}}
+                onChange={(config) => setFormData((current) => ({ ...current, card_lines_config: config }))}
+              />
+            )}
+
             {formTab === 'features' && (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <FormField
@@ -574,9 +600,6 @@ const SubscriptionPlans = () => {
                   checked={formData.has_advanced_stats}
                   onChange={(checked) => setFormData((current) => ({ ...current, has_advanced_stats: checked }))}
                 />
-                <div className="md:col-span-2">
-                  <FeatureLinesPreview lines={automaticFeatureLines(formData)} />
-                </div>
               </div>
             )}
 
@@ -599,88 +622,114 @@ const SubscriptionPlans = () => {
 };
 
 /**
- * The lines the pricing page builds from a plan's limits when no list was
- * written for it. A copy of `planFeatures` in mel.iq's PricingSection — keep
- * the two in sync — so the editor opens on exactly what the page shows.
+ * The plan card lines, each read from a limit or a switch the backend
+ * enforces. The operator rewords, hides and orders them; `{n}` stands for the
+ * plan's real number, so a changed limit changes its line too.
  */
-type FeatureLineSource = Pick<
-  Plan,
-  | 'max_products'
-  | 'max_categories'
-  | 'max_category_groups'
-  | 'max_coupons'
-  | 'max_monthly_orders'
-  | 'ai_store_credits'
-  | 'has_ai_editor'
-  | 'ai_editor_credits'
-  | 'ai_editor_trial'
-  | 'has_social_pixels'
-  | 'has_custom_domain'
-  | 'has_online_payment'
-  | 'has_courier_integrations'
-  | 'has_advanced_stats'
-  | 'has_mobile_app'
-  | 'has_pos'
->;
+const CardLinesEditor = ({
+  plan,
+  config,
+  onChange,
+}: {
+  plan: PlanPayload;
+  config: PlanCardLinesConfig;
+  onChange: (config: PlanCardLinesConfig) => void;
+}) => {
+  const items = cardLineItems(plan, config);
+  const setLine = (key: string, patch: { label?: string; hidden?: boolean }) => {
+    const current = config.lines?.[key] ?? {};
+    const next = { ...current, ...patch };
+    if (next.label === undefined) delete next.label;
+    if (!next.hidden) delete next.hidden;
+    const lines = { ...config.lines };
+    if (Object.keys(next).length) lines[key] = next;
+    else delete lines[key];
+    onChange({ ...config, lines });
+  };
+  const move = (index: number, by: -1 | 1) => {
+    const order = items.map((item) => item.key);
+    const target = index + by;
+    if (target < 0 || target >= order.length) return;
+    [order[index], order[target]] = [order[target], order[index]];
+    onChange({ ...config, order });
+  };
 
-const automaticFeatureLines = (plan: Partial<FeatureLineSource>): string[] => {
-  const cap = (limit: number | null | undefined, capped: (n: number) => string, unlimited: string) =>
-    typeof limit === 'number' ? capped(limit) : unlimited;
-  const lines = [
-    cap(plan.max_products, (n) => `حتى ${n} منتج`, 'منتجات بلا حدود'),
-    cap(
-      plan.max_categories,
-      (n) => `حتى ${n} أقسام و${plan.max_category_groups ?? 5} مجموعات أقسام`,
-      'أقسام ومجموعات أقسام بلا حدود',
-    ),
-    cap(plan.max_monthly_orders, (n) => `${n} طلب شهرياً`, 'طلبات بلا حدود'),
-    cap(plan.max_coupons, (n) => `${n} كوبونات خصم`, 'كوبونات بلا حدود'),
-  ];
-  const storeCredits = Number(plan.ai_store_credits ?? 0);
-  lines.push(
-    storeCredits > 0
-      ? `${storeCredits} متاجر بالذكاء الاصطناعي شهرياً`
-      : 'تجربة مجانية لإنشاء متجر بالذكاء الاصطناعي',
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold text-slate-400">
+        كل سطر مأخوذ من حدود ومزايا الباقة. اكتب {'{n}'} مكان الرقم ليبقى مطابقاً للباقة.
+      </p>
+      <ul className="space-y-2">
+        {items.map((item, index) => (
+          <CardLineRow
+            key={item.key}
+            item={item}
+            first={index === 0}
+            last={index === items.length - 1}
+            onMove={(by) => move(index, by)}
+            onLabel={(label) => setLine(item.key, { label: label === item.default_template ? undefined : label })}
+            onHidden={(hidden) => setLine(item.key, { hidden })}
+          />
+        ))}
+      </ul>
+    </div>
   );
-  lines.push(
-    plan.has_ai_editor
-      ? `${plan.ai_editor_credits ?? 20} رصيد شهرياً لمساعد المحرر الذكي`
-      : `تجربة مساعد المحرر الذكي (${plan.ai_editor_trial ?? 5} رسائل)`,
-  );
-  // `!== false`: these three default to on, and a server older than the
-  // columns leaves them out.
-  if (plan.has_online_payment !== false) lines.push('الدفع الإلكتروني: زين كاش وكي كارد');
-  if (plan.has_courier_integrations !== false) lines.push('ربط شركات الشحن وإرسال الطلبات تلقائياً');
-  if (plan.has_advanced_stats !== false) lines.push('إحصائيات وتقارير متقدمة');
-  if (plan.has_social_pixels) lines.push('بكسلات الإعلانات: ميتا، تيك توك، سناب');
-  if (plan.has_custom_domain) lines.push('ربط نطاقك الخاص (yourstore.com)');
-  if (plan.has_mobile_app) lines.push('تطبيق التاجر على الهاتف');
-  if (plan.has_pos) lines.push('نقطة البيع POS');
-  lines.push('محرر المتجر والدفع عند الاستلام');
-  return lines;
 };
 
-/**
- * What the pricing page will list for the plan, read-only. Every line is a
- * limit or a switch the backend enforces, so it changes only by changing the
- * plan itself.
- */
-const FeatureLinesPreview = ({ lines }: { lines: string[] }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-    <p className="text-sm font-black text-slate-800">يظهر في صفحة الباقات</p>
-    <p className="mt-0.5 mb-3 text-xs font-semibold text-slate-400">
-      تُكتب من الحدود والمزايا أعلاه، ويطبّقها النظام على المتاجر.
-    </p>
-    <ul className="space-y-2">
-      {lines.map((line) => (
-        <li key={line} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-600">
-          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
-          {line}
-        </li>
-      ))}
-    </ul>
-  </div>
-);
+const CardLineRow = ({
+  item,
+  first,
+  last,
+  onMove,
+  onLabel,
+  onHidden,
+}: {
+  item: CardLineItem;
+  first: boolean;
+  last: boolean;
+  onMove: (by: -1 | 1) => void;
+  onLabel: (label: string) => void;
+  onHidden: (hidden: boolean) => void;
+}) => {
+  const missing = missingPlaceholders(item);
+  const iconButton = 'grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30';
+  return (
+    <li className={`rounded-xl border p-3 ${item.hidden ? 'border-dashed border-slate-200 bg-slate-50/60' : 'border-slate-200 bg-white'}`}>
+      <div className="mb-2 flex items-center gap-1">
+        <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-500">{item.title}</span>
+        <button type="button" className={iconButton} disabled={first} onClick={() => onMove(-1)} aria-label="للأعلى"><ArrowUp className="h-4 w-4" /></button>
+        <button type="button" className={iconButton} disabled={last} onClick={() => onMove(1)} aria-label="للأسفل"><ArrowDown className="h-4 w-4" /></button>
+        {item.template !== item.default_template && (
+          <button type="button" className={iconButton} onClick={() => onLabel(item.default_template)} aria-label="النص الأصلي"><RotateCcw className="h-4 w-4" /></button>
+        )}
+        <button
+          type="button"
+          className={`${iconButton} ${item.hidden ? '' : 'text-blue-600'}`}
+          onClick={() => onHidden(!item.hidden)}
+          aria-label={item.hidden ? 'إظهار' : 'إخفاء'}
+        >
+          {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+      <input
+        value={item.template}
+        onChange={(event) => onLabel(event.target.value)}
+        maxLength={120}
+        className={`h-10 w-full rounded-lg border bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 ${missing.length ? 'border-red-300' : 'border-slate-200'}`}
+      />
+      {missing.length ? (
+        <p className="mt-1.5 text-xs font-bold text-red-500">أضف {missing.join(' و')} ليظهر رقم الباقة</p>
+      ) : (
+        item.text !== item.template && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+            <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+            {item.text}
+          </p>
+        )
+      )}
+    </li>
+  );
+};
 
 /**
  * The page is RTL, so the card is laid out from the right: icon first, then the
@@ -748,7 +797,7 @@ const PlanCard = ({ plan, onEdit, onDelete }: { plan: Plan; onEdit: (plan: Plan)
       {plan.has_custom_domain ? <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">نطاق خاص</span> : null}
     </div>
     <ul className="space-y-3">
-      {automaticFeatureLines(plan).slice(0, 6).map((line, index) => (
+      {(plan.card_lines ?? cardLines(plan, undefined)).slice(0, 6).map((line, index) => (
         <li key={index} className="flex items-center gap-2 text-sm font-semibold text-slate-600">
           <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
           <span className="min-w-0">{line}</span>

@@ -1,3 +1,4 @@
+import type { CardLineItem, PlanCardLinesConfig } from '@/lib/planCardLines';
 import axiosInstance from '../utils/AxiosInstance';
 
 export interface PlanFeature {
@@ -71,6 +72,10 @@ export interface Plan {
   has_online_payment?: boolean;
   has_courier_integrations?: boolean;
   has_advanced_stats?: boolean;
+  /** What the plan card lists, built by the server from the columns. */
+  card_lines?: string[];
+  /** Every line that applies, hidden ones too, with its wording template. */
+  card_line_items?: CardLineItem[];
   features: PlanFeature[];
   modules: PlanModule[];
   _count?: {
@@ -151,6 +156,8 @@ export interface PlanPayload {
   has_online_payment: boolean;
   has_courier_integrations: boolean;
   has_advanced_stats: boolean;
+  /** Wording, visibility and order of the card lines. */
+  card_lines_config?: PlanCardLinesConfig;
   featureIds: string[];
   moduleIds: string[];
 }
