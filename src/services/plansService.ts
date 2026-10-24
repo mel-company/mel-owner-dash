@@ -67,6 +67,8 @@ export interface Plan {
   ai_editor_trial?: number;
   has_social_pixels?: boolean;
   has_custom_domain?: boolean;
+  /** The lines the pricing page lists under the plan; empty = built from its limits. */
+  feature_lines?: string[];
   features: PlanFeature[];
   modules: PlanModule[];
   _count?: {
@@ -144,6 +146,8 @@ export interface PlanPayload {
   ai_editor_trial: number;
   has_social_pixels: boolean;
   has_custom_domain: boolean;
+  /** Sent only when edited, so saving a price never freezes the automatic lines. */
+  feature_lines?: string[];
   featureIds: string[];
   moduleIds: string[];
 }

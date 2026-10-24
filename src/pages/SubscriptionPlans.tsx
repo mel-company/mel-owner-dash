@@ -21,7 +21,6 @@ import {
   plansService,
   type EditorPricing,
   type Plan,
-  type PlanFeature,
   type PlanPayload,
 } from '../services/plansService';
 import { systemSubscriptionsService, type Subscription } from '../services/systemSubscriptionsService';
@@ -122,6 +121,9 @@ const SubscriptionPlans = () => {
   const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
   const [formData, setFormData] = useState<PlanPayload>(defaultPlanForm);
   const [formTab, setFormTab] = useState<PlanFormTab>('basics');
+  const [featureLines, setFeatureLines] = useState<string[]>([]);
+  const [linesTouched, setLinesTouched] = useState(false);
+  const [linesAuto, setLinesAuto] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -169,6 +171,9 @@ const SubscriptionPlans = () => {
   const openCreateDrawer = () => {
     setEditingPlan(null);
     setFormData(defaultPlanForm);
+    setFeatureLines([]);
+    setLinesTouched(false);
+    setLinesAuto(true);
     setFormTab('basics');
     setShowDrawer(true);
   };
@@ -214,6 +219,9 @@ const SubscriptionPlans = () => {
       // saved again.
       moduleIds: plan.modules?.map((item) => item.module.id) || [],
     });
+    setFeatureLines(plan.feature_lines?.length ? plan.feature_lines : automaticFeatureLines(plan));
+    setLinesAuto(!plan.feature_lines?.length);
+    setLinesTouched(false);
     setFormTab('basics');
     setShowDrawer(true);
   };
@@ -238,6 +246,9 @@ const SubscriptionPlans = () => {
         formData.order_number === null || Number.isNaN(formData.order_number)
           ? null
           : Number(formData.order_number),
+      ...(linesTouched
+        ? { feature_lines: linesAuto ? [] : featureLines.map((line) => line.trim()).filter(Boolean) }
+        : {}),
     };
 
     try {
@@ -553,6 +564,22 @@ const SubscriptionPlans = () => {
                   checked={formData.has_pos}
                   onChange={(checked) => setFormData((current) => ({ ...current, has_pos: checked }))}
                 />
+                <div className="md:col-span-2">
+                  <FeatureLinesEditor
+                    lines={featureLines}
+                    automatic={linesAuto}
+                    onChange={(lines) => {
+                      setFeatureLines(lines);
+                      setLinesAuto(false);
+                      setLinesTouched(true);
+                    }}
+                    onReset={() => {
+                      setFeatureLines(automaticFeatureLines(formData));
+                      setLinesAuto(true);
+                      setLinesTouched(true);
+                    }}
+                  />
+                </div>
               </div>
             )}
 
@@ -573,6 +600,115 @@ const SubscriptionPlans = () => {
     </div>
   );
 };
+
+/**
+ * The lines the pricing page builds from a plan's limits when no list was
+ * written for it. A copy of `planFeatures` in mel.iq's PricingSection — keep
+ * the two in sync — so the editor opens on exactly what the page shows.
+ */
+type FeatureLineSource = Pick<
+  Plan,
+  | 'max_products'
+  | 'max_categories'
+  | 'max_category_groups'
+  | 'max_coupons'
+  | 'max_monthly_orders'
+  | 'ai_store_credits'
+  | 'has_ai_editor'
+  | 'ai_editor_credits'
+  | 'ai_editor_trial'
+  | 'has_social_pixels'
+  | 'has_custom_domain'
+>;
+
+const automaticFeatureLines = (plan: Partial<FeatureLineSource>): string[] => {
+  const cap = (limit: number | null | undefined, capped: (n: number) => string, unlimited: string) =>
+    typeof limit === 'number' ? capped(limit) : unlimited;
+  const lines = [
+    cap(plan.max_products, (n) => `حتى ${n} منتج`, 'منتجات بلا حدود'),
+    cap(
+      plan.max_categories,
+      (n) => `حتى ${n} أقسام و${plan.max_category_groups ?? 5} مجموعات أقسام`,
+      'أقسام ومجموعات أقسام بلا حدود',
+    ),
+    cap(plan.max_monthly_orders, (n) => `${n} طلب شهرياً`, 'طلبات بلا حدود'),
+    cap(plan.max_coupons, (n) => `${n} كوبونات خصم`, 'كوبونات بلا حدود'),
+  ];
+  const storeCredits = Number(plan.ai_store_credits ?? 0);
+  lines.push(
+    storeCredits > 0
+      ? `${storeCredits} متاجر بالذكاء الاصطناعي شهرياً`
+      : 'تجربة مجانية لإنشاء متجر بالذكاء الاصطناعي',
+  );
+  lines.push(
+    plan.has_ai_editor
+      ? `${plan.ai_editor_credits ?? 20} رصيد شهرياً لمساعد المحرر الذكي`
+      : `تجربة مساعد المحرر الذكي (${plan.ai_editor_trial ?? 5} رسائل)`,
+  );
+  if (plan.has_social_pixels) lines.push('بكسلات الإعلانات: ميتا، تيك توك، سناب');
+  if (plan.has_custom_domain) lines.push('ربط نطاقك الخاص (yourstore.com)');
+  lines.push('محرر المتجر وربط شركات الشحن');
+  return lines;
+};
+
+/** The plan's list on the pricing page: one line per row, in order. */
+const FeatureLinesEditor = ({
+  lines,
+  automatic,
+  onChange,
+  onReset,
+}: {
+  lines: string[];
+  automatic: boolean;
+  onChange: (lines: string[]) => void;
+  onReset: () => void;
+}) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <div>
+        <p className="text-sm font-black text-slate-800">المزايا في صفحة الباقات</p>
+        <p className="mt-0.5 text-xs font-semibold text-slate-400">
+          {automatic ? 'تلقائية من حدود الباقة. عدّل أي سطر لتصبح القائمة يدوية.' : 'قائمة يدوية تظهر كما هي.'}
+        </p>
+      </div>
+      {!automatic && (
+        <button type="button" onClick={onReset} className="shrink-0 text-xs font-bold text-blue-600">
+          رجوع للتلقائي
+        </button>
+      )}
+    </div>
+    <div className="space-y-2">
+      {lines.map((line, index) => (
+        <div key={index} className="flex items-center gap-2">
+          <input
+            value={line}
+            maxLength={120}
+            onChange={(event) => onChange(lines.map((item, i) => (i === index ? event.target.value : item)))}
+            className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500"
+          />
+          <button
+            type="button"
+            aria-label="حذف"
+            onClick={() => onChange(lines.filter((_, i) => i !== index))}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-red-50 text-red-500"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+    </div>
+    {lines.length < 20 && (
+      <button
+        type="button"
+        onClick={() => onChange([...lines, ''])}
+        className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-blue-50 px-4 text-sm font-bold text-blue-700"
+      >
+        <Plus className="h-4 w-4" />
+        إضافة ميزة
+      </button>
+    )}
+  </div>
+);
 
 /**
  * The page is RTL, so the card is laid out from the right: icon first, then the
@@ -640,16 +776,12 @@ const PlanCard = ({ plan, onEdit, onDelete }: { plan: Plan; onEdit: (plan: Plan)
       {plan.has_custom_domain ? <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">نطاق خاص</span> : null}
     </div>
     <ul className="space-y-3">
-      {Array.isArray(plan.features) && plan.features.length > 0 ? (
-        plan.features.slice(0, 5).map((feature: PlanFeature) => (
-          <li key={feature.feature.id} className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-            <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
-            <span className="min-w-0">{renderText(feature.feature.name)}</span>
-          </li>
-        ))
-      ) : (
-        <li className="text-sm font-semibold text-slate-400">لا توجد ميزات</li>
-      )}
+      {(plan.feature_lines?.length ? plan.feature_lines : automaticFeatureLines(plan)).slice(0, 6).map((line, index) => (
+        <li key={index} className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
+          <span className="min-w-0">{line}</span>
+        </li>
+      ))}
     </ul>
     {/* `mt-auto`: cards in a row stretch to the tallest, so the buttons line up
         along the bottom instead of floating under a short feature list. */}
