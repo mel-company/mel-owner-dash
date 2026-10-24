@@ -123,7 +123,6 @@ const SubscriptionPlans = () => {
   const [formTab, setFormTab] = useState<PlanFormTab>('basics');
   const [featureLines, setFeatureLines] = useState<string[]>([]);
   const [linesTouched, setLinesTouched] = useState(false);
-  const [linesAuto, setLinesAuto] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -173,7 +172,6 @@ const SubscriptionPlans = () => {
     setFormData(defaultPlanForm);
     setFeatureLines([]);
     setLinesTouched(false);
-    setLinesAuto(true);
     setFormTab('basics');
     setShowDrawer(true);
   };
@@ -219,8 +217,7 @@ const SubscriptionPlans = () => {
       // saved again.
       moduleIds: plan.modules?.map((item) => item.module.id) || [],
     });
-    setFeatureLines(plan.feature_lines?.length ? plan.feature_lines : automaticFeatureLines(plan));
-    setLinesAuto(!plan.feature_lines?.length);
+    setFeatureLines(extraFeatureLines(plan));
     setLinesTouched(false);
     setFormTab('basics');
     setShowDrawer(true);
@@ -247,7 +244,7 @@ const SubscriptionPlans = () => {
           ? null
           : Number(formData.order_number),
       ...(linesTouched
-        ? { feature_lines: linesAuto ? [] : featureLines.map((line) => line.trim()).filter(Boolean) }
+        ? { feature_lines: featureLines.map((line) => line.trim()).filter(Boolean) }
         : {}),
     };
 
@@ -566,16 +563,10 @@ const SubscriptionPlans = () => {
                 />
                 <div className="md:col-span-2">
                   <FeatureLinesEditor
+                    automatic={automaticFeatureLines(formData)}
                     lines={featureLines}
-                    automatic={linesAuto}
                     onChange={(lines) => {
                       setFeatureLines(lines);
-                      setLinesAuto(false);
-                      setLinesTouched(true);
-                    }}
-                    onReset={() => {
-                      setFeatureLines(automaticFeatureLines(formData));
-                      setLinesAuto(true);
                       setLinesTouched(true);
                     }}
                   />
@@ -651,32 +642,47 @@ const automaticFeatureLines = (plan: Partial<FeatureLineSource>): string[] => {
   return lines;
 };
 
-/** The plan's list on the pricing page: one line per row, in order. */
+/**
+ * The written lines: extras listed after the automatic ones. A line that only
+ * repeats an automatic one is dropped — lists saved before the split carried
+ * the whole list, limits included.
+ */
+const extraFeatureLines = (plan: Partial<FeatureLineSource> & { feature_lines?: string[] }) => {
+  const automatic = new Set(automaticFeatureLines(plan));
+  return (plan.feature_lines ?? []).filter((line) => line.trim() && !automatic.has(line.trim()));
+};
+
+/** Everything the plan lists on the pricing page and its card. */
+const planFeatureLines = (plan: Plan) => [...automaticFeatureLines(plan), ...extraFeatureLines(plan)];
+
+/**
+ * The plan's list on the pricing page. Lines that state a limit or a switch are
+ * built from the plan's real values, so they cannot drift from what the store
+ * is held to; only extra lines are free text.
+ */
 const FeatureLinesEditor = ({
-  lines,
   automatic,
+  lines,
   onChange,
-  onReset,
 }: {
+  automatic: string[];
   lines: string[];
-  automatic: boolean;
   onChange: (lines: string[]) => void;
-  onReset: () => void;
 }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-    <div className="mb-3 flex items-center justify-between gap-3">
-      <div>
-        <p className="text-sm font-black text-slate-800">المزايا في صفحة الباقات</p>
-        <p className="mt-0.5 text-xs font-semibold text-slate-400">
-          {automatic ? 'تلقائية من حدود الباقة. عدّل أي سطر لتصبح القائمة يدوية.' : 'قائمة يدوية تظهر كما هي.'}
-        </p>
-      </div>
-      {!automatic && (
-        <button type="button" onClick={onReset} className="shrink-0 text-xs font-bold text-blue-600">
-          رجوع للتلقائي
-        </button>
-      )}
-    </div>
+    <p className="text-sm font-black text-slate-800">المزايا في صفحة الباقات</p>
+    <p className="mt-0.5 mb-3 text-xs font-semibold text-slate-400">
+      هذه الأسطر تُكتب تلقائياً من الحدود والمزايا، وتتغير معها.
+    </p>
+    <ul className="mb-4 space-y-2">
+      {automatic.map((line) => (
+        <li key={line} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-600">
+          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
+          {line}
+        </li>
+      ))}
+    </ul>
+    <p className="mb-2 text-sm font-black text-slate-800">مزايا إضافية</p>
     <div className="space-y-2">
       {lines.map((line, index) => (
         <div key={index} className="flex items-center gap-2">
@@ -776,7 +782,7 @@ const PlanCard = ({ plan, onEdit, onDelete }: { plan: Plan; onEdit: (plan: Plan)
       {plan.has_custom_domain ? <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">نطاق خاص</span> : null}
     </div>
     <ul className="space-y-3">
-      {(plan.feature_lines?.length ? plan.feature_lines : automaticFeatureLines(plan)).slice(0, 6).map((line, index) => (
+      {planFeatureLines(plan).slice(0, 6).map((line, index) => (
         <li key={index} className="flex items-center gap-2 text-sm font-semibold text-slate-600">
           <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
           <span className="min-w-0">{line}</span>
