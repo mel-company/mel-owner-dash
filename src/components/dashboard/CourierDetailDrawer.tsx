@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { SideDrawer, StatTile, StatusPill } from './index';
 import { CourierLogo } from './CourierLogo';
+import { AlzaeemSettingsCard } from './AlzaeemSettingsCard';
 import {
   courierService,
   type CourierDetailStats,
@@ -438,62 +439,68 @@ export const CourierDetailDrawer = ({
           )}
         </section>
 
-        <section
-          className="rounded-3xl bg-slate-50/70 p-5 ring-1 ring-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
-          style={{ animationDelay: '240ms', animationFillMode: 'both' }}
-        >
-          <h3 className="mb-1 text-sm font-black text-slate-700">
-            معلومات الاتصال
-          </h3>
-          <p className="mb-3 text-xs font-semibold text-slate-400">
-            أسماء المتغيّرات فقط — لا تُعرض أي قيمة سرية هنا ولا يرجعها الخادم.
-          </p>
+        {/* Al-Zaeem's login is saved here, not in environment variables;
+            saving re-checks the connection with it. */}
+        {courier.code === 'alzaeem' ? (
+          <AlzaeemSettingsCard onSaved={probe} />
+        ) : (
+          <section
+            className="rounded-3xl bg-slate-50/70 p-5 ring-1 ring-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
+            style={{ animationDelay: '240ms', animationFillMode: 'both' }}
+          >
+            <h3 className="mb-1 text-sm font-black text-slate-700">
+              معلومات الاتصال
+            </h3>
+            <p className="mb-3 text-xs font-semibold text-slate-400">
+              أسماء المتغيّرات فقط — لا تُعرض أي قيمة سرية هنا ولا يرجعها الخادم.
+            </p>
 
-          <ul className="space-y-1.5">
-            {health.presentEnv.map((name) => (
-              <li
-                key={name}
-                className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2"
-              >
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                <span
-                  className="truncate font-mono text-xs font-semibold text-slate-600"
-                  dir="ltr"
+            <ul className="space-y-1.5">
+              {health.presentEnv.map((name) => (
+                <li
+                  key={name}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2"
                 >
-                  {name}
-                </span>
-              </li>
-            ))}
-            {health.missingEnv.map((name) => (
-              <li
-                key={name}
-                className="flex items-center justify-between gap-3 rounded-xl bg-orange-50 px-3 py-2"
-              >
-                <XCircle className="h-4 w-4 shrink-0 text-orange-500" />
-                <span
-                  className="truncate font-mono text-xs font-semibold text-orange-700"
-                  dir="ltr"
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                  <span
+                    className="truncate font-mono text-xs font-semibold text-slate-600"
+                    dir="ltr"
+                  >
+                    {name}
+                  </span>
+                </li>
+              ))}
+              {health.missingEnv.map((name) => (
+                <li
+                  key={name}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-orange-50 px-3 py-2"
                 >
-                  {name}
-                </span>
-              </li>
-            ))}
-          </ul>
+                  <XCircle className="h-4 w-4 shrink-0 text-orange-500" />
+                  <span
+                    className="truncate font-mono text-xs font-semibold text-orange-700"
+                    dir="ltr"
+                  >
+                    {name}
+                  </span>
+                </li>
+              ))}
+            </ul>
 
-          <div className="mt-3 flex items-center justify-between gap-3 text-xs font-bold">
-            <span className="font-mono text-slate-400" dir="ltr">
-              {health.baseUrl}
-            </span>
-            {/* A courier on a vendor sandbox passes every probe and cannot
-                carry a real parcel. Nothing else in the platform says so. */}
-            {!health.production && health.configured && (
-              <span className="flex items-center gap-1 text-amber-600">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                بيئة تجريبية
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs font-bold">
+              <span className="font-mono text-slate-400" dir="ltr">
+                {health.baseUrl}
               </span>
-            )}
-          </div>
-        </section>
+              {/* A courier on a vendor sandbox passes every probe and cannot
+                  carry a real parcel. Nothing else in the platform says so. */}
+              {!health.production && health.configured && (
+                <span className="flex items-center gap-1 text-amber-600">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  بيئة تجريبية
+                </span>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </SideDrawer>
   );
