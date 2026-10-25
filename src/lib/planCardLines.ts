@@ -129,10 +129,19 @@ export const CARD_LINE_DEFINITIONS: LineDefinition[] = [
 ];
 
 export type CardLineSetting = { label?: string; hidden?: boolean };
+/**
+ * A line the operator wrote themselves (support, onboarding, ...). Nothing in
+ * the backend enforces it, so the admin marks it as text only.
+ */
+export type CustomCardLine = { id: string; label: string };
 export type PlanCardLinesConfig = {
   order?: string[];
   lines?: Record<string, CardLineSetting>;
+  custom?: CustomCardLine[];
 };
+
+export const CUSTOM_LINE_PREFIX = 'custom_';
+export const MAX_CUSTOM_LINES = 20;
 
 export type CardLineItem = {
   key: string;
@@ -144,6 +153,8 @@ export type CardLineItem = {
   /** The wording with the plan's real numbers in. */
   text: string;
   hidden: boolean;
+  /** Written by the operator, not read from a plan column. */
+  custom: boolean;
 };
 
 const fill = (template: string, values: Record<string, number>) =>
@@ -165,7 +176,7 @@ export function cardLineItems(
     const at = order.indexOf(key);
     return at === -1 ? order.length + CARD_LINE_DEFINITIONS.findIndex((d) => d.key === key) : at;
   };
-  return CARD_LINE_DEFINITIONS.flatMap((definition) => {
+  const builtIn: CardLineItem[] = CARD_LINE_DEFINITIONS.flatMap((definition) => {
     const values = definition.values(plan);
     if (!values) return [];
     const setting = config?.lines?.[definition.key] ?? {};
@@ -180,15 +191,32 @@ export function cardLineItems(
         placeholders: definition.placeholders,
         text: fill(template, values),
         hidden: setting.hidden === true,
+        custom: false,
       },
     ];
-  }).sort((a, b) => rank(a.key) - rank(b.key));
+  });
+  const custom: CardLineItem[] = (Array.isArray(config?.custom) ? config!.custom : [])
+    .filter((line) => typeof line?.label === 'string')
+    .map((line) => ({
+      key: `${CUSTOM_LINE_PREFIX}${line.id}`,
+      title: 'سطر مخصص',
+      template: line.label.trim(),
+      default_template: line.label.trim(),
+      placeholders: [],
+      text: line.label.trim(),
+      hidden: false,
+      custom: true,
+    }));
+  // A custom line never placed goes after everything else.
+  const rankOf = (item: CardLineItem) =>
+    item.custom && !order.includes(item.key) ? Number.MAX_SAFE_INTEGER : rank(item.key);
+  return [...builtIn, ...custom].sort((a, b) => rankOf(a) - rankOf(b));
 }
 
 /** What a card shows: the visible lines' text, in order. */
 export const cardLines = (plan: CardLinePlan, config: PlanCardLinesConfig | undefined) =>
   cardLineItems(plan, config)
-    .filter((item) => !item.hidden)
+    .filter((item) => !item.hidden && item.text)
     .map((item) => item.text);
 
 /** Placeholders a wording dropped; non-empty means the form can't save it. */
@@ -199,11 +227,16 @@ export const missingPlaceholders = (item: Pick<CardLineItem, 'template' | 'place
 export const configFromItems = (items: CardLineItem[] | undefined): PlanCardLinesConfig => {
   if (!items?.length) return {};
   const lines: Record<string, CardLineSetting> = {};
+  const custom: CustomCardLine[] = [];
   for (const item of items) {
+    if (item.custom) {
+      custom.push({ id: item.key.slice(CUSTOM_LINE_PREFIX.length), label: item.template });
+      continue;
+    }
     const setting: CardLineSetting = {};
     if (item.template !== item.default_template) setting.label = item.template;
     if (item.hidden) setting.hidden = true;
     if (Object.keys(setting).length) lines[item.key] = setting;
   }
-  return { order: items.map((item) => item.key), lines };
+  return { order: items.map((item) => item.key), lines, custom };
 };
