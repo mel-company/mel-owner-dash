@@ -403,22 +403,25 @@ const SubscriptionPlans = () => {
           >
             {/* One tab at a time: the form had some forty inputs and four help
                 boxes in one column. Only name and price are required, and both
-                sit on the first tab, so a hidden tab never blocks saving. */}
-            <div role="tablist" className="mb-5 flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1">
-              {PLAN_FORM_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={formTab === tab.key}
-                  onClick={() => setFormTab(tab.key)}
-                  className={`shrink-0 rounded-xl px-4 py-2 text-sm font-black transition ${
-                    formTab === tab.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+                sit on the first tab, so a hidden tab never blocks saving.
+                Sticky, on a white band, so the tabs stay in reach on a long tab. */}
+            <div className="sticky top-0 z-10 bg-white pb-5">
+              <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1">
+                {PLAN_FORM_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={formTab === tab.key}
+                    onClick={() => setFormTab(tab.key)}
+                    className={`shrink-0 rounded-xl px-4 py-2 text-sm font-black transition ${
+                      formTab === tab.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {formTab === 'basics' && (
