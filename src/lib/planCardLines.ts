@@ -155,7 +155,28 @@ export type CardLineItem = {
   hidden: boolean;
   /** Written by the operator, not read from a plan column. */
   custom: boolean;
+  /**
+   * Follows a number on the plan (a limit or an AI allowance): the operator
+   * may hide it but not delete it.
+   */
+  dynamic: boolean;
 };
+
+/** Lines that follow a limit or an AI allowance. */
+const DYNAMIC_LINE_KEYS = new Set([
+  'products',
+  'products_unlimited',
+  'categories',
+  'categories_unlimited',
+  'orders',
+  'orders_unlimited',
+  'coupons',
+  'coupons_unlimited',
+  'ai_stores',
+  'ai_stores_trial',
+  'ai_editor',
+  'ai_editor_trial',
+]);
 
 const fill = (template: string, values: Record<string, number>) =>
   template.replace(/\{(\w+)\}/g, (match, name: string) =>
@@ -192,6 +213,7 @@ export function cardLineItems(
         text: fill(template, values),
         hidden: setting.hidden === true,
         custom: false,
+        dynamic: DYNAMIC_LINE_KEYS.has(definition.key),
       },
     ];
   });
@@ -206,6 +228,7 @@ export function cardLineItems(
       text: line.label.trim(),
       hidden: false,
       custom: true,
+      dynamic: false,
     }));
   // A custom line never placed goes after everything else.
   const rankOf = (item: CardLineItem) =>

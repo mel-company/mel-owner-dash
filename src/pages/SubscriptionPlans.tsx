@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDown, ArrowUp, CheckCircle, Crown, Layers3, Pencil, Plus, ReceiptText, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle, Crown, Eye, EyeOff, Layers3, Pencil, Plus, ReceiptText, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import {
   CUSTOM_LINE_PREFIX,
   MAX_CUSTOM_LINES,
@@ -639,8 +639,10 @@ const CardLinesEditor = ({
   onChange: (config: PlanCardLinesConfig) => void;
 }) => {
   const items = cardLineItems(plan, config);
-  const shown = items.filter((item) => !item.hidden);
-  const removed = items.filter((item) => item.hidden);
+  // A number line stays in the list when hidden (it only stops showing on the
+  // card); any other built-in line, once deleted, waits in «سطور محذوفة».
+  const shown = items.filter((item) => !item.hidden || item.dynamic);
+  const removed = items.filter((item) => item.hidden && !item.dynamic);
   const custom = config.custom ?? [];
 
   const setLine = (key: string, patch: { label?: string; hidden?: boolean }) => {
@@ -708,6 +710,7 @@ const CardLinesEditor = ({
             onMove={(by) => move(index, by)}
             onLabel={(label) => setLabel(item, label)}
             onRemove={() => remove(item)}
+            onHidden={(hidden) => setLine(item.key, { hidden })}
           />
         ))}
       </ul>
@@ -749,6 +752,7 @@ const CardLineRow = ({
   onMove,
   onLabel,
   onRemove,
+  onHidden,
 }: {
   item: CardLineItem;
   first: boolean;
@@ -756,14 +760,16 @@ const CardLineRow = ({
   onMove: (by: -1 | 1) => void;
   onLabel: (label: string) => void;
   onRemove: () => void;
+  onHidden: (hidden: boolean) => void;
 }) => {
   const missing = missingPlaceholders(item);
   const iconButton = 'grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30';
   return (
-    <li className="rounded-xl border border-slate-200 bg-white p-3">
+    <li className={`rounded-xl border p-3 ${item.hidden ? 'border-dashed border-slate-200 bg-slate-50 opacity-60' : 'border-slate-200 bg-white'}`}>
       <div className="mb-2 flex items-center gap-1">
         <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-500">
           {item.title}
+          {item.hidden && <span className="ms-2 rounded-md bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-500">مخفي</span>}
           {item.custom && <span className="ms-2 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-bold text-amber-600">نص فقط</span>}
         </span>
         <button type="button" className={iconButton} disabled={first} onClick={() => onMove(-1)} aria-label="للأعلى"><ArrowUp className="h-4 w-4" /></button>
@@ -771,7 +777,18 @@ const CardLineRow = ({
         {!item.custom && item.template !== item.default_template && (
           <button type="button" className={iconButton} onClick={() => onLabel(item.default_template)} aria-label="النص الأصلي"><RotateCcw className="h-4 w-4" /></button>
         )}
-        <button type="button" className={`${iconButton} hover:bg-red-50 hover:text-red-500`} onClick={onRemove} aria-label="حذف"><Trash2 className="h-4 w-4" /></button>
+        {item.dynamic ? (
+          <button
+            type="button"
+            className={`${iconButton} ${item.hidden ? '' : 'text-blue-600'}`}
+            onClick={() => onHidden(!item.hidden)}
+            aria-label={item.hidden ? 'إظهار' : 'إخفاء'}
+          >
+            {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        ) : (
+          <button type="button" className={`${iconButton} hover:bg-red-50 hover:text-red-500`} onClick={onRemove} aria-label="حذف"><Trash2 className="h-4 w-4" /></button>
+        )}
       </div>
       <input
         value={item.template}
