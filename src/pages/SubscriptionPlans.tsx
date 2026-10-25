@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowUp, CheckCircle, Crown, Eye, EyeOff, Layers3, Pencil, Plus, ReceiptText, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import {
+  CUSTOM_LINE_PREFIX,
+  MAX_CUSTOM_LINES,
   cardLineItems,
   cardLines,
   configFromItems,
@@ -622,9 +624,10 @@ const SubscriptionPlans = () => {
 };
 
 /**
- * The plan card lines, each read from a limit or a switch the backend
- * enforces. The operator rewords, hides and orders them; `{n}` stands for the
- * plan's real number, so a changed limit changes its line too.
+ * The plan card lines. Built-in lines are read from a limit or a switch the
+ * backend enforces: the operator rewords, removes and orders them, and `{n}`
+ * stands for the plan's real number, so a changed limit changes its line too.
+ * Lines the operator adds are text only; nothing enforces them.
  */
 const CardLinesEditor = ({
   plan,
@@ -636,6 +639,12 @@ const CardLinesEditor = ({
   onChange: (config: PlanCardLinesConfig) => void;
 }) => {
   const items = cardLineItems(plan, config);
+  // A number line stays in the list when hidden (it only stops showing on the
+  // card); any other built-in line, once deleted, waits in «سطور محذوفة».
+  const shown = items.filter((item) => !item.hidden || item.dynamic);
+  const removed = items.filter((item) => item.hidden && !item.dynamic);
+  const custom = config.custom ?? [];
+
   const setLine = (key: string, patch: { label?: string; hidden?: boolean }) => {
     const current = config.lines?.[key] ?? {};
     const next = { ...current, ...patch };
@@ -646,32 +655,92 @@ const CardLinesEditor = ({
     else delete lines[key];
     onChange({ ...config, lines });
   };
+  const customId = (item: CardLineItem) => item.key.slice(CUSTOM_LINE_PREFIX.length);
+  const setLabel = (item: CardLineItem, label: string) => {
+    if (!item.custom) {
+      setLine(item.key, { label: label === item.default_template ? undefined : label });
+      return;
+    }
+    onChange({
+      ...config,
+      custom: custom.map((line) => (line.id === customId(item) ? { ...line, label } : line)),
+    });
+  };
+  const remove = (item: CardLineItem) => {
+    if (!item.custom) {
+      setLine(item.key, { hidden: true });
+      return;
+    }
+    onChange({
+      ...config,
+      custom: custom.filter((line) => line.id !== customId(item)),
+      order: (config.order ?? []).filter((key) => key !== item.key),
+    });
+  };
   const move = (index: number, by: -1 | 1) => {
-    const order = items.map((item) => item.key);
+    const order = shown.map((item) => item.key);
     const target = index + by;
     if (target < 0 || target >= order.length) return;
     [order[index], order[target]] = [order[target], order[index]];
-    onChange({ ...config, order });
+    onChange({ ...config, order: [...order, ...removed.map((item) => item.key)] });
+  };
+  const addCustom = () => {
+    let n = custom.length + 1;
+    while (custom.some((line) => line.id === `c${n}`)) n += 1;
+    const id = `c${n}`;
+    onChange({
+      ...config,
+      custom: [...custom, { id, label: '' }],
+      order: [...shown.map((item) => item.key), `${CUSTOM_LINE_PREFIX}${id}`, ...removed.map((item) => item.key)],
+    });
   };
 
   return (
     <div className="space-y-3">
       <p className="text-xs font-semibold text-slate-400">
-        كل سطر مأخوذ من حدود ومزايا الباقة. اكتب {'{n}'} مكان الرقم ليبقى مطابقاً للباقة.
+        السطور الأساسية مأخوذة من حدود ومزايا الباقة. اكتب {'{n}'} مكان الرقم ليبقى مطابقاً للباقة.
       </p>
       <ul className="space-y-2">
-        {items.map((item, index) => (
+        {shown.map((item, index) => (
           <CardLineRow
             key={item.key}
             item={item}
             first={index === 0}
-            last={index === items.length - 1}
+            last={index === shown.length - 1}
             onMove={(by) => move(index, by)}
-            onLabel={(label) => setLine(item.key, { label: label === item.default_template ? undefined : label })}
+            onLabel={(label) => setLabel(item, label)}
+            onRemove={() => remove(item)}
             onHidden={(hidden) => setLine(item.key, { hidden })}
           />
         ))}
       </ul>
+      <button
+        type="button"
+        onClick={addCustom}
+        disabled={custom.length >= MAX_CUSTOM_LINES}
+        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-blue-300 text-sm font-black text-blue-600 transition hover:bg-blue-50 disabled:opacity-40"
+      >
+        <Plus className="h-4 w-4" />
+        إضافة سطر
+      </button>
+      {removed.length > 0 && (
+        <div className="rounded-xl bg-slate-50 p-3">
+          <p className="mb-2 text-xs font-black text-slate-500">سطور محذوفة</p>
+          <div className="flex flex-wrap gap-2">
+            {removed.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setLine(item.key, { hidden: false })}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200 transition hover:text-blue-600 hover:ring-blue-300"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {item.text}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -682,6 +751,7 @@ const CardLineRow = ({
   last,
   onMove,
   onLabel,
+  onRemove,
   onHidden,
 }: {
   item: CardLineItem;
@@ -689,32 +759,43 @@ const CardLineRow = ({
   last: boolean;
   onMove: (by: -1 | 1) => void;
   onLabel: (label: string) => void;
+  onRemove: () => void;
   onHidden: (hidden: boolean) => void;
 }) => {
   const missing = missingPlaceholders(item);
   const iconButton = 'grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30';
   return (
-    <li className={`rounded-xl border p-3 ${item.hidden ? 'border-dashed border-slate-200 bg-slate-50/60' : 'border-slate-200 bg-white'}`}>
+    <li className={`rounded-xl border p-3 ${item.hidden ? 'border-dashed border-slate-200 bg-slate-50 opacity-60' : 'border-slate-200 bg-white'}`}>
       <div className="mb-2 flex items-center gap-1">
-        <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-500">{item.title}</span>
+        <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-500">
+          {item.title}
+          {item.hidden && <span className="ms-2 rounded-md bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-500">مخفي</span>}
+          {item.custom && <span className="ms-2 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-bold text-amber-600">نص فقط</span>}
+        </span>
         <button type="button" className={iconButton} disabled={first} onClick={() => onMove(-1)} aria-label="للأعلى"><ArrowUp className="h-4 w-4" /></button>
         <button type="button" className={iconButton} disabled={last} onClick={() => onMove(1)} aria-label="للأسفل"><ArrowDown className="h-4 w-4" /></button>
-        {item.template !== item.default_template && (
+        {!item.custom && item.template !== item.default_template && (
           <button type="button" className={iconButton} onClick={() => onLabel(item.default_template)} aria-label="النص الأصلي"><RotateCcw className="h-4 w-4" /></button>
         )}
-        <button
-          type="button"
-          className={`${iconButton} ${item.hidden ? '' : 'text-blue-600'}`}
-          onClick={() => onHidden(!item.hidden)}
-          aria-label={item.hidden ? 'إظهار' : 'إخفاء'}
-        >
-          {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
+        {item.dynamic ? (
+          <button
+            type="button"
+            className={`${iconButton} ${item.hidden ? '' : 'text-blue-600'}`}
+            onClick={() => onHidden(!item.hidden)}
+            aria-label={item.hidden ? 'إظهار' : 'إخفاء'}
+          >
+            {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        ) : (
+          <button type="button" className={`${iconButton} hover:bg-red-50 hover:text-red-500`} onClick={onRemove} aria-label="حذف"><Trash2 className="h-4 w-4" /></button>
+        )}
       </div>
       <input
         value={item.template}
         onChange={(event) => onLabel(event.target.value)}
         maxLength={120}
+        placeholder={item.custom ? 'مثال: دعم فني عبر واتساب' : undefined}
+        autoFocus={item.custom && !item.template}
         className={`h-10 w-full rounded-lg border bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 ${missing.length ? 'border-red-300' : 'border-slate-200'}`}
       />
       {missing.length ? (
