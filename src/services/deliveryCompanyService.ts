@@ -142,6 +142,15 @@ export const deliveryCompanyService = {
     return response as unknown as DeliveryCompany;
   },
 
+  /** Upload a logo (PNG, JPG or WebP, up to 2 MB); returns its public url. */
+  uploadLogo: async (file: File): Promise<string> => {
+    const form = new FormData();
+    form.append('file', file);
+    // The request interceptor drops Content-Type so the browser adds the boundary.
+    const response = await axiosInstance.post('/delivery-company/logo', form);
+    return (response as unknown as { url: string }).url;
+  },
+
   deleteDeliveryCompany: async (id: string): Promise<void> => {
     await axiosInstance.delete<void>(`/delivery-company/${id}`);
   },
