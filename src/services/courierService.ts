@@ -224,6 +224,27 @@ export interface CourierDetailStats extends CourierStats {
   recent: CourierRecentParcel[];
 }
 
+/** The platform's Al-Zaeem account. Never carries the password or token. */
+export interface AlzaeemSettings {
+  username: string | null;
+  systemCode: string | null;
+  passwordSet: boolean;
+  webhookSecretSet: boolean;
+  webhookSecretLast4: string | null;
+  webhookDomain: string;
+  configured: boolean;
+  /** Only in the reply to a save that generated a new token. */
+  generatedWebhookSecret?: string;
+}
+
+export interface AlzaeemSettingsPayload {
+  username?: string;
+  /** Blank keeps the saved password. */
+  password?: string;
+  systemCode?: string;
+  generateWebhookSecret?: boolean;
+}
+
 export const courierService = {
   /**
    * كل شركات الشحن وحالتها. GET /shipping/couriers/health
@@ -320,6 +341,25 @@ export const courierService = {
       payload,
     );
     return response as unknown as CourierAccountView;
+  },
+
+  /**
+   * حساب المنصة لدى الزعيم.
+   * GET/PUT /shipping/couriers/alzaeem/settings
+   */
+  getAlzaeemSettings: async (): Promise<AlzaeemSettings> => {
+    const response = await axiosInstance.get('/shipping/couriers/alzaeem/settings');
+    return response as unknown as AlzaeemSettings;
+  },
+
+  saveAlzaeemSettings: async (
+    payload: AlzaeemSettingsPayload,
+  ): Promise<AlzaeemSettings> => {
+    const response = await axiosInstance.put(
+      '/shipping/couriers/alzaeem/settings',
+      payload,
+    );
+    return response as unknown as AlzaeemSettings;
   },
 };
 
