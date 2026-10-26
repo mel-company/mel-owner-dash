@@ -13,6 +13,7 @@ import {
   StatCard,
   StatusPill,
   TableShell,
+  Spinner,
 } from '@/components/dashboard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -724,8 +725,9 @@ const Accounting = () => {
                 type="button"
                 disabled={refunding}
                 onClick={submitRefund}
-                className="h-14 rounded-2xl bg-linear-to-l from-rose-600 to-orange-500 font-black text-white shadow-lg shadow-rose-200 disabled:opacity-60"
+                className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-linear-to-l from-rose-600 to-orange-500 font-black text-white shadow-lg shadow-rose-200 disabled:opacity-80"
               >
+                {refunding && <Spinner />}
                 {refunding ? 'جارٍ الاسترجاع…' : 'تأكيد الاسترجاع'}
               </button>
             </div>

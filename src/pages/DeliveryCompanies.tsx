@@ -20,6 +20,7 @@ import {
   AlertMessage,
   ConfirmDeleteModal,
   DrawerFooter,
+  DrawerForm,
   FormField,
   LoadingState,
   MenuItem,
@@ -745,7 +746,7 @@ const DeliveryCompanies = () => {
       )}
 
       {showDrawer && (
-        <form onSubmit={handleSubmit}>
+        <DrawerForm onSubmit={handleSubmit}>
           <SideDrawer
             title={editingCompany ? 'تعديل شركة الشحن' : 'إضافة شركة شحن'}
             icon={<Truck className="h-6 w-6" />}
@@ -874,7 +875,7 @@ const DeliveryCompanies = () => {
               />
             </div>
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
 
       {companyToDelete && (

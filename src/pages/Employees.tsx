@@ -3,6 +3,7 @@ import { Pencil, Plus, ShieldCheck, Trash2, UserRound, Users } from 'lucide-reac
 import {
   AlertMessage,
   DrawerFooter,
+  DrawerForm,
   EmptyState,
   FormField,
   LoadingState,
@@ -15,7 +16,11 @@ import {
   StatusPill,
   StatusToggle,
   TableShell,
+  ModalCancelButton,
+  ModalOverlay,
+  Spinner,
 } from '@/components/dashboard';
+import { usePending } from '@/components/dashboard/modal-state';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/UserAvatar';
 import {
@@ -456,7 +461,7 @@ const Employees = () => {
       </TableShell>
 
       {showDrawer && (
-        <form onSubmit={handleSubmit}>
+        <DrawerForm onSubmit={handleSubmit}>
           <SideDrawer
             title={editingEmployee ? 'تعديل بيانات الموظف' : 'اضافة موظف جديد'}
             icon={<Users className="h-6 w-6" />}
@@ -559,7 +564,7 @@ const Employees = () => {
               )}
             </div>
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
 
       {showFilters && (
@@ -686,8 +691,9 @@ const ConfirmNameModal = ({
   value: string;
   onChange: (value: string) => void;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => unknown;
 }) => {
+  const [busy, run] = usePending();
   const canConfirm = namesMatch(value, employee.name);
   const titleColor = accent === 'red' ? 'text-red-600' : 'text-orange-500';
   const buttonColor = accent === 'red' ? 'bg-red-600' : 'bg-orange-500';
@@ -695,8 +701,8 @@ const ConfirmNameModal = ({
   const showMismatch = value.trim().length > 0 && !canConfirm;
 
   return (
-    <div className="fixed inset-0 z-9999 grid place-items-end bg-black/70 p-3 sm:place-items-center sm:p-6" dir="rtl">
-      <div className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-[1.5rem] bg-white p-5 text-center shadow-2xl sm:rounded-[2rem] sm:p-8">
+    <ModalOverlay onClose={onClose} locked={busy} className="grid place-items-end bg-black/70 p-3 sm:place-items-center sm:p-6">
+      <div role="alertdialog" aria-modal="true" className="modal-panel max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-[1.5rem] bg-white p-5 text-center shadow-2xl sm:rounded-[2rem] sm:p-8">
         <div className={cn('mx-auto mb-6 flex min-h-36 max-w-sm items-center justify-center rounded-[1.5rem] p-4 sm:mb-8 sm:min-h-44 sm:rounded-[2rem] sm:p-6', previewBg)}>
           <div className="w-full rounded-3xl bg-white p-4 text-right shadow-sm sm:p-5">
             <div className="flex items-center gap-3">
@@ -740,20 +746,19 @@ const ConfirmNameModal = ({
           <p className="mt-2 text-xs font-bold text-red-500">الاسم غير مطابق — اضغط الاسم أعلاه لنسخه</p>
         )}
         <div className="mt-6 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-[1fr_2fr] sm:gap-5">
-          <button type="button" onClick={onClose} className="h-12 rounded-2xl bg-slate-100 text-base font-black text-slate-600 sm:h-14 sm:text-lg">
-            إلغاء
-          </button>
+          <ModalCancelButton disabled={busy} className="h-12 rounded-2xl bg-slate-100 text-base font-black text-slate-600 disabled:opacity-60 sm:h-14 sm:text-lg" />
           <button
             type="button"
-            onClick={onConfirm}
-            disabled={!canConfirm}
-            className={cn('h-12 rounded-2xl text-base font-black text-white disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:text-lg', buttonColor)}
+            onClick={() => void run(onConfirm)}
+            disabled={!canConfirm || busy}
+            className={cn('inline-flex h-12 items-center justify-center gap-2 rounded-2xl text-base font-black text-white disabled:cursor-not-allowed disabled:opacity-50 sm:h-14 sm:text-lg', busy && 'disabled:opacity-80', buttonColor)}
           >
+            {busy && <Spinner className="h-5 w-5" />}
             {confirmLabel}
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 };
 

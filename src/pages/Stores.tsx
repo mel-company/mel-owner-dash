@@ -13,6 +13,7 @@ import {
 import {
   AlertMessage,
   DrawerFooter,
+  DrawerForm,
   EmptyState,
   FormField,
   LoadingState,
@@ -24,7 +25,11 @@ import {
   StatCard,
   StatusPill,
   TableShell,
+  ModalCancelButton,
+  ModalOverlay,
+  Spinner,
 } from '@/components/dashboard';
+import { usePending } from '@/components/dashboard/modal-state';
 import { cn } from '@/lib/utils';
 import {
   systemStoresService,
@@ -570,7 +575,7 @@ const Stores = () => {
       </TableShell>
 
       {showModal && (
-        <form onSubmit={editingStore ? handleUpdateStore : handleCreateStore}>
+        <DrawerForm onSubmit={editingStore ? handleUpdateStore : handleCreateStore}>
           <SideDrawer
             title={editingStore ? 'تعديل بيانات المتجر' : 'اضافة متجر جديد'}
             icon={<StoreIcon className="h-6 w-6" />}
@@ -591,7 +596,7 @@ const Stores = () => {
               onImageChange={handleImageChange}
             />
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
 
       {showFilters && (
@@ -919,14 +924,15 @@ const DeleteStoreModal = ({
   value: string;
   onChange: (value: string) => void;
   onClose: () => void;
-  onDelete: () => void;
+  onDelete: () => unknown;
 }) => {
+  const [busy, run] = usePending();
   const canDelete = value === store.name;
   const row = getStoreDisplay(store, 0);
 
   return (
-    <div className="fixed inset-0 z-9999 grid place-items-center bg-black/70 p-6" dir="rtl">
-      <div className="w-full max-w-3xl rounded-[2rem] bg-white p-8 text-center shadow-2xl">
+    <ModalOverlay onClose={onClose} locked={busy} className="grid place-items-center bg-black/70 p-6">
+      <div role="alertdialog" aria-modal="true" className="modal-panel w-full max-w-3xl rounded-[2rem] bg-white p-8 text-center shadow-2xl">
         <div className="mx-auto mb-8 flex min-h-56 max-w-sm items-center justify-center rounded-[2rem] bg-red-50 p-6">
           <StoreCard row={row} onView={() => undefined} />
         </div>
@@ -941,20 +947,19 @@ const DeleteStoreModal = ({
           className="mt-6 h-14 w-full rounded-2xl border border-slate-200 px-5 text-sm font-bold outline-none focus:border-red-300 focus:ring-4 focus:ring-red-100"
         />
         <div className="mt-8 grid grid-cols-[1fr_2fr] gap-5">
-          <button type="button" onClick={onClose} className="h-14 rounded-2xl bg-slate-100 text-lg font-black text-slate-600">
-            إلغاء
-          </button>
+          <ModalCancelButton disabled={busy} className="h-14 rounded-2xl bg-slate-100 text-lg font-black text-slate-600 disabled:opacity-60" />
           <button
             type="button"
-            onClick={onDelete}
-            disabled={!canDelete}
-            className="h-14 rounded-2xl bg-red-600 text-lg font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => void run(onDelete)}
+            disabled={!canDelete || busy}
+            className={cn('inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-red-600 text-lg font-black text-white disabled:cursor-not-allowed disabled:opacity-50', busy && 'disabled:opacity-80')}
           >
+            {busy && <Spinner className="h-5 w-5" />}
             حذف المتجر
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 };
 

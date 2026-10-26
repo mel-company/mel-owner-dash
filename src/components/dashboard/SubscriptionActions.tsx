@@ -12,6 +12,7 @@ import {
   AlertMessage,
   ConfirmDeleteModal,
   DrawerFooter,
+  DrawerForm,
   FormField,
   SelectField,
   SideDrawer,
@@ -312,10 +313,10 @@ export const SubscriptionActions = ({
       )}
 
       {showRenew && (
-        <form
+        <DrawerForm
           onSubmit={(event) => {
             event.preventDefault();
-            void submitRenew();
+            return submitRenew();
           }}
         >
           <SideDrawer
@@ -344,14 +345,14 @@ export const SubscriptionActions = ({
               التاجر، استخدم مسار الدفع في لوحة التاجر.
             </p>
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
 
       {showEdit && (
-        <form
+        <DrawerForm
           onSubmit={(event) => {
             event.preventDefault();
-            void submitEdit();
+            return submitEdit();
           }}
         >
           <SideDrawer
@@ -400,7 +401,7 @@ export const SubscriptionActions = ({
               />
             </div>
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
     </div>
   );
@@ -586,10 +587,10 @@ export const CreateSubscriptionPanel = ({
       </button>
 
       {open && (
-        <form
+        <DrawerForm
           onSubmit={(event) => {
             event.preventDefault();
-            void submit();
+            return submit();
           }}
         >
           <SideDrawer
@@ -643,7 +644,7 @@ export const CreateSubscriptionPanel = ({
               بنصف السعر) يُحسب عند الدفع ولا يُستهلك من هنا.
             </p>
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
     </div>
   );

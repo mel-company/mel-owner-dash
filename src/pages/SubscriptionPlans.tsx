@@ -16,6 +16,7 @@ import {
   ConfirmDeleteModal,
   SwitchField,
   DrawerFooter,
+  DrawerForm,
   FormField,
   LoadingState,
   PageHeader,
@@ -394,7 +395,7 @@ const SubscriptionPlans = () => {
       </TableShell>
 
       {showDrawer && (
-        <form onSubmit={handleSubmit}>
+        <DrawerForm onSubmit={handleSubmit}>
           <SideDrawer
             title={editingPlan ? 'تعديل الباقة' : 'إضافة باقة'}
             icon={<Crown className="h-6 w-6" />}
@@ -609,7 +610,7 @@ const SubscriptionPlans = () => {
             )}
 
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
 
       {planToDelete && (
