@@ -374,3 +374,115 @@
     display: none;
   }
 }
+
+/* Modals and drawers (components/dashboard: SideDrawer, ConfirmDeleteModal,
+   ModalBackdrop). They used to pop in and vanish with no motion. The backdrop
+   fades, a drawer slides in from its edge (up from the bottom on phones, in
+   from the left beside the RTL content on wider screens), a centred modal
+   rises and scales up. `data-closing` plays the same thing backwards before
+   the component unmounts. */
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+}
+
+@keyframes modal-pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes drawer-up-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes drawer-up-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes drawer-side-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes drawer-side-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.modal-backdrop {
+  animation: modal-fade-in 0.2s ease-out both;
+}
+
+.modal-backdrop[data-closing] {
+  animation: modal-fade-out 0.18s ease-in both;
+}
+
+.modal-panel {
+  animation: modal-pop-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-closing] .modal-panel {
+  animation: modal-pop-out 0.18s ease-in both;
+}
+
+.drawer-panel {
+  animation: drawer-up-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-closing] .drawer-panel {
+  animation: drawer-up-out 0.2s ease-in both;
+}
+
+@media (min-width: 640px) {
+  .drawer-panel {
+    animation-name: drawer-side-in;
+  }
+
+  [data-closing] .drawer-panel {
+    animation-name: drawer-side-out;
+  }
+}
+
+/* A full-height drawer (Support's own drawers) slides from the side at every
+   width, since it never becomes a bottom sheet. */
+.drawer-panel-side {
+  animation: drawer-side-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-closing] .drawer-panel-side {
+  animation: drawer-side-out 0.2s ease-in both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal-panel,
+  .drawer-panel,
+  .drawer-panel-side,
+  [data-closing] .modal-panel,
+  [data-closing] .drawer-panel,
+  [data-closing] .drawer-panel-side {
+    animation-duration: 1ms;
+  }
+}

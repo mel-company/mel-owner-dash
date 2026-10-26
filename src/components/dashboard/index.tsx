@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -8,13 +9,14 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, MoreVertical, Pencil, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreVertical, Pencil, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { FormPendingContext, ModalCloseContext, useModalClose, useModalExit, usePending } from './modal-state';
 
 export type StatTone = 'blue' | 'cyan' | 'teal' | 'amber' | 'rose' | 'violet' | 'emerald' | 'slate';
 
@@ -524,6 +526,101 @@ export const Pagination = ({
   );
 };
 
+/**
+ * The `<form>` around a SideDrawer. Pass an async submit handler (or one that
+ * returns its promise) and the footer's save button shows a spinner and stays
+ * disabled until it settles, the drawer can't be dismissed mid-save, and a
+ * second Enter or click doesn't send the request twice.
+ */
+export const DrawerForm = ({
+  onSubmit,
+  className,
+  children,
+}: {
+  onSubmit: (event: FormEvent<HTMLFormElement>) => unknown;
+  className?: string;
+  children: ReactNode;
+}) => {
+  const [pending, run] = usePending();
+
+  return (
+    <FormPendingContext.Provider value={pending}>
+      <form
+        className={className}
+        onSubmit={(event) => {
+          if (pending) {
+            event.preventDefault();
+            return;
+          }
+          void run(() => onSubmit(event));
+        }}
+      >
+        {children}
+      </form>
+    </FormPendingContext.Provider>
+  );
+};
+
+/**
+ * The dimmed backdrop for a page's own modal or drawer, with the same open and
+ * close animation as SideDrawer. Give the panel inside `modal-panel` (centred),
+ * `drawer-panel` (bottom sheet on phones) or `drawer-panel-side`, and close it
+ * with the function the children receive so the exit plays first. Clicking
+ * the backdrop itself closes too, unless `dismissable` is false.
+ */
+export const ModalOverlay = ({
+  onClose,
+  className,
+  locked = false,
+  dismissable = true,
+  children,
+}: {
+  onClose: () => void;
+  className?: string;
+  locked?: boolean;
+  dismissable?: boolean;
+  children: ReactNode;
+}) => {
+  const { closing, requestClose } = useModalExit(onClose, locked);
+
+  return (
+    <ModalCloseContext.Provider value={requestClose}>
+      <div
+        className={cn('modal-backdrop fixed inset-0 z-9999', className)}
+        data-closing={closing || undefined}
+        dir="rtl"
+        onMouseDown={(event) => {
+          if (dismissable && event.target === event.currentTarget) requestClose();
+        }}
+      >
+        {children}
+      </div>
+    </ModalCloseContext.Provider>
+  );
+};
+
+/** A cancel button for a ModalOverlay: closes it with the exit animation. */
+export const ModalCancelButton = ({
+  className,
+  disabled,
+  children = 'إلغاء',
+}: {
+  className?: string;
+  disabled?: boolean;
+  children?: ReactNode;
+}) => {
+  const close = useModalClose();
+  return (
+    <button type="button" disabled={disabled} onClick={() => close?.()} className={className}>
+      {children}
+    </button>
+  );
+};
+
+export const Spinner = ({ className }: { className?: string }) => (
+  <Loader2 aria-hidden className={cn('h-4 w-4 animate-spin', className)} />
+);
+
 export const SideDrawer = ({
   title,
   subtitle,
@@ -540,52 +637,94 @@ export const SideDrawer = ({
   footer?: ReactNode;
   onClose: () => void;
   maxWidth?: string;
-}) => (
-  <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
-    <div
-      onMouseDown={(event) => event.stopPropagation()}
-      className={cn(
-        'fixed inset-x-0 bottom-0 z-10000 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-white px-4 py-5 shadow-2xl sm:inset-y-0 sm:left-0 sm:right-auto sm:max-h-none sm:rounded-none sm:px-6 sm:py-8 md:px-8',
-        maxWidth
-      )}
-    >
-      <div className="mb-5 flex shrink-0 items-start justify-between gap-3 sm:mb-8">
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-          <div className="min-w-0 text-right">
-            <h2 className="text-xl font-black text-violet-700 sm:text-3xl">{title}</h2>
-            {subtitle && <p className="mt-1 text-sm font-bold text-violet-500">{subtitle}</p>}
-          </div>
-          <PageIcon>{icon}</PageIcon>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="size-10 shrink-0 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100"
-        >
-          <X className="h-5 w-5" />
-        </Button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{children}</div>
-      {footer && <div className="shrink-0 pt-5 sm:pt-7">{footer}</div>}
-    </div>
-  </div>
-);
+}) => {
+  const saving = useContext(FormPendingContext);
+  const { closing, requestClose } = useModalExit(onClose, saving);
 
-export const DrawerFooter = ({ onCancel, submitLabel = 'حفظ', cancelLabel = 'إلغاء' }: { onCancel: () => void; submitLabel?: string; cancelLabel?: string }) => (
-  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-    <Button type="button" variant="secondary" onClick={onCancel} className="h-12 rounded-2xl text-sm font-black sm:h-14 sm:text-base">
-      {cancelLabel}
-    </Button>
-    <Button
-      type="submit"
-      className="h-12 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 text-sm font-black text-white shadow-lg shadow-violet-200 hover:opacity-95 sm:h-14 sm:text-base"
-    >
-      {submitLabel}
-    </Button>
-  </div>
-);
+  return (
+    <ModalCloseContext.Provider value={requestClose}>
+      <div
+        className="modal-backdrop fixed inset-0 z-9999 bg-black/35"
+        data-closing={closing || undefined}
+        dir="rtl"
+        onMouseDown={() => requestClose()}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          onMouseDown={(event) => event.stopPropagation()}
+          className={cn(
+            'drawer-panel fixed inset-x-0 bottom-0 z-10000 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-white px-4 py-5 shadow-2xl sm:inset-y-0 sm:left-0 sm:right-auto sm:max-h-none sm:rounded-none sm:px-6 sm:py-8 md:px-8',
+            maxWidth
+          )}
+        >
+          <div className="mb-5 flex shrink-0 items-start justify-between gap-3 sm:mb-8">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="min-w-0 text-right">
+                <h2 className="text-xl font-black text-violet-700 sm:text-3xl">{title}</h2>
+                {subtitle && <p className="mt-1 text-sm font-bold text-violet-500">{subtitle}</p>}
+              </div>
+              <PageIcon>{icon}</PageIcon>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => requestClose()}
+              disabled={saving}
+              aria-label="إغلاق"
+              className="size-10 shrink-0 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{children}</div>
+          {footer && <div className="shrink-0 pt-5 sm:pt-7">{footer}</div>}
+        </div>
+      </div>
+    </ModalCloseContext.Provider>
+  );
+};
+
+export const DrawerFooter = ({
+  onCancel,
+  submitLabel = 'حفظ',
+  cancelLabel = 'إلغاء',
+  loading,
+}: {
+  onCancel: () => void;
+  submitLabel?: string;
+  cancelLabel?: string;
+  loading?: boolean;
+}) => {
+  const formPending = useContext(FormPendingContext);
+  const requestClose = useModalClose();
+  const busy = loading || formPending;
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={busy}
+        onClick={() => (requestClose ? requestClose(onCancel) : onCancel())}
+        className="h-12 rounded-2xl text-sm font-black sm:h-14 sm:text-base"
+      >
+        {cancelLabel}
+      </Button>
+      <Button
+        type="submit"
+        disabled={busy}
+        aria-busy={busy || undefined}
+        className="h-12 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 text-sm font-black text-white shadow-lg shadow-violet-200 hover:opacity-95 disabled:opacity-80 sm:h-14 sm:text-base"
+      >
+        {busy && <Spinner />}
+        {submitLabel}
+      </Button>
+    </div>
+  );
+};
 
 export const ConfirmDeleteModal = ({
   title,
@@ -599,25 +738,44 @@ export const ConfirmDeleteModal = ({
   description: string;
   confirmLabel?: string;
   onClose: () => void;
-  onConfirm: () => void;
+  /** Return the request's promise to keep a spinner on the button until it ends. */
+  onConfirm: () => unknown;
   preview?: ReactNode;
-}) => (
-  <div className="fixed inset-0 z-9999 grid place-items-end bg-black/70 p-3 sm:place-items-center sm:p-6" dir="rtl">
-    <div className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-[1.5rem] bg-white p-5 text-center shadow-2xl sm:rounded-[2rem] sm:p-8">
-      {preview && <div className="mx-auto mb-6 flex min-h-40 max-w-sm items-center justify-center rounded-[1.5rem] bg-red-50 p-4 sm:mb-8 sm:min-h-56 sm:rounded-[2rem] sm:p-6">{preview}</div>}
-      <h2 className="text-xl font-black text-red-600 sm:text-3xl">{title}</h2>
-      <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">{description}</p>
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-[1fr_2fr] sm:gap-5">
-        <Button type="button" variant="secondary" onClick={onClose} className="h-12 rounded-2xl text-base font-black sm:h-14 sm:text-lg">
-          إلغاء
-        </Button>
-        <Button type="button" variant="destructive" onClick={onConfirm} className="h-12 rounded-2xl text-base font-black sm:h-14 sm:text-lg">
-          {confirmLabel}
-        </Button>
+}) => {
+  const [busy, run] = usePending();
+  const { closing, requestClose } = useModalExit(onClose, busy);
+
+  return (
+    <div
+      className="modal-backdrop fixed inset-0 z-9999 grid place-items-end bg-black/70 p-3 sm:place-items-center sm:p-6"
+      data-closing={closing || undefined}
+      dir="rtl"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) requestClose();
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        className="modal-panel max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-[1.5rem] bg-white p-5 text-center shadow-2xl sm:rounded-[2rem] sm:p-8"
+      >
+        {preview && <div className="mx-auto mb-6 flex min-h-40 max-w-sm items-center justify-center rounded-[1.5rem] bg-red-50 p-4 sm:mb-8 sm:min-h-56 sm:rounded-[2rem] sm:p-6">{preview}</div>}
+        <h2 className="text-xl font-black text-red-600 sm:text-3xl">{title}</h2>
+        <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">{description}</p>
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-[1fr_2fr] sm:gap-5">
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => requestClose()} className="h-12 rounded-2xl text-base font-black sm:h-14 sm:text-lg">
+            إلغاء
+          </Button>
+          <Button type="button" variant="destructive" disabled={busy} aria-busy={busy || undefined} onClick={() => void run(onConfirm)} className="h-12 rounded-2xl text-base font-black disabled:opacity-80 sm:h-14 sm:text-lg">
+            {busy && <Spinner />}
+            {confirmLabel}
+          </Button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const FormField = ({ label, value, onChange, type = 'text', placeholder, required }: { label: string; value: string | number | undefined; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean }) => (
   <div>

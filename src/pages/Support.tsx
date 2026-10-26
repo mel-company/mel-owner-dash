@@ -32,7 +32,17 @@ import {
 import { supportMessagesService, type SupportMessage } from '../services/supportMessagesService';
 import { useSupportUnread } from '../contexts/SupportUnreadContext';
 import { markTicketReadLocally } from '../utils/supportUnread';
-import { CardTable, PageHeader, PrimaryActionButton } from '@/components/dashboard';
+import {
+  CardTable,
+  DrawerFooter,
+  DrawerForm,
+  ModalCancelButton,
+  ModalOverlay,
+  PageHeader,
+  PrimaryActionButton,
+  Spinner,
+} from '@/components/dashboard';
+import { useModalClose, usePending } from '@/components/dashboard/modal-state';
 import { cn } from '@/lib/utils';
 
 type TicketFilters = {
@@ -701,10 +711,11 @@ const FiltersDrawer = ({
   onApply: () => void;
   onReset: () => void;
 }) => (
-  <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
+  <ModalOverlay onClose={onClose} className="bg-black/35">
     <div
-      onMouseDown={(event) => event.stopPropagation()}
-      className="fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8"
+      role="dialog"
+      aria-modal="true"
+      className="drawer-panel-side fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8"
     >
       <DrawerHeader title="الفلاتر" onClose={onClose} />
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -739,7 +750,7 @@ const FiltersDrawer = ({
         </button>
       </div>
     </div>
-  </div>
+  </ModalOverlay>
 );
 
 /** `value` is undefined when the server did not send the count: shown as «—». */
@@ -935,11 +946,11 @@ const CreateTicketDrawer = ({
   stores: SupportTicketStoreOption[];
   selectedFiles: File[];
   setSelectedFiles: React.Dispatch<React.SetStateAction<File[]>>;
-  onSubmit: (event: FormEvent) => void;
+  onSubmit: (event: FormEvent) => unknown;
   onClose: () => void;
 }) => (
-  <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
-    <form onSubmit={onSubmit} onMouseDown={(event) => event.stopPropagation()} className="fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-3xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8">
+  <ModalOverlay onClose={onClose} className="bg-black/35">
+    <DrawerForm onSubmit={onSubmit} className="drawer-panel-side fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-3xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8">
       <DrawerHeader title="إضافة تذكرة جديدة" onClose={onClose} />
       <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -986,12 +997,11 @@ const CreateTicketDrawer = ({
           onFilesChange={(files) => setSelectedFiles(Array.from(files))}
         />
       </div>
-      <div className="grid shrink-0 grid-cols-2 gap-4 pt-7">
-        <button type="button" onClick={onClose} className="h-14 rounded-2xl bg-slate-100 font-black text-slate-600">إلغاء</button>
-        <button type="submit" className="h-14 rounded-2xl bg-linear-to-l from-violet-700 to-fuchsia-500 font-black text-white shadow-lg shadow-violet-200">إضافة التذكرة</button>
+      <div className="shrink-0 pt-7">
+        <DrawerFooter onCancel={onClose} submitLabel="إضافة التذكرة" />
       </div>
-    </form>
-  </div>
+    </DrawerForm>
+  </ModalOverlay>
 );
 
 const TicketDetailsDrawer = ({
@@ -1032,8 +1042,8 @@ const TicketDetailsDrawer = ({
   const hasUnavailableAttachments = attachments.some((attachment) => !isAttachmentAvailable(attachment));
 
   return (
-    <div className="fixed inset-0 z-9999 bg-black/35" dir="rtl" onMouseDown={onClose}>
-      <div onMouseDown={(event) => event.stopPropagation()} className="fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-5xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8">
+    <ModalOverlay onClose={onClose} className="bg-black/35">
+      <div role="dialog" aria-modal="true" className="drawer-panel-side fixed inset-y-0 left-0 z-10000 flex h-dvh w-full max-w-5xl flex-col overflow-hidden bg-white px-6 py-8 shadow-2xl sm:px-8">
         <DrawerHeader title="تفاصيل التذكرة" subtitle={`#${ticket.id.slice(0, 8)}`} onClose={onClose} />
         {/* Below lg the two columns stack, so the whole body scrolls as one
             page; squeezing both into the drawer's height made the fields
@@ -1263,13 +1273,16 @@ const TicketDetailsDrawer = ({
           </div>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 };
 
-const DeleteTicketModal = ({ ticket, onClose, onConfirm }: { ticket: SupportTicket; onClose: () => void; onConfirm: () => void }) => (
-  <div className="fixed inset-0 z-9999 grid place-items-center bg-black/70 p-6" dir="rtl">
-    <div className="w-full max-w-4xl rounded-[2rem] bg-white p-8 text-center shadow-2xl">
+const DeleteTicketModal = ({ ticket, onClose, onConfirm }: { ticket: SupportTicket; onClose: () => void; onConfirm: () => unknown }) => {
+  const [busy, run] = usePending();
+
+  return (
+  <ModalOverlay onClose={onClose} locked={busy} className="grid place-items-center bg-black/70 p-6">
+    <div role="alertdialog" aria-modal="true" className="modal-panel w-full max-w-4xl rounded-[2rem] bg-white p-8 text-center shadow-2xl">
       <div className="mx-auto mb-8 flex min-h-72 max-w-3xl items-center justify-center rounded-[2rem] bg-red-50">
         <div className="rounded-3xl bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-center gap-4">
@@ -1291,14 +1304,26 @@ const DeleteTicketModal = ({ ticket, onClose, onConfirm }: { ticket: SupportTick
         سوف تقوم بحذف طلب الدعم من النظام ولن تستطيع إعادته مرة أخرى؛ لتأكيد العملية يرجى التأكد من التذكرة قبل الحذف.
       </p>
       <div className="mt-8 grid grid-cols-[1fr_2fr] gap-6">
-        <button onClick={onClose} className="h-16 rounded-2xl bg-slate-100 text-xl font-black text-slate-600">إلغاء</button>
-        <button onClick={onConfirm} className="h-16 rounded-2xl bg-red-600 text-xl font-black text-white">حذف التذكرة</button>
+        <ModalCancelButton disabled={busy} className="h-16 rounded-2xl bg-slate-100 text-xl font-black text-slate-600 disabled:opacity-60" />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void run(onConfirm)}
+          className="inline-flex h-16 items-center justify-center gap-2 rounded-2xl bg-red-600 text-xl font-black text-white disabled:opacity-80"
+        >
+          {busy && <Spinner className="h-5 w-5" />}
+          حذف التذكرة
+        </button>
       </div>
     </div>
-  </div>
-);
+  </ModalOverlay>
+  );
+};
 
-const DrawerHeader = ({ title, subtitle, onClose }: { title: string; subtitle?: string; onClose: () => void }) => (
+const DrawerHeader = ({ title, subtitle, onClose }: { title: string; subtitle?: string; onClose: () => void }) => {
+  const close = useModalClose();
+
+  return (
   <div className="mb-8 flex shrink-0 items-start justify-between">
     <div className="flex items-center gap-4">
       <div className="text-right">
@@ -1309,11 +1334,12 @@ const DrawerHeader = ({ title, subtitle, onClose }: { title: string; subtitle?: 
         <MessageCircle className="h-6 w-6" />
       </PageIcon>
     </div>
-    <button onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-slate-50 text-slate-400">
+    <button type="button" aria-label="إغلاق" onClick={() => (close ? close() : onClose())} className="grid h-10 w-10 place-items-center rounded-full bg-slate-50 text-slate-400">
       <X className="h-5 w-5" />
     </button>
   </div>
-);
+  );
+};
 
 const TextField = ({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (value: string) => void }) => (
   <div className="mt-5">

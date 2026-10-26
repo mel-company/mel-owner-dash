@@ -5,6 +5,7 @@ import {
   AlertMessage,
   ConfirmDeleteModal,
   DrawerFooter,
+  DrawerForm,
   EmptyState,
   FormField,
   LoadingState,
@@ -664,7 +665,7 @@ const PaymentMethods = () => {
       )}
 
       {showDrawer && (
-        <form onSubmit={handleSubmit}>
+        <DrawerForm onSubmit={handleSubmit}>
           <SideDrawer
             title={activeTab === 'methods' ? (editingMethod ? 'تعديل طريقة الدفع' : 'إضافة طريقة دفع') : (editingProvider ? 'تعديل مزود الدفع' : 'إضافة مزود دفع')}
             icon={<CreditCard className="h-6 w-6" />}
@@ -702,7 +703,7 @@ const PaymentMethods = () => {
               </div>
             )}
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
 
       {deactivateTarget && (

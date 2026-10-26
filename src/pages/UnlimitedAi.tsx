@@ -5,6 +5,7 @@ import {
   AlertMessage,
   ConfirmDeleteModal,
   DrawerFooter,
+  DrawerForm,
   EmptyState,
   FormField,
   LoadingState,
@@ -188,7 +189,7 @@ const UnlimitedAi = () => {
       </TableShell>
 
       {showDrawer && (
-        <form onSubmit={handleSubmit}>
+        <DrawerForm onSubmit={handleSubmit}>
           <SideDrawer
             title={editing ? 'تعديل الرقم' : 'إضافة رقم غير محدود'}
             subtitle={editing ? formatPhone(editing.phone) : undefined}
@@ -224,7 +225,7 @@ const UnlimitedAi = () => {
               {formError && <AlertMessage>{formError}</AlertMessage>}
             </div>
           </SideDrawer>
-        </form>
+        </DrawerForm>
       )}
 
       {toRemove && (
@@ -232,7 +233,7 @@ const UnlimitedAi = () => {
           title="حذف الرقم"
           description={`سيعود ${formatPhone(toRemove.phone)} إلى الرصيد العادي ولن يتمكن من إنشاء متاجر مجاناً.`}
           onClose={() => setToRemove(null)}
-          onConfirm={() => void handleRemove()}
+          onConfirm={handleRemove}
         />
       )}
     </div>

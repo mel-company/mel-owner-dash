@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ImageUp, RotateCcw, X } from 'lucide-react';
+import { Check, ImageUp, Loader2, RotateCcw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -67,7 +67,7 @@ export const AvatarPickerDialog = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <div
-      className="fixed inset-0 z-9999 grid place-items-end bg-black/60 p-3 sm:place-items-center sm:p-6"
+      className="modal-backdrop fixed inset-0 z-9999 grid place-items-end bg-black/60 p-3 sm:place-items-center sm:p-6"
       dir="rtl"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -77,7 +77,7 @@ export const AvatarPickerDialog = ({ onClose }: { onClose: () => void }) => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="avatar-picker-title"
-        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-[1.5rem] bg-white p-5 text-right shadow-2xl sm:rounded-[2rem] sm:p-7"
+        className="modal-panel max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-[1.5rem] bg-white p-5 text-right shadow-2xl sm:rounded-[2rem] sm:p-7"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -148,7 +148,7 @@ export const AvatarPickerDialog = ({ onClose }: { onClose: () => void }) => {
             onClick={() => fileRef.current?.click()}
             className="h-12 gap-2 rounded-2xl bg-violet-600 text-sm font-black text-white hover:bg-violet-700"
           >
-            <ImageUp className="h-4 w-4" />
+            {busy === 'upload' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}
             {busy === 'upload' ? 'جاري الرفع...' : hasPhoto ? 'رفع صورة أخرى' : 'رفع صورة من جهازك'}
           </Button>
           <Button
