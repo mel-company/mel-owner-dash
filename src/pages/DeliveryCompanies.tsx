@@ -34,6 +34,7 @@ import {
 } from '@/components/dashboard';
 import { CourierDetailDrawer } from '@/components/dashboard/CourierDetailDrawer';
 import { CourierLogo } from '@/components/dashboard/CourierLogo';
+import { LogoUploadField } from '@/components/dashboard/LogoUploadField';
 import {
   deliveryCompanyService,
   type DeliveryCompany,
@@ -596,7 +597,7 @@ const DeliveryCompanies = () => {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <CourierLogo
-                        src={entry?.profile.logoUrl || company.logo}
+                        src={company.logo || entry?.profile.logoUrl}
                         name={company.name}
                       />
                       <div className="min-w-0">
@@ -782,7 +783,9 @@ const DeliveryCompanies = () => {
               <FormField label="جهة الاتصال" value={formData.contact} onChange={(value) => setFormData((current) => ({ ...current, contact: value }))} />
               <FormField label="البريد الإلكتروني" value={formData.email} required onChange={(value) => setFormData((current) => ({ ...current, email: value }))} />
               <FormField label="رقم الهاتف" value={formData.phone} onChange={(value) => setFormData((current) => ({ ...current, phone: value }))} />
-              <FormField label="رابط الشعار" value={formData.logo} onChange={(value) => setFormData((current) => ({ ...current, logo: value }))} />
+              <div className="md:col-span-2">
+                <LogoUploadField value={formData.logo ?? ''} name={formData.name} onChange={(value) => setFormData((current) => ({ ...current, logo: value }))} />
+              </div>
               <FormField label="الموقع الإلكتروني" value={formData.website} onChange={(value) => setFormData((current) => ({ ...current, website: value }))} />
               <FormField label="العنوان" value={formData.address} onChange={(value) => setFormData((current) => ({ ...current, address: value }))} />
               <FormField label="الرمز البريدي" value={formData.zip} onChange={(value) => setFormData((current) => ({ ...current, zip: value }))} />
