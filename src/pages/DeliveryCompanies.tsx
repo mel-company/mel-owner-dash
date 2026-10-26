@@ -397,7 +397,11 @@ const DeliveryCompanies = () => {
       closeDrawer();
       void fetchAll();
     } catch (err) {
-      setError('فشل في حفظ شركة الشحن.');
+      // Say which field the server refused instead of a bare failure.
+      const message = (err as { response?: { data?: { message?: unknown } } })
+        ?.response?.data?.message;
+      const reason = Array.isArray(message) ? message.join('، ') : typeof message === 'string' ? message : '';
+      setError(reason ? `فشل في حفظ شركة الشحن: ${reason}` : 'فشل في حفظ شركة الشحن.');
       console.error('Error saving delivery company:', err);
     }
   };
@@ -781,7 +785,7 @@ const DeliveryCompanies = () => {
                 )}
               </div>
               <FormField label="جهة الاتصال" value={formData.contact} onChange={(value) => setFormData((current) => ({ ...current, contact: value }))} />
-              <FormField label="البريد الإلكتروني" value={formData.email} required onChange={(value) => setFormData((current) => ({ ...current, email: value }))} />
+              <FormField label="البريد الإلكتروني" value={formData.email} onChange={(value) => setFormData((current) => ({ ...current, email: value }))} />
               <FormField label="رقم الهاتف" value={formData.phone} onChange={(value) => setFormData((current) => ({ ...current, phone: value }))} />
               <div className="md:col-span-2">
                 <LogoUploadField value={formData.logo ?? ''} name={formData.name} onChange={(value) => setFormData((current) => ({ ...current, logo: value }))} />
