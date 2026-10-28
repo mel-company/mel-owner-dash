@@ -325,10 +325,8 @@ const hostOf = (url?: string | null) => {
   }
 };
 
-/** Prefer API `links[]`; fall back so older payloads still show both URLs. */
+/** Rebuild from domain fields so a platform-only `links[]` never hides custom. */
 const getStoreDomainLinks = (store: Store) => {
-  if (store.links?.length) return store.links;
-
   const links: NonNullable<Store['links']> = [];
   const platformUrl =
     store.platformUrl ||
@@ -351,7 +349,7 @@ const getStoreDomainLinks = (store: Store) => {
       primary: true,
     });
   }
-  return links;
+  return links.length ? links : store.links ?? [];
 };
 
 const SummaryRow = ({ label, value, missing = value === 'غير محدد' }: { label: string; value: string; missing?: boolean }) => (
