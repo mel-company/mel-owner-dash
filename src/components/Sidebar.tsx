@@ -27,6 +27,7 @@ const menuItems: AppMenuItem[] = [
   { path: '/dashboard/employees', label: 'ادارة الموظفين', icon: '/sidebar/icon-employees.svg', roles: ['owner'], section: 'system' },
   { path: '/dashboard/accounting', label: 'الحسابات المالية', icon: '/sidebar/icon-accounting.svg', roles: ['owner', 'employee'], section: 'system', flipIcon: true },
   { path: '/dashboard/financial-ai', label: 'مالية الذكاء الاصطناعي', icon: '/sidebar/icon-financial-ai.svg', roles: ['owner'], section: 'system' },
+  { path: '/dashboard/ai-generations', label: 'توليدات الذكاء', icon: '/sidebar/icon-financial-ai.svg', roles: ['owner', 'developer'], section: 'system' },
   { path: '/dashboard/unlimited-ai', label: 'الذكاء غير المحدود', icon: '/sidebar/icon-financial-ai.svg', roles: ['owner'], section: 'system' },
   { path: '/dashboard/payments', label: 'بوابات الدفع', icon: '/sidebar/icon-payments.svg', roles: ['owner'], section: 'system' },
   { path: '/dashboard/stores', label: 'أدارة المتجر', icon: '/sidebar/icon-stores.svg', roles: ['owner', 'employee'], section: 'user' },
