@@ -51,6 +51,10 @@ export interface Store {
   customDomain?: string | null;
   /** Public storefront URL from the API (custom domain wins over *.mel.iq). */
   storeUrl?: string | null;
+  /** Always https://{slug}.mel.iq when the store has a slug. */
+  platformUrl?: string | null;
+  /** Platform + custom open links from the API. */
+  links?: StoreDomainLink[] | null;
   ownerId: string | null;
   deliveryCompanyId: string | null;
   /** Detail route only: the linked courier's name, so no raw id is shown. */
@@ -67,6 +71,13 @@ export interface Store {
     coupons?: number;
     users?: number;
   };
+}
+
+export type StoreDomainLink = {
+  type: 'platform' | 'custom';
+  label: string;
+  url: string;
+  primary: boolean;
 }
 
 export interface StoresListResponse {

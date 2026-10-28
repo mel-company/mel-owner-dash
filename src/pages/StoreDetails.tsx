@@ -65,6 +65,8 @@ const StoreDetails = () => {
   const courierName = store.deliveryCompany?.name?.trim() || '';
   const storeUrl = getStorePublicUrl(store);
   const domainLabel = getStorePublicHostLabel(store);
+  const storeLinks = getStoreDomainLinks(store);
+  const primaryLink = storeLinks.find((link) => link.primary) ?? storeLinks[0];
 
   return (
     <div className="page-shell bg-[#f8fafc] text-right" dir="rtl">
@@ -82,15 +84,17 @@ const StoreDetails = () => {
         <StatCard
           title="النطاق"
           value={
-            storeUrl && domainLabel ? (
+            primaryLink ? (
               <a
-                href={storeUrl}
+                href={primaryLink.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex max-w-full items-center gap-1.5 text-cyan-700 underline-offset-4 transition hover:text-cyan-900 hover:underline"
                 title="فتح المتجر"
               >
-                <span className="truncate" dir="ltr">{domainLabel}</span>
+                <span className="truncate" dir="ltr">
+                  {hostOf(primaryLink.url) || domainLabel}
+                </span>
                 <ExternalLink className="h-3.5 w-3.5 shrink-0" />
               </a>
             ) : (
@@ -179,27 +183,52 @@ const StoreDetails = () => {
         </DetailsCard>
 
         <DetailsCard title="الروابط والنطاق">
-          <InfoItem
-            label="رابط المتجر"
-            value={
-              storeUrl && domainLabel ? (
-                <StorefrontLink href={storeUrl} label={domainLabel} />
-              ) : (
-                'غير محدد'
-              )
-            }
-          />
-          {store.customDomain && store.domain ? (
+          {storeLinks.length > 0 ? (
+            <div className="space-y-2">
+              {storeLinks.map((link) => (
+                <div
+                  key={link.type}
+                  className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ${
+                    link.primary ? 'bg-cyan-50 ring-1 ring-cyan-100' : 'bg-slate-50'
+                  }`}
+                >
+                  <div className="min-w-0 text-right">
+                    <p className="text-xs font-semibold text-slate-400">
+                      {link.label}
+                      {link.primary ? ' · الرئيسي' : ''}
+                    </p>
+                    <p
+                      className="truncate text-sm font-bold text-slate-800"
+                      dir="ltr"
+                      title={link.url}
+                    >
+                      {hostOf(link.url)}
+                    </p>
+                  </div>
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm font-bold text-violet-700 shadow-sm ring-1 ring-slate-100 transition hover:bg-violet-50 hover:text-violet-900"
+                  >
+                    فتح
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              ))}
+            </div>
+          ) : (
             <InfoItem
-              label="نطاق المنصة"
+              label="رابط المتجر"
               value={
-                <StorefrontLink
-                  href={`https://${store.domain}.mel.iq`}
-                  label={`${store.domain}.mel.iq`}
-                />
+                storeUrl && domainLabel ? (
+                  <StorefrontLink href={storeUrl} label={domainLabel} />
+                ) : (
+                  'غير محدد'
+                )
               }
             />
-          ) : null}
+          )}
           <InfoItem label="آخر تحديث للنطاق" value={store.domain_last_update ? formatDate(store.domain_last_update) : 'غير محدد'} />
           <InfoItem label="Instagram" value={store.instagram || 'غير محدد'} />
           <InfoItem label="Facebook" value={store.facebook || 'غير محدد'} />
@@ -285,6 +314,44 @@ const getStorePublicHostLabel = (store: Store) => {
   if (custom) return custom;
   if (store.domain) return `${store.domain}.mel.iq`;
   return null;
+};
+
+const hostOf = (url?: string | null) => {
+  if (!url) return null;
+  try {
+    return new URL(url).host;
+  } catch {
+    return url.replace(/^https?:\/\//, '').split('/')[0] || null;
+  }
+};
+
+/** Prefer API `links[]`; fall back so older payloads still show both URLs. */
+const getStoreDomainLinks = (store: Store) => {
+  if (store.links?.length) return store.links;
+
+  const links: NonNullable<Store['links']> = [];
+  const platformUrl =
+    store.platformUrl ||
+    (store.domain ? `https://${store.domain}.mel.iq` : null);
+  const custom = store.customDomain?.trim().toLowerCase().replace(/^www\./, '');
+
+  if (platformUrl) {
+    links.push({
+      type: 'platform',
+      label: 'رابط MEL',
+      url: platformUrl,
+      primary: !custom,
+    });
+  }
+  if (custom) {
+    links.push({
+      type: 'custom',
+      label: 'النطاق المخصص',
+      url: `https://${custom}`,
+      primary: true,
+    });
+  }
+  return links;
 };
 
 const SummaryRow = ({ label, value, missing = value === 'غير محدد' }: { label: string; value: string; missing?: boolean }) => (
