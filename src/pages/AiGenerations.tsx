@@ -20,6 +20,7 @@ import {
   type GenerationRow,
   type GenerationStatus,
   type GenerationsSummary,
+  libraryHomeService,
 } from '../services/aiGenerationsService';
 
 /**
@@ -271,6 +272,82 @@ const DetailDrawer = ({ id, onClose }: { id: string; onClose: () => void }) => {
   );
 };
 
+/**
+ * How many new AI builds get a home page made of store library sections
+ * instead of a drawn one. 0 = none; only builds from a written prompt qualify.
+ */
+const LibraryHomeRollout = () => {
+  const [saved, setSaved] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    libraryHomeService
+      .get()
+      .then((value) => {
+        setSaved(value.percent);
+        setDraft(String(value.percent));
+      })
+      .catch((err) => setError(errorMessage(err, 'تعذر تحميل الإعداد')));
+  }, []);
+
+  const value = Number(draft);
+  const valid = draft.trim() !== '' && Number.isInteger(value) && value >= 0 && value <= 100;
+
+  const save = async () => {
+    if (!valid) return;
+    setSaving(true);
+    setError('');
+    try {
+      const next = await libraryHomeService.set(value);
+      setSaved(next.percent);
+      setDraft(String(next.percent));
+    } catch (err) {
+      setError(errorMessage(err, 'تعذر الحفظ'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-slate-800">الصفحة الرئيسية من مكتبة المتجر</div>
+        <div className="text-xs text-slate-500">
+          نسبة المتاجر الجديدة التي تُبنى صفحتها الرئيسية من أقسام المكتبة الجاهزة. 0 = لا شيء. يشمل الطلبات المكتوبة فقط.
+        </div>
+        {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex items-center rounded-lg border border-slate-200 bg-white px-2">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            inputMode="numeric"
+            dir="ltr"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            className="h-9 w-16 bg-transparent text-center text-sm outline-none"
+            aria-label="النسبة"
+          />
+          <span className="text-sm text-slate-500">%</span>
+        </div>
+        <button
+          type="button"
+          onClick={save}
+          disabled={!valid || saving || value === saved}
+          className="h-9 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white disabled:opacity-40"
+        >
+          {saving ? 'جارٍ الحفظ…' : 'حفظ'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const AiGenerations = () => {
   const [summary, setSummary] = useState<GenerationsSummary | null>(null);
   const [rows, setRows] = useState<GenerationRow[]>([]);
@@ -332,6 +409,8 @@ const AiGenerations = () => {
       />
 
       {error && <AlertMessage>{error}</AlertMessage>}
+
+      <LibraryHomeRollout />
 
       {summary && counts && (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
