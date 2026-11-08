@@ -36,8 +36,10 @@ const FIELD_COPY: Record<string, { label: string; hint: string }> = {
     hint: 'رقم المتجر الذي يعيده create-merchant-shop. ترفض Prime الشحنة بدونه.',
   },
   merchantLoginId: {
-    label: 'حساب التاجر لدى Prime (merchantLoginId)',
-    hint: 'اختياري — عند تركه فارغًا تُستخدم بيانات المنصة (PRIME_LOGIN).',
+    label: 'معرّف التاجر لدى الشركة (merchantLoginId)',
+    hint:
+      'Prime: حساب التاجر (اختياري — بدونها يُستخدم حساب المنصة). ' +
+      'الزعيم: رقم merchant_id من Jenni (إلزامي لحساب Aggregator).',
   },
   pickUpAddressUid: {
     label: 'عنوان الاستلام لدى Boxy (pickUpAddressUid)',
