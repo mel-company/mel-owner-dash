@@ -19,6 +19,7 @@ import PaymentMethods from './pages/PaymentMethods';
 import Developer from './pages/Developer';
 import DomainHealth from './pages/DomainHealth';
 import UnlimitedAi from './pages/UnlimitedAi';
+import ShopperAccounts from './pages/ShopperAccounts';
 import VisitorJourney from './pages/VisitorJourney';
 
 function App() {
@@ -83,6 +84,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['owner']}>
                   <VisitorJourney />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="shoppers"
+              element={
+                <ProtectedRoute requiredRoles={['owner']}>
+                  <ShopperAccounts />
                 </ProtectedRoute>
               }
             />
