@@ -21,6 +21,7 @@ import {
   type GenerationStatus,
   type GenerationsSummary,
   libraryHomeService,
+  type LibraryHomeSetting,
 } from '../services/aiGenerationsService';
 
 /**
@@ -277,32 +278,40 @@ const DetailDrawer = ({ id, onClose }: { id: string; onClose: () => void }) => {
  * instead of a drawn one. 0 = none; only builds from a written prompt qualify.
  */
 const LibraryHomeRollout = () => {
-  const [saved, setSaved] = useState<number | null>(null);
+  const [saved, setSaved] = useState<LibraryHomeSetting | null>(null);
   const [draft, setDraft] = useState('');
+  const [testers, setTesters] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const show = (value: LibraryHomeSetting) => {
+    setSaved(value);
+    setDraft(String(value.percent));
+    setTesters((value.testers ?? []).map(localPhone).join('، '));
+  };
 
   useEffect(() => {
     libraryHomeService
       .get()
-      .then((value) => {
-        setSaved(value.percent);
-        setDraft(String(value.percent));
-      })
+      .then(show)
       .catch((err) => setError(errorMessage(err, 'تعذر تحميل الإعداد')));
   }, []);
 
   const value = Number(draft);
   const valid = draft.trim() !== '' && Number.isInteger(value) && value >= 0 && value <= 100;
+  const testerList = testers
+    .split(/[\s,،؛;]+/)
+    .map((part) => part.replace(/\D/g, ''))
+    .filter(Boolean);
+  const changed =
+    !saved || value !== saved.percent || testerList.map(localPhone).join() !== (saved.testers ?? []).map(localPhone).join();
 
   const save = async () => {
     if (!valid) return;
     setSaving(true);
     setError('');
     try {
-      const next = await libraryHomeService.set(value);
-      setSaved(next.percent);
-      setDraft(String(next.percent));
+      show(await libraryHomeService.set(value, testerList));
     } catch (err) {
       setError(errorMessage(err, 'تعذر الحفظ'));
     } finally {
@@ -311,15 +320,14 @@ const LibraryHomeRollout = () => {
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-      <div className="min-w-0">
-        <div className="text-sm font-semibold text-slate-800">الصفحة الرئيسية من مكتبة المتجر</div>
-        <div className="text-xs text-slate-500">
-          نسبة المتاجر الجديدة التي تُبنى صفحتها الرئيسية من أقسام المكتبة الجاهزة. 0 = لا شيء. يشمل الطلبات المكتوبة فقط.
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-800">التوليد من القوالب الجاهزة</div>
+          <div className="text-xs text-slate-500">
+            نسبة المتاجر الجديدة التي تُبنى من القوالب والأقسام الجاهزة. 0 = لا شيء. أرقام التجربة تحصل عليه دائماً.
+          </div>
         </div>
-        {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
-      </div>
-      <div className="flex items-center gap-2">
         <div className="flex items-center rounded-lg border border-slate-200 bg-white px-2">
           <input
             type="number"
@@ -335,17 +343,37 @@ const LibraryHomeRollout = () => {
           />
           <span className="text-sm text-slate-500">%</span>
         </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="shrink-0 text-xs font-semibold text-slate-600" htmlFor="library-testers">
+          أرقام التجربة
+        </label>
+        <input
+          id="library-testers"
+          dir="ltr"
+          value={testers}
+          onChange={(event) => setTesters(event.target.value)}
+          placeholder="07701234567, 07801234567"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-left text-sm outline-none focus:border-slate-400"
+        />
         <button
           type="button"
           onClick={save}
-          disabled={!valid || saving || value === saved}
+          disabled={!valid || saving || !changed}
           className="h-9 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white disabled:opacity-40"
         >
           {saving ? 'جارٍ الحفظ…' : 'حفظ'}
         </button>
       </div>
+      {error && <div className="text-xs text-red-600">{error}</div>}
     </div>
   );
+};
+
+/** 9647701234567 → 07701234567 */
+const localPhone = (phone: string) => {
+  const digits = phone.replace(/\D/g, '');
+  return digits.startsWith('964') ? `0${digits.slice(3)}` : digits;
 };
 
 const AiGenerations = () => {

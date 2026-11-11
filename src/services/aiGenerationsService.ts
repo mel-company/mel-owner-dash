@@ -125,6 +125,8 @@ export const aiGenerationsService = {
 /** Share of AI builds whose home page is built from the store library. */
 export interface LibraryHomeSetting {
   percent: number;
+  /** Phone numbers (9647…) whose builds always use the library, whatever the percent. */
+  testers: string[];
 }
 
 export const libraryHomeService = {
@@ -134,8 +136,8 @@ export const libraryHomeService = {
     return response as unknown as LibraryHomeSetting;
   },
   /** PUT /api/v1/ai/system/library-home */
-  set: async (percent: number): Promise<LibraryHomeSetting> => {
-    const response = await axiosInstance.put<LibraryHomeSetting>('/ai/system/library-home', { percent });
+  set: async (percent: number, testers: string[]): Promise<LibraryHomeSetting> => {
+    const response = await axiosInstance.put<LibraryHomeSetting>('/ai/system/library-home', { percent, testers });
     return response as unknown as LibraryHomeSetting;
   },
 };
