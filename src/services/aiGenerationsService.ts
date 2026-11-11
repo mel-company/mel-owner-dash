@@ -121,3 +121,23 @@ export const aiGenerationsService = {
     return response as unknown as GenerationDetail;
   },
 };
+
+/** Share of AI builds whose home page is built from the store library. */
+export interface LibraryHomeSetting {
+  percent: number;
+  /** Phone numbers (9647…) whose builds always use the library, whatever the percent. */
+  testers: string[];
+}
+
+export const libraryHomeService = {
+  /** GET /api/v1/ai/system/library-home */
+  get: async (): Promise<LibraryHomeSetting> => {
+    const response = await axiosInstance.get<LibraryHomeSetting>('/ai/system/library-home');
+    return response as unknown as LibraryHomeSetting;
+  },
+  /** PUT /api/v1/ai/system/library-home */
+  set: async (percent: number, testers: string[]): Promise<LibraryHomeSetting> => {
+    const response = await axiosInstance.put<LibraryHomeSetting>('/ai/system/library-home', { percent, testers });
+    return response as unknown as LibraryHomeSetting;
+  },
+};
