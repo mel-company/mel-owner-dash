@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!--
+    Warid's mark at tab size. The W is drawn as a single stroked polyline
+    rather than set in a typeface: at 16px a letterform loses its counters and
+    turns to mud, whereas three strokes and a dot stay legible. Lime on
+    charcoal is the one pairing the brand allows — lime is 1.3:1 on white and
+    would vanish against a light tab strip.
+  -->
+  <rect width="32" height="32" rx="7" fill="#242424"/>
+  <path d="M7 11l3.2 10L13.4 11l3.2 10L19.8 11" fill="none" stroke="#EAFB5D"
+        stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24" cy="12" r="2.6" fill="#EAFB5D"/>
+</svg>
