@@ -22,9 +22,9 @@ const INFO: Record<ShopperOtpProviderId, { name: string; detail: string; logo: s
 const INPUT =
   'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-400';
 
-const configured = (row: Row) => Boolean(row.apiUrl.trim() && (row.apiKey.trim() || row.hasApiKey));
+const configured = (row: Row) => Boolean(row.channelId.trim() && (row.apiKey.trim() || row.hasApiKey));
 const toRows = (providers: ShopperOtpProvider[]): Row[] => providers.map((p) => ({ ...p, apiKey: '' }));
-const snapshot = (rows: Row[]) => JSON.stringify(rows.map(({ id, enabled, apiUrl, senderId, apiKey }) => [id, enabled, apiUrl, senderId, apiKey]));
+const snapshot = (rows: Row[]) => JSON.stringify(rows.map(({ id, enabled, channelId, apiKey }) => [id, enabled, channelId, apiKey]));
 
 const ShopperAccounts = () => {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -60,7 +60,7 @@ const ShopperAccounts = () => {
   const toggle = (row: Row) => {
     if (!row.enabled && INFO[row.id].fields && !configured(row)) {
       setOpen(row.id);
-      setError(`أدخل عنوان الربط والمفتاح لتشغيل ${INFO[row.id].name}.`);
+      setError(`أدخل مفتاح API ومعرّف القناة لتشغيل ${INFO[row.id].name}.`);
       return;
     }
     setError('');
@@ -112,7 +112,7 @@ const ShopperAccounts = () => {
           id: row.id,
           enabled: row.enabled,
           ...(INFO[row.id].fields
-            ? { apiUrl: row.apiUrl.trim(), senderId: row.senderId.trim(), ...(row.apiKey.trim() ? { apiKey: row.apiKey.trim() } : {}) }
+            ? { channelId: row.channelId.trim(), ...(row.apiKey.trim() ? { apiKey: row.apiKey.trim() } : {}) }
             : {}),
         })),
       );
@@ -213,26 +213,25 @@ const ShopperAccounts = () => {
 
                   {expanded && (
                     <div className="grid gap-3 border-t border-dashed border-slate-100 bg-slate-50/60 px-4 py-4 sm:grid-cols-2 sm:pr-[5.5rem]">
-                      <label className="block sm:col-span-2">
-                        <span className="mb-1 block text-xs font-bold text-slate-600">عنوان الربط</span>
-                        <input dir="ltr" className={cn(INPUT, 'text-left')} value={row.apiUrl} placeholder="https://" onChange={(e) => update(row.id, { apiUrl: e.target.value })} />
-                      </label>
                       <label className="block">
-                        <span className="mb-1 block text-xs font-bold text-slate-600">المفتاح</span>
+                        <span className="mb-1 block text-xs font-bold text-slate-600">مفتاح API</span>
                         <input
                           dir="ltr"
                           type="password"
                           autoComplete="new-password"
                           className={cn(INPUT, 'text-left')}
                           value={row.apiKey}
-                          placeholder={row.hasApiKey ? 'محفوظ' : ''}
+                          placeholder={row.hasApiKey ? 'محفوظ' : 'mik_…'}
                           onChange={(e) => update(row.id, { apiKey: e.target.value })}
                         />
                       </label>
                       <label className="block">
-                        <span className="mb-1 block text-xs font-bold text-slate-600">اسم المرسل</span>
-                        <input className={INPUT} value={row.senderId} placeholder="Mel" onChange={(e) => update(row.id, { senderId: e.target.value })} />
+                        <span className="mb-1 block text-xs font-bold text-slate-600">معرّف قناة واتساب</span>
+                        <input dir="ltr" className={cn(INPUT, 'text-left')} value={row.channelId} onChange={(e) => update(row.id, { channelId: e.target.value })} />
                       </label>
+                      <p className="text-xs font-semibold text-slate-500 sm:col-span-2">
+                        من لوحة وارد: المطورون ← مفاتيح API، وقالب «رموز الدخول» معتمد في القنوات ← القوالب.
+                      </p>
                     </div>
                   )}
                 </div>

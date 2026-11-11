@@ -11,8 +11,7 @@ export type ShopperOtpProviderId = 'warid' | 'otpiq';
 export type ShopperOtpProvider = {
   id: ShopperOtpProviderId;
   enabled: boolean;
-  apiUrl: string;
-  senderId: string;
+  channelId: string;
   hasApiKey: boolean;
   ready: boolean;
 };
@@ -20,8 +19,7 @@ export type ShopperOtpProvider = {
 export type ShopperOtpProviderPayload = {
   id: ShopperOtpProviderId;
   enabled: boolean;
-  apiUrl?: string;
-  senderId?: string;
+  channelId?: string;
   apiKey?: string;
 };
 
