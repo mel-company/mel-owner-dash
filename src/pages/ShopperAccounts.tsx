@@ -15,7 +15,7 @@ import { shopperService, type ShopperOtpProvider, type ShopperOtpProviderId } fr
 type Row = ShopperOtpProvider & { apiKey: string };
 
 const INFO: Record<ShopperOtpProviderId, { name: string; detail: string; logo: string; tile: string; fields: boolean }> = {
-  warid: { name: 'وارد', detail: 'رسالة واتساب', logo: '/providers/warid.svg', tile: '', fields: true },
+  warid: { name: 'وارد', detail: 'رسالة واتساب', logo: '/providers/warid.png', tile: 'bg-white p-2 ring-1 ring-slate-200', fields: true },
   otpiq: { name: 'OTPIQ', detail: 'واتساب، ثم رسالة نصية', logo: '/providers/otpiq.svg', tile: 'bg-white p-2 ring-1 ring-slate-200', fields: false },
 };
 
