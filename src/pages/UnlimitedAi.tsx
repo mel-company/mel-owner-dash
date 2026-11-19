@@ -15,6 +15,7 @@ import {
   StatusPill,
   TableShell,
 } from '@/components/dashboard';
+import TesterOtpCard from '../components/TesterOtpCard';
 import { unlimitedAiService, type UnlimitedAiPhone } from '../services/unlimitedAiService';
 
 /**
@@ -135,6 +136,8 @@ const UnlimitedAi = () => {
         icon={<InfinityIcon className="h-5 w-5" />}
         action={<PrimaryActionButton onClick={openCreate}>إضافة رقم</PrimaryActionButton>}
       />
+
+      <TesterOtpCard />
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
