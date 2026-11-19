@@ -15,7 +15,6 @@ import {
   StatusPill,
   TableShell,
 } from '@/components/dashboard';
-import TesterOtpCard from '../components/TesterOtpCard';
 import { unlimitedAiService, type UnlimitedAiPhone } from '../services/unlimitedAiService';
 
 /**
@@ -132,12 +131,10 @@ const UnlimitedAi = () => {
     <div className="page-shell space-y-6 bg-[#f8fafc] text-right" dir="rtl">
       <PageHeader
         title="الذكاء الاصطناعي غير المحدود"
-        description={`أرقام لا يُخصم منها رصيد الذكاء الاصطناعي، بحد يومي لإنشاء المتاجر (${DEFAULT_DAILY_LIMIT} افتراضياً). يبدأ اليوم من منتصف الليل بتوقيت بغداد.`}
+        description={`أرقام لا يُخصم منها رصيد الذكاء الاصطناعي، بحد يومي لإنشاء المتاجر (${DEFAULT_DAILY_LIMIT} افتراضياً). يبدأ اليوم من منتصف الليل بتوقيت بغداد. يمكن لهذه الأرقام الدخول بالرمز 1212 أو بالرمز المرسل.`}
         icon={<InfinityIcon className="h-5 w-5" />}
         action={<PrimaryActionButton onClick={openCreate}>إضافة رقم</PrimaryActionButton>}
       />
-
-      <TesterOtpCard />
 
       {error && <AlertMessage>{error}</AlertMessage>}
 
